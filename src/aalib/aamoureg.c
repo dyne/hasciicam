@@ -9,6 +9,9 @@ __AA_CONST struct aa_mousedriver * __AA_CONST aa_mousedrivers[] =
 #ifdef DJGPP
     &mouse_dos_d,
 #else
+#ifdef SDL_MOUSEDRIVER
+    &mouse_SDL_d,
+#endif
 #ifdef X11_MOUSEDRIVER
     &mouse_X11_d,
 #endif

@@ -8,6 +8,9 @@ __AA_CONST struct aa_driver * __AA_CONST aa_drivers[] =
 #ifdef DJGPP
     &dos_d,
 #else
+#ifdef SDL_DRIVER
+    &SDL_d,
+#endif
 #ifdef X11_DRIVER
     &X11_d,
 #endif

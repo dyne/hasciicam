@@ -12,6 +12,9 @@ __AA_CONST struct aa_kbddriver * __AA_CONST aa_kbddrivers[] =
 #ifdef DJGPP
     &kbd_dos_d,
 #else
+#ifdef SDL_KBDDRIVER
+    &kbd_SDL_d,
+#endif
 #ifdef X11_KBDDRIVER
     &kbd_X11_d,
 #endif
