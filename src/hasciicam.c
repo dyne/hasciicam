@@ -40,6 +40,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
+#include <grp.h>
 #include <signal.h>
 
 #include <linux/types.h>
@@ -162,7 +163,7 @@ struct aa_savedata ascii_save;
 
 char hascii_header[1024];
 
-char *html_escapes[] =
+const char * const html_escapes[] =
   { "<", "&lt;", ">", "&gt;", "&", "&amp;", NULL };
 
 struct aa_format hascii_format = {
@@ -672,8 +673,13 @@ main (int argc, char **argv) {
   /* aalib init */
   if (mode > 0)
     ascii_context = aa_init (&save_d, &ascii_hwparms, &ascii_save);
-  else
+  else {
+    aa_recommendhidisplay("curses");
+    aa_recommendhidisplay("slang");
+    aa_recommendhidisplay("linux");
+    aa_recommendhidisplay("stdout");
     ascii_context = aa_autoinit (&ascii_hwparms);
+  }
 
   if(!ascii_context) {
     fprintf(stderr,"!! cannot initialize aalib\n");
