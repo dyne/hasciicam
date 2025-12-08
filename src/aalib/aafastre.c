@@ -20,7 +20,8 @@ void aa_fastrender(aa_context * c, int x1, int y1, int x2, int y2)
     if (y1 < 0)
 	y1 = 0;
     if (c->table == NULL)
-	aa_mktable(c);
+        if (aa_mktable(c) == NULL)
+            return;
     for (y = y1; y < y2; y++) {
 	pos = 2 * y * wi;
 	pos1 = y * aa_scrwidth(c);

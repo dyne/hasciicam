@@ -17,9 +17,6 @@ __AA_CONST struct aa_driver * __AA_CONST aa_drivers[] =
 #ifdef LINUX_DRIVER
     &linux_d,
 #endif
-#ifdef SLANG_DRIVER
-    &slang_d,
-#endif
 #ifdef CURSES_DRIVER
     &curses_d,
 #endif
