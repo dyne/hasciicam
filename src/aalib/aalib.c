@@ -94,6 +94,8 @@ int aa_resize(aa_context * c)
 }
 aa_context *aa_init(__AA_CONST struct aa_driver * driver, __AA_CONST struct aa_hardware_params * defparams, __AA_CONST void *driverdata)
 {
+    
+    
     struct aa_context *c;
     c = calloc(1, sizeof(*c));
     c->driverdata=NULL;
@@ -102,8 +104,10 @@ aa_context *aa_init(__AA_CONST struct aa_driver * driver, __AA_CONST struct aa_h
     if (c == NULL) {
 	return NULL;
     }
-    if (!driver->init(defparams, driverdata,&c->driverparams,&c->driverdata)) {
+    int init_result = driver->init(defparams, driverdata,&c->driverparams,&c->driverdata);
+    if (!init_result) {
         free(c);
+	
 	return NULL;
     }
     c->driver = driver;
@@ -186,10 +190,12 @@ aa_context *aa_init(__AA_CONST struct aa_driver * driver, __AA_CONST struct aa_h
 	if(c->driverdata!=NULL) free(c->driverdata);
 	free(c);
 	printf("out of memory\n");
+	
 	return NULL;
     }
     if (!aa_validmode(aa_scrwidth(c), aa_scrheight(c), defparams)) {
 	aa_close(c);
+	
 	return 0;
     }
     return (c);

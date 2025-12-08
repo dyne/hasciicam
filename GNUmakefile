@@ -1,12 +1,18 @@
 PACKAGE := hasciicam
 VERSION ?= 2.0.0
 
+CC ?= gcc
+CFLAGS ?= -O0 -ggdb
+
+SDL_LIBS ?= $(shell sdl2-config --libs 2>/dev/null || echo "")
+
 all: src/hasciicam.o src/aalib/libaa.a
 	$(CC) -o hasciicam src/hasciicam.o \
-	src/aalib/libaa.a -L/usr/lib/x86_64-linux-gnu/ -lSDL2 -lSDL2_ttf -lm
+	-Wl,--whole-archive src/aalib/libaa.a -Wl,--no-whole-archive \
+	-L/usr/lib/x86_64-linux-gnu/ -lm $(SDL_LIBS) -lX11 -lncurses
 
 src/aalib/libaa.a:
-	CC=$(CC) CFLAGS="$(CFLAGS) -DSDL_DRIVER" $(MAKE) -C src/aalib
+	CC=$(CC) CFLAGS="$(CFLAGS)" $(MAKE) -C src/aalib
 
 clean:
 	rm -f hasciicam src/hasciicam.o
