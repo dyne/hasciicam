@@ -215,7 +215,8 @@ int aw, ah; // ascii w and h
 size_t greysize;
 int vbytesperline;
 
-
+/* Function declarations */
+void YUV422_to_grey_scaled(unsigned char *src, unsigned char *dst, int src_w, int src_h, int dst_w, int dst_h);
 
 void YUV422_to_grey(unsigned char *src, unsigned char *dst, int w, int h) {
     unsigned char *writehead, *readhead;
@@ -228,6 +229,38 @@ void YUV422_to_grey(unsigned char *src, unsigned char *dst, int w, int h) {
             readhead += xbytestep;
         }
         readhead += ybytestep;
+    }
+}
+
+/* New function to scale YUV422 to grey at target dimensions */
+void YUV422_to_grey_scaled(unsigned char *src, unsigned char *dst, int src_w, int src_h, int dst_w, int dst_h) {
+    unsigned char *writehead = dst;
+    unsigned char *readhead = src;
+
+    /* Calculate scaling factors */
+    float x_scale = (float)src_w / (float)dst_w;
+    float y_scale = (float)src_h / (float)dst_h;
+
+    int xstep_bytes = (int)(x_scale * 2); /* YUV422 has 2 bytes per pixel */
+    int ystep_lines = (int)(y_scale);
+
+    if (xstep_bytes < 2) xstep_bytes = 2;
+    if (ystep_lines < 1) ystep_lines = 1;
+
+    int y_stride = src_w * 2; /* YUV422: 2 bytes per pixel */
+
+    for(int y = 0; y < dst_h; ++y) {
+        /* Calculate source row */
+        int src_y = (int)(y * y_scale);
+        unsigned char *row_ptr = src + src_y * y_stride;
+
+        for(int x = 0; x < dst_w; ++x) {
+            /* Calculate source column */
+            int src_x = (int)(x * x_scale);
+            /* In YUV422, we want the Y component, which is at even byte positions */
+            int src_byte = src_x * 2;
+            *(writehead++) = row_ptr[src_byte];
+        }
     }
 }
 
@@ -324,6 +357,12 @@ int vid_init() {
     vw = format.fmt.pix.width;
     vh = format.fmt.pix.height;
     vbytesperline = format.fmt.pix.bytesperline;
+
+    // Initialize vid_geo with the actual video dimensions
+    vid_geo.w = vw;
+    vid_geo.h = vh;
+    vid_geo.size = vw * vh;
+
     xbytestep = xstep + xstep; // for YUV422. for other formats may differ
     ybytestep = vbytesperline * (ystep-1);
     // we shrink our pixels crudely, by hopping over them:
@@ -332,12 +371,12 @@ int vid_init() {
     // aalib converts every block of 4 pixels to one character, so our sizes shrink by 2:
     aw = gw / 2;
     ah = gh / 2;
-    
+
     greysize = gw * gh;
     grey = malloc(greysize); // To get grey from YUYV we simply ignore the U and V bytes
     printf("Grey buffer is %i bytes\n", greysize);
     for (j=0; j< 256; ++j)
-        YtoRGB[j] = 1.164*(j-256);    
+        YtoRGB[j] = 1.164*(j-256);
 
     memset (&reqbuf, 0, sizeof (reqbuf));
     reqbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -423,11 +462,21 @@ void grab_one () {
     
     if((++framenum) == renderhop){
         framenum=0;
-        YUV422_to_grey(buffers[buffer.index].start, grey, vw, vh);
-        
-        memcpy( aa_image(ascii_context), grey, greysize);
-        aa_fastrender(ascii_context, 0, 0, vw/(xstep*2), vh/(ystep*2)); //TODO are the w&h args correct?
-//		aa_render(ascii_context, ascii_rndparms, 0, 0, vw/(xstep*2), vh/(ystep*2)); //TODO are the w&h args correct?
+        /* Get the ASCII context dimensions */
+        int ascii_width = aa_imgwidth(ascii_context);
+        int ascii_height = aa_imgheight(ascii_context);
+
+        /* Convert YUV to grey, scaling to match ASCII context size */
+        YUV422_to_grey_scaled(buffers[buffer.index].start, grey, vw, vh, ascii_width, ascii_height);
+
+        /* Copy grey data to ASCII context image buffer */
+        int grey_size = ascii_width * ascii_height;
+        int dest_size = aa_imgwidth(ascii_context) * aa_imgheight(ascii_context);
+        int copy_size = (grey_size < dest_size) ? grey_size : dest_size;
+        if (copy_size > 0) {
+            memcpy(aa_image(ascii_context), grey, copy_size);
+            aa_fastrender(ascii_context, 0, 0, ascii_width/2, ascii_height/2);
+        }
         aa_flush(ascii_context);
     }
     
@@ -743,14 +792,14 @@ main (int argc, char **argv) {
 
 
   while (userbreak <1) {
-    grab_one ();	
+    grab_one ();
 	/*aa_setpalette (gamma di colori, indice, colore rosso, verde, blu)*/
-	
+
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-    memcpy (aa_image (ascii_context), grey, vid_geo.size);
-    aa_render (ascii_context, ascii_rndparms, 0, 0, 
-	       vid_geo.w,vid_geo.h);
-	
+//    memcpy (aa_image (ascii_context), grey, vid_geo.size);
+//    aa_render (ascii_context, ascii_rndparms, 0, 0,
+//	       vid_geo.w,vid_geo.h);
+
     aa_flush (ascii_context);
   //  unlink(aafile);
     rename(aatmpfile,aafile);

@@ -58,7 +58,8 @@ void aa_renderpalette(aa_context * c, __AA_CONST aa_palette palette, __AA_CONST 
     if (y1 < 0)
 	y1 = 0;
     if (c->table == NULL)
-	aa_mktable(c);
+        if (aa_mktable(c) == NULL)
+            return;
     if (dither == AA_FLOYD_S) {
 	errors[0] = calloc(1, (x2 + 5) * sizeof(int));
 	if (errors[0] == NULL)
@@ -92,6 +93,12 @@ void aa_renderpalette(aa_context * c, __AA_CONST aa_palette palette, __AA_CONST 
     gamma = 0;
     if (randomval)
 	gamma = randomval / 2;
+
+    /* Prevent crash if filltable is not initialized or indices are invalid */
+    if (c->filltable == NULL) {
+        return;
+    }
+
     mval = (c->parameters[c->filltable[255]].p[4]);
     for (y = y1; y < y2; y++) {
 	pos = 2 * y * wi;
@@ -227,6 +234,12 @@ void aa_render(aa_context * c, __AA_CONST aa_renderparams * p, int x1, int y1, i
 {
     int i;
     static aa_palette table;
+
+    /* Validate dimensions to prevent crashes */
+    if (x2 <= x1 || y2 <= y1) {
+        return;
+    }
+
     if (table[255] != 255)
 	for (i = 0; i < 256; i++) {
 	    table[i] = i;

@@ -173,8 +173,6 @@ aa_context *aa_init(__AA_CONST struct aa_driver * driver, __AA_CONST struct aa_h
 	c->params.height = defparams->maxheight;
     if (c->driverparams.maxheight && c->driverparams.maxheight > c->params.height)
 	c->params.height = c->driverparams.maxheight;
-    c->params.width *= -1;
-    c->params.height *= -1;
     c->params.dimmul = 5.3;
     c->params.boldmul = 2.7;
     if(c->driverparams.dimmul) c->params.dimmul=c->driverparams.dimmul;

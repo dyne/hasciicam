@@ -1,5 +1,7 @@
 // #include "config.h"
 #include <stdio.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 #include "aalib.h"
 #include "aaint.h"
 
@@ -14,6 +16,16 @@ static void stdout_uninit(aa_context * c)
 }
 static void stdout_getsize(aa_context * c, int *width, int *height)
 {
+    // Try to get terminal size using ioctl
+    struct winsize ws;
+    if (ioctl(1, TIOCGWINSZ, &ws) == 0) {
+        *width = ws.ws_col > 0 ? ws.ws_col : 80;
+        *height = ws.ws_row > 0 ? ws.ws_row : 25;
+    } else {
+        // Fallback to default size
+        *width = 80;
+        *height = 25;
+    }
 }
 
 static void stdout_flush(aa_context * c)

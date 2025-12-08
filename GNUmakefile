@@ -3,13 +3,14 @@ VERSION ?= 2.0.0
 
 CC ?= gcc
 CFLAGS ?= -O0 -ggdb
+LDFLAGS ?=
 
-SDL_LIBS ?= $(shell sdl2-config --libs 2>/dev/null || echo "")
+SDL_LIBS ?= $(shell sdl2-config --libs 2>/dev/null || echo "-lSDL2")
 
 all: src/hasciicam.o src/aalib/libaa.a
 	$(CC) -o hasciicam src/hasciicam.o \
 	-Wl,--whole-archive src/aalib/libaa.a -Wl,--no-whole-archive \
-	-L/usr/lib/x86_64-linux-gnu/ -lm $(SDL_LIBS) -lX11 -lncurses
+	-L/usr/lib/x86_64-linux-gnu/ -lm $(SDL_LIBS) -lX11 -lncurses $(LDFLAGS)
 
 src/aalib/libaa.a:
 	CC=$(CC) CFLAGS="$(CFLAGS)" $(MAKE) -C src/aalib

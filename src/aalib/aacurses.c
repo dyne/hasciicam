@@ -77,8 +77,8 @@ static void curses_getsize(aa_context * c, int *width, int *height)
 {
     if (__resized_curses)
 	curses_uninit(c), curses_init(&c->params, NULL,&c->driverparams, NULL), __resized_curses = 0;
-    *width = stdscr->_maxx + 1;
-    *height = stdscr->_maxy + 1;
+    *width = getmaxx(stdscr);
+    *height = getmaxy(stdscr);
 #ifdef GPM_MOUSEDRIVER
     gpm_mx = *width;
     gpm_my = *height;
