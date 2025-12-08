@@ -35,9 +35,34 @@ unsigned short *aa_mktable(aa_context * c)
     unsigned short *filltable;
     static struct parameters *parameters;
     next = (unsigned short *) malloc(sizeof(*next) * TABLESIZE);
+    if (next == NULL) {
+        fprintf(stderr, "Failed to allocate memory for next table\n");
+        return NULL;
+    }
+
     parameters = (struct parameters *) calloc(1, sizeof(struct parameters) * (NCHARS + 1));
+    if (parameters == NULL) {
+        fprintf(stderr, "Failed to allocate memory for parameters\n");
+        free(next);
+        return NULL;
+    }
+
     table = (unsigned short *) calloc(1, TABLESIZE * sizeof(*table));
+    if (table == NULL) {
+        fprintf(stderr, "Failed to allocate memory for table\n");
+        free(next);
+        free(parameters);
+        return NULL;
+    }
+
     filltable = (unsigned short *) calloc(1, 256 * sizeof(*filltable));
+    if (filltable == NULL) {
+        fprintf(stderr, "Failed to allocate memory for filltable\n");
+        free(next);
+        free(parameters);
+        free(table);
+        return NULL;
+    }
     first = -1;
     last = -1;
     for (i = 0; i < TABLESIZE; i++)

@@ -14,41 +14,50 @@ static void SDL_flush(aa_context *c);
 
 static void SDL_render_char(struct sdldriverdata *d, unsigned char ch, int x, int y, int fg_color, int bg_color)
 {
-    if (!d || !d->renderer)
+    if (!d || !d->renderer) {
+        fprintf(stderr, "SDL_render_char: d or renderer is NULL\n");
         return;
-    
+    }
+
+    // Debug print
+    // fprintf(stderr, "SDL_render_char: ch=%d, x=%d, y=%d\n", ch, x, y);
+
     SDL_Rect dst = {
         x * d->char_width,
         y * d->char_height,
         d->char_width,
         d->char_height
     };
-    
+
     /* Draw background */
     if (bg_color != d->black_color) {
-        SDL_SetRenderDrawColor(d->renderer, 
+        SDL_SetRenderDrawColor(d->renderer,
             (bg_color >> 16) & 0xFF,
             (bg_color >> 8) & 0xFF,
             bg_color & 0xFF, 255);
         SDL_RenderFillRect(d->renderer, &dst);
     }
-    
+
     /* Draw character using font bitmap directly - pixel by pixel */
-    if (d->font && ch < 256) {
+    if (d->font && d->font->data && ch < 256) {
         const unsigned char *font_data = d->font->data;
         int font_height = d->font->height < d->char_height ? d->font->height : d->char_height;
-        
+
         SDL_SetRenderDrawColor(d->renderer,
             (fg_color >> 16) & 0xFF,
             (fg_color >> 8) & 0xFF,
             fg_color & 0xFF, 255);
-        
+
         for (int py = 0; py < font_height; py++) {
-            unsigned char byte = font_data[ch * d->font->height + py];
-            for (int px = 0; px < 8 && px < d->char_width; px++) {
-                if (byte & (0x80 >> px)) {
-                    SDL_Rect pixel = { dst.x + px, dst.y + py, 1, 1 };
-                    SDL_RenderFillRect(d->renderer, &pixel);
+            // Check bounds before accessing font_data
+            int index = ch * d->font->height + py;
+            if (index >= 0 && index < (256 * d->font->height)) {
+                unsigned char byte = font_data[index];
+                for (int px = 0; px < 8 && px < d->char_width; px++) {
+                    if (byte & (0x80 >> px)) {
+                        SDL_Rect pixel = { dst.x + px, dst.y + py, 1, 1 };
+                        SDL_RenderFillRect(d->renderer, &pixel);
+                    }
                 }
             }
         }
@@ -264,16 +273,20 @@ static void SDL_getsize(aa_context *c, int *width, int *height)
 {
     struct sdldriverdata *d = c->driverdata;
     int win_width, win_height;
-    
+
     SDL_GetWindowSize(d->window, &win_width, &win_height);
-    
+
     int new_width = win_width / d->char_width;
     int new_height = win_height / d->char_height;
-    
+
+    // Ensure minimum size of 1x1
+    if (new_width < 1) new_width = 1;
+    if (new_height < 1) new_height = 1;
+
     if (new_width != d->width || new_height != d->height) {
         d->width = new_width;
         d->height = new_height;
-        
+
         if (d->previoust) {
             free(d->previoust);
             free(d->previousa);
@@ -281,7 +294,7 @@ static void SDL_getsize(aa_context *c, int *width, int *height)
             d->previousa = NULL;
         }
     }
-    
+
     *width = d->width;
     *height = d->height;
 }
