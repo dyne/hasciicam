@@ -73,6 +73,7 @@ char *help =
 " -i --input        input channel number      - default 1\n"
 " -s --size         ascii image size WxH      - webcam's smallest default\n"
 " -o --aafile       dumped file               - default hasciicam.[txt|html]\n"
+" -O --aadriver     aalib driver: SDL|X11|curses|slang - default auto\n"
 " -D --daemon       run in background         - default foregrond\n"
 " -U --uid          setuid (int)              - default current\n"
 " -G --gid          setgid (int)              - default current\n"
@@ -97,6 +98,7 @@ const struct option long_options[] = {
   {"input", required_argument, NULL, 'i'},
   {"size", required_argument, NULL, 's'},
   {"aafile", required_argument, NULL, 'o'},
+  {"aadriver", required_argument, NULL, 'O'},
   {"daemon", no_argument, NULL, 'D'},
   {"font-size", required_argument, NULL, 'S'},
   {"font-face", required_argument, NULL, 'a'},
@@ -138,6 +140,7 @@ int linespace = 5;
 char background[64];
 char foreground[64];
 char fontface[256];
+char aadriver[64];
 
 int user_w = 0;
 int user_h = 0;
@@ -455,6 +458,7 @@ config_init (int argc, char *argv[]) {
   strcpy(background,"000000");
   strcpy(foreground,"00FF00");
   strcpy(fontface,"courier"); /* you'd better choose monospace fonts */
+  strcpy(aadriver,""); /* empty means auto-detect */
 
   aa_geo.w = 80; // 96;
   aa_geo.h = 40; // 72;
@@ -546,6 +550,9 @@ config_init (int argc, char *argv[]) {
       if(mode>0)
 	strncpy(aafile,optarg,256);
       break;
+    case 'O':
+      strncpy(aadriver,optarg,64);
+      break;
     case 'D':
       daemon_mode = 1;
       break;
@@ -616,8 +623,11 @@ main (int argc, char **argv) {
 
   /* width/height image setup */
   ascii_hwparms.font = NULL; // default font, thanks
-  ascii_hwparms.width = aw;
-  ascii_hwparms.height = ah;
+  /* Use recommended dimensions instead of exact for flexibility with DPI scaling */
+  ascii_hwparms.width = 0;
+  ascii_hwparms.height = 0;
+  ascii_hwparms.recwidth = aw;
+  ascii_hwparms.recheight = ah;
 
 
   /* init the html header */
@@ -671,19 +681,44 @@ main (int argc, char **argv) {
   fprintf(stderr,"\n");
 
   /* aalib init */
-  if (mode > 0)
+  if (mode > 0) {
+    fprintf(stderr,"Using save mode with file output\n");
     ascii_context = aa_init (&save_d, &ascii_hwparms, &ascii_save);
-  else {
-    aa_recommendhidisplay("curses");
-    aa_recommendhidisplay("slang");
-    aa_recommendhidisplay("linux");
-    aa_recommendhidisplay("stdout");
+  } else {
+    /* set driver preferences */
+    if(strlen(aadriver) > 0) {
+      /* user specified a driver */
+      if(!quiet)
+        fprintf(stderr,"Driver preference: %s\n", aadriver);
+      aa_recommendhidisplay(aadriver);
+    } else {
+      /* default: prefer SDL, then X11, then text-based */
+      if(!quiet)
+        fprintf(stderr,"Auto-detecting display driver (SDL preferred)\n");
+      aa_recommendhidisplay("SDL");
+      aa_recommendhidisplay("X11");
+      aa_recommendhidisplay("curses");
+      aa_recommendhidisplay("slang");
+      aa_recommendhidisplay("linux");
+      aa_recommendhidisplay("stdout");
+    }
     ascii_context = aa_autoinit (&ascii_hwparms);
   }
 
   if(!ascii_context) {
     fprintf(stderr,"!! cannot initialize aalib\n");
+    if(strlen(aadriver) > 0) {
+      fprintf(stderr,"!! failed to initialize '%s' driver\n", aadriver);
+      fprintf(stderr,"!! try: -O curses for terminal mode\n");
+    }
     exit(-1);
+  }
+
+  /* report which driver was actually initialized */
+  if(!quiet && ascii_context->driver) {
+    fprintf(stderr,"Using driver: %s (%s)\n", 
+            ascii_context->driver->shortname,
+            ascii_context->driver->name);
   }
 
 
