@@ -8,6 +8,9 @@ __AA_CONST struct aa_driver * __AA_CONST aa_drivers[] =
 #ifdef DJGPP
     &dos_d,
 #else
+#ifdef SDL_DRIVER
+    &SDL_d,
+#endif
 #ifdef X11_DRIVER
     &X11_d,
 #endif
@@ -38,18 +41,26 @@ aa_context *aa_autoinit(__AA_CONST struct aa_hardware_params *params)
 	    for (i = 0; aa_drivers[i] != NULL; i++) {
 		if (!strcmp(t, aa_drivers[i]->name) || !strcmp(t, aa_drivers[i]->shortname)) {
 		    context = aa_init(aa_drivers[i], params, NULL);
+		    if (context != NULL) {
+			free(t);
+			/* Clear remaining recommendations */
+			while ((t = aa_getfirst(&aa_displayrecommended)) != NULL)
+			    free(t);
+			return context;
+		    }
 		    break;
 		}
 	    }
 	    if (aa_drivers[i] == NULL)
 		printf("Driver %s unknown", t);
-	    free(t);
 	}
+	free(t);
     }
     i = 0;
     while (context == NULL) {
-	if (aa_drivers[i] == NULL)
+	if (aa_drivers[i] == NULL) {
 	    return NULL;
+	}
 	context = aa_init(aa_drivers[i], params, NULL);
 	i++;
     }

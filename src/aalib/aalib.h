@@ -339,7 +339,7 @@ extern __AA_CONST char * __AA_CONST aa_dithernames[];
  */
 extern __AA_CONST struct aa_driver * __AA_CONST aa_drivers[];
 extern __AA_CONST struct aa_driver curses_d, dos_d, linux_d, slang_d, stdout_d,
-				   stderr_d, X11_d, os2vio_d;
+				   stderr_d, X11_d, os2vio_d, SDL_d;
 
 /*
  * NULL-terminated array of keyboard drivers available in AA_lib.
