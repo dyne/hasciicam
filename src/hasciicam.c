@@ -35,16 +35,18 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <sys/time.h>
+#include <signal.h>
+
+#if defined(__linux__)
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
 #include <grp.h>
-#include <signal.h>
-
 #include <linux/types.h>
 #include <linux/videodev2.h>
+#endif
 
 #include <aalib.h>
 
