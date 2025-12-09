@@ -34,6 +34,13 @@ jobs:
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v5
+      - name: vcpkg build
+        uses: johnwason/vcpkg-action@v7
+        id: vcpkg
+        with:
+          pkgs: sdl2
+          triplet: x64-windows-release
+          token: ${{ github.token }}
       - name: Build native windows exe for x86_64
         run: |
           mkdir build && cd build && cmake .. -G Ninja && ninja
