@@ -18,7 +18,7 @@ jobs:
     name: 🐧 Linux test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@latest
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Cache APT packages
@@ -33,7 +33,7 @@ jobs:
     name: 🪟 Windows native test
     runs-on: "windows-latest"
     steps:
-      - uses: actions/checkout@latest
+      - uses: actions/checkout@v5
       - name: Build native windows exe for x86_64
         run: |
           mkdir build && cd build && cmake .. -G Ninja && ninja
@@ -42,7 +42,7 @@ jobs:
     name: 🍎 OSX native test
     runs-on: "macos-latest"
     steps:
-      - uses: actions/checkout@latest
+      - uses: actions/checkout@v5
       - name: Build native Apple/OSX command executable
         run: |
           mkdir build && cd build && cmake .. -G Ninja && ninja
