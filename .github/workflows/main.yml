@@ -1,0 +1,48 @@
+name: hasciicam
+on:
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+    branches:
+      - master
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+    branches:
+      - master
+
+jobs:
+  linux-test:
+    name: 🐧 Linux test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@latest
+        with:
+          fetch-depth: 0
+      - name: Cache APT packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: "gcc cmake ninja-build meson libsdl2-dev libx11-dev libncurses-dev"
+      - name: Build
+        run: |
+          mkdir build && cd build && cmake .. -G Ninja && ninja
+
+  win-test:
+    name: 🪟 Windows native test
+    runs-on: "windows-latest"
+    steps:
+      - uses: actions/checkout@latest
+      - name: Build native windows exe for x86_64
+        run: |
+          mkdir build && cd build && cmake .. -G Ninja && ninja
+
+  osx-test:
+    name: 🍎 OSX native test
+    runs-on: "macos-latest"
+    steps:
+      - uses: actions/checkout@latest
+      - name: Build native Apple/OSX command executable
+        run: |
+          mkdir build && cd build && cmake .. -G Ninja && ninja
