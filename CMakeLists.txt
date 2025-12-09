@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.10)
-project(hasciicam VERSION 1.3 LANGUAGES C)
+cmake_minimum_required(VERSION 3.12)
+project(hasciicam VERSION 2.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -7,34 +7,24 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Options
 option(ENABLE_ASAN "Enable AddressSanitizer for debugging" OFF)
 
-# Find required libraries
-find_package(PkgConfig REQUIRED)
-
-# Check for SDL2
-pkg_check_modules(SDL2 sdl2)
-if(SDL2_FOUND)
-    message(STATUS "Found SDL2: ${SDL2_VERSION}")
-    add_compile_definitions(SDL_DRIVER)
-else()
-    message(WARNING "SDL2 not found - SDL driver will not be available")
+find_package(SDL2)
+if(TARGET SDL2::SDL2)
+  message(STATUS "Found SDL2: ${SDL2_VERSION}")
+  add_compile_definitions(SDL_DRIVER)
 endif()
 
-# Check for X11
-find_package(X11)
-if(X11_FOUND)
+if(UNIX AND NOT APPLE)
+  find_package(X11)
+  if(X11_FOUND)
     message(STATUS "Found X11")
     add_compile_definitions(X11_DRIVER)
-else()
-    message(WARNING "X11 not found - X11 driver will not be available")
+  endif()
 endif()
 
-# Check for Curses
 find_package(Curses)
-if(CURSES_FOUND)
+if(Curses_FOUND)
     message(STATUS "Found Curses")
     add_compile_definitions(CURSES_DRIVER)
-else()
-    message(WARNING "Curses not found - Curses driver will not be available")
 endif()
 
 # ASAN flags
@@ -99,7 +89,7 @@ set(AALIB_SOURCES
 )
 
 # Conditionally add SDL driver
-if(SDL2_FOUND)
+if(TARGET SDL2::SDL2)
     list(APPEND AALIB_SOURCES src/aalib/aasdl.c)
 endif()
 
@@ -117,19 +107,16 @@ add_library(aalib STATIC ${AALIB_SOURCES})
 target_include_directories(aalib PUBLIC src/aalib)
 
 # Link libraries to aalib
-if(SDL2_FOUND)
+if(TARGET SDL2::SDL2)
     target_include_directories(aalib PRIVATE ${SDL2_INCLUDE_DIRS})
-    target_link_libraries(aalib PRIVATE ${SDL2_LIBRARIES})
 endif()
 
 if(X11_FOUND)
     target_include_directories(aalib PRIVATE ${X11_INCLUDE_DIR})
-    target_link_libraries(aalib PRIVATE ${X11_LIBRARIES})
 endif()
 
 if(CURSES_FOUND)
     target_include_directories(aalib PRIVATE ${CURSES_INCLUDE_DIR})
-    target_link_libraries(aalib PRIVATE ${CURSES_LIBRARIES})
 endif()
 
 # Main executable
@@ -143,15 +130,20 @@ target_link_libraries(hasciicam PRIVATE aalib)
 # Additional system libraries that may be needed
 target_link_libraries(hasciicam PRIVATE m)
 
+# Link optional libraries to hasciicam
+if(TARGET SDL2::SDL2)
+  target_link_libraries(hasciicam PRIVATE SDL2::SDL2 SDL2::SDL2main)
+endif()
+
+if(X11_FOUND)
+  target_link_libraries(hasciicam PRIVATE X11::X11)
+endif()
+
+if(Curses_FOUND)
+  target_link_libraries(hasciicam PRIVATE ${CURSES_LIBRARIES})
+  target_include_directories(hasciicam PRIVATE ${CURSES_INCLUDE_DIRS})
+endif()
+
 # Install targets
 install(TARGETS hasciicam DESTINATION bin)
 install(FILES doc/hasciicam.1 DESTINATION share/man/man1 OPTIONAL)
-
-# Print configuration summary
-message(STATUS "")
-message(STATUS "Configuration Summary:")
-message(STATUS "  SDL2 support:    ${SDL2_FOUND}")
-message(STATUS "  X11 support:     ${X11_FOUND}")
-message(STATUS "  Curses support:  ${CURSES_FOUND}")
-message(STATUS "  ASAN enabled:    ${ENABLE_ASAN}")
-message(STATUS "")
