@@ -1,0 +1,221 @@
+#+TITLE: Windows Video Capture
+#+SUBTITLE: Add Media Foundation capture with DirectShow fallback while preserving AA-lib rendering input
+#+DATE: 2026-05-25
+#+KEYWORDS: hasciicam windows media-foundation directshow capture aalib yuy2 yuyv
+
+* WIP [#A] Establish a cross-platform capture port
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Replace direct calls from the main loop to V4L2-specific globals with a small C capture interface that can support Linux V4L2, Windows Media Foundation, and Windows DirectShow without changing AA-lib.
+:Notes: Keep this minimal. The current application already has a tiny implicit interface: detect, init, grab one frame, cleanup. Make that explicit first, then move platform code behind it. Do not introduce a framework or object system.
+:END:
+
+** DONE [#A] Define the capture data contract
+:PROPERTIES:
+:Why: Windows backends may produce YUY2, NV12, RGB24, RGB32, or MJPEG depending on camera and API. AA-lib must still receive the same grayscale image buffer it currently receives after Linux V4L2 YUYV conversion.
+:Change: Add a small capture header, for example `src/capture/capture.h`, with plain C structs: requested device/input/size, actual width/height/stride, pixel format enum, frame pointer/size, and a backend vtable or simple function set. Include formats needed now: `CAPTURE_PIXFMT_YUYV`, `CAPTURE_PIXFMT_YUY2`, `CAPTURE_PIXFMT_NV12`, `CAPTURE_PIXFMT_RGB24`, `CAPTURE_PIXFMT_BGR24`, `CAPTURE_PIXFMT_RGB32`, `CAPTURE_PIXFMT_BGRA32`, and `CAPTURE_PIXFMT_GRAY8`. Treat YUYV and YUY2 as the same byte layout for luma extraction.
+:Tests: Compile on Windows and Linux after introducing the header. Add a small conversion test target only if the repo already has a test pattern by then; otherwise keep this as compile-only for this L2.
+:Done when: The capture interface compiles on Windows and Linux and describes enough metadata for the existing render loop to consume frames without knowing which API produced them.
+:END:
+
+** WIP [#A] Move Linux V4L2 into a Linux adapter
+:PROPERTIES:
+:Why: `src/hasciicam.c` currently owns V4L2 types, mmap buffers, ioctls, and frame dequeue/requeue. That blocks clean Windows support and makes every platform change touch the main loop.
+:Change: Move `vid_detect()`, `vid_init()`, V4L2 globals, `VIDIOC_*` calls, mmap buffer ownership, and V4L2 cleanup into `src/capture/capture_v4l2.c`. Keep function names close to the current language but expose them through the new capture port. Preserve the current YUYV request via `V4L2_PIX_FMT_YUYV`.
+:Tests: Build on Windows to prove V4L2 is excluded. Build on Linux or WSL with Linux headers if available to prove V4L2 still compiles. If no Linux camera is available, document that only compile verification was possible.
+:Done when: `src/hasciicam.c` no longer includes Linux video headers or owns V4L2 buffers, and Linux behavior is intended to remain unchanged.
+:END:
+
+** TODO [#A] Make the main loop backend-neutral
+:PROPERTIES:
+:Why: The render loop should only pull a frame, convert luminance, copy to `aa_image()`, render, flush, and release the frame. It should not know about V4L2, Media Foundation, or DirectShow.
+:Change: Replace direct calls to `vid_detect()`, `vid_init()`, `grab_one()`, and platform cleanup with capture-port calls such as `capture_open()`, `capture_start()`, `capture_read()`, `capture_release()`, `capture_stop()`, and `capture_close()`. Keep the old command-line options mapped into the capture request.
+:Tests: Build on Windows. Run `hasciicam.exe -h` and `hasciicam.exe -H`. On Linux, build and smoke-test live/text/html modes if a camera is available.
+:Done when: `src/hasciicam.c` contains no platform capture branches except choosing a backend at startup, and AA-lib setup/rendering remains untouched.
+:END:
+
+* TODO [#A] Normalize camera frames to AA-lib-compatible luminance
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Ensure every capture backend feeds the same grayscale buffer semantics that the V4L2 YUYV path feeds to AA-lib today.
+:Notes: AA-lib does not get YUYV directly. It gets an image buffer filled with luma/grayscale bytes. Preserve that contract. Prefer direct luma extraction over RGB conversion whenever the source format has a Y plane or interleaved Y values.
+:END:
+
+** TODO [#A] Extract conversion into a small module
+:PROPERTIES:
+:Why: Conversion is currently inside `src/hasciicam.c`, tied to YUV422 and AA context dimensions. Windows needs format-specific conversion without changing AA-lib.
+:Change: Move `YUV422_to_grey_scaled()` into `src/capture/frame_convert.c` with a header such as `src/capture/frame_convert.h`. Add a single entry point like `capture_frame_to_gray_scaled(frame, dst, dst_w, dst_h)`. Keep the existing nearest-neighbor scaling behavior first.
+:Tests: Build on Windows and Linux. Add tiny deterministic conversion checks if practical: one YUY2 sample should copy Y bytes, one BGRA/RGB sample should produce expected luma using standard integer coefficients.
+:Done when: The render loop calls one converter function and no longer contains pixel-format-specific code.
+:END:
+
+** TODO [#A] Support Windows camera formats without touching AA-lib
+:PROPERTIES:
+:Why: Media Foundation cameras commonly offer NV12, YUY2, RGB32, and sometimes MJPEG. DirectShow often exposes YUY2, RGB24, RGB32, or MJPEG. We need a predictable internal path.
+:Change: Implement converters in this priority order: `GRAY8` copy/scale, `YUYV/YUY2` luma extraction/scale, `NV12` Y-plane extraction/scale, `BGR24/RGB24` luma conversion/scale, `BGRA32/RGB32` luma conversion/scale. Defer MJPEG unless no uncompressed format is available; prefer asking the API for uncompressed output first.
+:Tests: Add deterministic converter tests or a small debug-only sample harness. Build with MSVC. Verify `-h` and `-H` still work. When Windows camera capture is available, confirm a frame reaches `aa_image()` as grayscale bytes.
+:Done when: Any supported Windows backend can return one of the normalized formats and AA-lib still receives the same grayscale image buffer shape as the V4L2 path.
+:END:
+
+** TODO [#B] Preserve existing ASCII sizing behavior
+:PROPERTIES:
+:Why: The current code computes video dimensions, intermediate grayscale dimensions, and ASCII dimensions before initializing AA-lib. Windows camera APIs may choose a different actual size from the request.
+:Change: After opening a backend, use the actual camera width and height to compute the recommended AA-lib size. Keep `-s WxH` as a requested camera size, not a guaranteed size. Log the actual selected format and dimensions.
+:Tests: Run with no `-s`, with a supported `-s`, and with an unsupported `-s` on Windows. Confirm the program reports actual dimensions and still initializes AA-lib.
+:Done when: The selected Windows camera format drives AA-lib dimensions the same way V4L2 actual format currently does.
+:END:
+
+* TODO [#A] Implement Windows Media Foundation capture first
+:PROPERTIES:
+:Effort: 2 days
+:Goal: Add the new Windows capture backend using Media Foundation as the preferred API.
+:Notes: Keep Media Foundation details out of `src/hasciicam.c`. Use C-callable functions in a C file if possible. If COM helper code becomes too painful in pure C, isolate any C++/COM boundary in one adapter file and expose only C functions to the rest of the program.
+:END:
+
+** TODO [#A] Add CMake support for Windows system media libraries
+:PROPERTIES:
+:Why: Media Foundation requires Windows SDK libraries and headers, not vcpkg packages.
+:Change: In CMake, when `WIN32`, compile `src/capture/capture_mf.c` and link only the required Windows libraries, likely `mfplat`, `mf`, `mfreadwrite`, `mfuuid`, `ole32`, and `uuid`. Keep this conditional and do not affect Linux/macOS builds.
+:Tests: Configure and build with MSVC x64 from the Visual Studio developer environment.
+:Done when: An empty/stub Media Foundation adapter links successfully on Windows.
+:END:
+
+** TODO [#A] Enumerate and select a camera source
+:PROPERTIES:
+:Why: HasciiCam currently accepts `-d` as a device path. Windows cameras are usually selected by symbolic link or friendly name, not `/dev/video0`.
+:Change: In the Media Foundation adapter, enumerate `MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID` devices. Interpret `-d` as either friendly-name substring or symbolic-link exact match. If no `-d` is provided, select the first usable video capture device.
+:Tests: Add verbose logging of friendly name, symbolic link, and selected source. Run on Windows with and without `-d`.
+:Done when: The backend can pick a camera deterministically and report which one it selected.
+:END:
+
+** TODO [#A] Negotiate an uncompressed camera format
+:PROPERTIES:
+:Why: To avoid changing AA-lib and avoid large dependencies, request formats that are easy to convert to grayscale.
+:Change: Use Media Foundation source reader format enumeration. Prefer formats in this order: YUY2, NV12, RGB32, RGB24, MJPEG only as a deferred last resort. Prefer user-requested size when available; otherwise select a modest default or the first sane camera mode. Store actual width, height, stride, and pixel format in the capture frame metadata.
+:Tests: Log all candidate formats in verbose mode or debug output. Run on Windows and confirm a selected uncompressed format is reported.
+:Done when: Media Foundation opens a source reader and selects an uncompressed format suitable for `capture_frame_to_gray_scaled()`.
+:END:
+
+** TODO [#A] Read frames through Media Foundation
+:PROPERTIES:
+:Why: The render loop needs a blocking or near-blocking `read one frame` operation equivalent to V4L2 dequeue.
+:Change: Implement `capture_read()` using `IMFSourceReader::ReadSample` or the C vtable equivalent. Lock the returned media buffer, expose a frame pointer and size, then unlock/release in `capture_release()`. Handle stream ticks and format changes conservatively.
+:Tests: Run a debug command path that reads one frame and reports dimensions/format/size. Then run normal `hasciicam` until it reaches AA-lib rendering.
+:Done when: Media Foundation can deliver frames repeatedly without leaking buffers and the frame data reaches the grayscale converter.
+:END:
+
+* TODO [#A] Implement DirectShow fallback
+:PROPERTIES:
+:Effort: 2 days
+:Goal: Add the old Windows capture backend and use it automatically when Media Foundation cannot open or read frames.
+:Notes: DirectShow is old but useful for legacy webcams and capture devices. Keep it behind the same capture port so the main loop does not care which backend is active.
+:END:
+
+** TODO [#A] Add a DirectShow adapter behind the same C port
+:PROPERTIES:
+:Why: Some devices fail under Media Foundation but still work through DirectShow.
+:Change: Add `src/capture/capture_dshow.c` or a small C++ adapter if COM callback code is too awkward in C. Use a Sample Grabber-style path if available, or a custom sample grabber callback if needed. Expose only C functions to the rest of the program.
+:Tests: Build with MSVC and link required system libraries, likely `strmiids`, `ole32`, and `oleaut32`. The adapter can initially enumerate and open only.
+:Done when: DirectShow adapter compiles and can enumerate/select a device without changing the main loop.
+:END:
+
+** TODO [#A] Negotiate DirectShow uncompressed formats
+:PROPERTIES:
+:Why: DirectShow format negotiation is separate from Media Foundation, but the converter should receive the same normalized pixel format enum.
+:Change: Enumerate stream caps and prefer YUY2, RGB24, RGB32, then MJPEG only if no uncompressed format exists. Map DirectShow media subtype GUIDs to the capture pixel format enum. Honor `-s WxH` as a preference.
+:Tests: Log selected DirectShow subtype and dimensions. Confirm unsupported sizes fall back to a real device mode.
+:Done when: DirectShow can select a frame format that the shared converter can handle.
+:END:
+
+** TODO [#A] Read frames and fallback automatically
+:PROPERTIES:
+:Why: The user asked for fallback from new API to old API, so the application should try Media Foundation first and DirectShow second without manual flags.
+:Change: Implement Windows backend selection as: try Media Foundation open/start/read-one-probe; if it fails, close it and try DirectShow. Keep an optional debug log naming the chosen backend. Do not require a new CLI option unless troubleshooting proves it is needed.
+:Tests: Simulate Media Foundation failure by forcing it off at compile-time or with a temporary debug flag, then verify DirectShow is selected. Run with a real camera and confirm frames reach the shared converter.
+:Done when: Windows startup selects Media Foundation when it works and DirectShow when Media Foundation cannot deliver frames.
+:END:
+
+* TODO [#B] Wire Windows capture into HasciiCam modes
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Make Windows capture usable in the same live/text/html flow as Linux, with AA-lib unchanged.
+:Notes: First target can be stdout/text/html. SDL live output depends on SDL2 availability and can follow once vcpkg SDL2 is installed.
+:END:
+
+** TODO [#A] Verify text and HTML output from Windows frames
+:PROPERTIES:
+:Why: Save modes avoid needing a GUI driver and prove the capture-to-AA-lib pipeline works.
+:Change: Run `hasciicam.exe -m text -o frame.asc` and `hasciicam.exe -m html -o frame.html` with Windows capture. Ensure the output changes frame by frame and uses the existing `save_d` driver.
+:Tests: Inspect generated text/HTML files. Confirm no AA-lib changes were needed.
+:Done when: Windows can write a text and HTML ASCII frame from a real camera.
+:END:
+
+** TODO [#B] Enable SDL live display on Windows
+:PROPERTIES:
+:Why: The current Windows build without SDL only lists stdout/stderr drivers. SDL is the right cross-platform live display path.
+:Change: Install or document `vcpkg install sdl2:x64-windows`. Confirm CMake finds SDL2 via the vcpkg toolchain. Build with `SDL_DRIVER` and run `hasciicam.exe -O SDL`.
+:Tests: Configure with vcpkg, build, run `hasciicam.exe -H`, and confirm `SDL` appears in available drivers. Run live mode with a camera.
+:Done when: Windows live mode opens an SDL window and renders camera frames as ASCII.
+:END:
+
+** TODO [#B] Keep stdout usable as a fallback display
+:PROPERTIES:
+:Why: A terminal fallback is useful for debugging and for machines without SDL.
+:Change: Confirm stdout rendering works on Windows console enough for low-friction smoke tests. Avoid making stdout the primary UX.
+:Tests: Run `hasciicam.exe -O stdout` with a camera for a short interval.
+:Done when: stdout mode does not crash and prints changing ASCII frames.
+:END:
+
+* TODO [#B] Polish command-line behavior and documentation
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Make Windows behavior discoverable without disturbing old Linux usage.
+:Notes: Avoid adding CLI switches unless they solve a real troubleshooting need.
+:END:
+
+** TODO [#B] Document Windows device selection
+:PROPERTIES:
+:Why: `/dev/video0` does not make sense on Windows, but users still need a way to select among multiple cameras.
+:Change: Update README/man/AGENTS as appropriate: on Windows, `-d` matches camera friendly name or symbolic link. Add a short note that Media Foundation is tried first and DirectShow is fallback.
+:Tests: Documentation review only.
+:Done when: A Windows user can understand how to build, select a camera, and know which API is preferred.
+:END:
+
+** TODO [#C] Add backend diagnostics without noisy normal output
+:PROPERTIES:
+:Why: Camera API failures are hard to diagnose. Useful logs should exist but not spam normal users.
+:Change: Reuse `quiet` semantics and current stderr style. Print selected backend, camera name, pixel format, dimensions, and fallback reason unless `--quiet` is set.
+:Tests: Run with and without `--quiet` and compare output.
+:Done when: Startup diagnostics help debug backend selection while `--quiet` stays quiet.
+:END:
+
+* TODO [#A] Verify and preserve non-Windows behavior
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Keep Linux V4L2 behavior and AA-lib rendering intact while adding Windows capture.
+:Notes: This is the guardrail. The change should be platform IO, not renderer churn.
+:END:
+
+** TODO [#A] Run Windows verification
+:PROPERTIES:
+:Why: The target platform is current Windows/MSVC.
+:Change: Build from a Visual Studio developer environment using CMake/Ninja and the vcpkg toolchain. Run help, AA help, text output, HTML output, and live SDL output when SDL2 is installed.
+:Tests: `cmake -S . -B build-msvc -G Ninja -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake`, `cmake --build build-msvc`, `hasciicam.exe -h`, `hasciicam.exe -H`, `hasciicam.exe -m text`, `hasciicam.exe -m html`, and `hasciicam.exe -O SDL`.
+:Done when: Windows builds cleanly and at least one real camera produces visible ASCII output.
+:END:
+
+** TODO [#A] Run Linux regression verification
+:PROPERTIES:
+:Why: Existing users depend on V4L2 behavior.
+:Change: Build with CMake/Ninja on Linux. If a V4L2 camera exists, run live/text/html smoke tests. If not, at least compile and run help paths.
+:Tests: `cmake -S . -B build -G Ninja`, `cmake --build build`, `hasciicam -h`, `hasciicam -H`, and camera smoke tests when hardware exists.
+:Done when: Linux compile behavior is preserved and any camera smoke test uses the same V4L2 path semantics as before.
+:END:
+
+** TODO [#B] Commit in small conventional slices
+:PROPERTIES:
+:Why: The repo workflow requires each changed L2 to be committed before marking it done, and this work crosses architecture, Windows API, conversion, and docs.
+:Change: Commit after each implemented L2 with messages such as `refactor: introduce capture port`, `feat: add media foundation capture`, `feat: add directshow capture fallback`, `test: cover frame conversion`, and `docs: document windows capture`.
+:Tests: Run touched tests or relevant smoke tests before each commit.
+:Done when: Every changed L2 has its own conventional commit and the final tree is clean except intentionally ignored build artifacts.
+:END:
