@@ -118,6 +118,15 @@ cmake .. -G Ninja
 ninja
 ```
 
+With presets (recommended for cross-platform maintenance):
+```sh
+cmake --list-presets
+cmake --preset windows-vcpkg-ninja
+cmake --build --preset windows-vcpkg-ninja
+ctest --preset windows-vcpkg-ninja
+```
+Other presets are `linux-ninja`, `macos-ninja`, and `wasm-emscripten`.
+
 ## Runtime Pipeline (2.0)
 
 The executable pipeline is now split into explicit capture and conversion stages:

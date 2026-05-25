@@ -1,0 +1,115 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "windows-vcpkg-ninja",
+      "displayName": "Windows + vcpkg + Ninja",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/presets/windows-vcpkg-ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "HASCIICAM_ENABLE_TESTS": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "linux-ninja",
+      "displayName": "Linux + Ninja",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/presets/linux-ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HASCIICAM_ENABLE_TESTS": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "macos-ninja",
+      "displayName": "macOS + Ninja",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/presets/macos-ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HASCIICAM_ENABLE_TESTS": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "wasm-emscripten",
+      "displayName": "WASM + Emscripten",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/presets/wasm-emscripten",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+        "HASCIICAM_BUILD_CLI": "OFF",
+        "HASCIICAM_ENABLE_TESTS": "OFF",
+        "HASCIICAM_ENABLE_SDL": "OFF",
+        "HASCIICAM_ENABLE_X11": "OFF",
+        "HASCIICAM_ENABLE_CURSES": "OFF",
+        "HASCIICAM_ENABLE_CAPTURE_V4L2": "OFF",
+        "HASCIICAM_ENABLE_CAPTURE_MF": "OFF",
+        "HASCIICAM_ENABLE_CAPTURE_DSHOW": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-vcpkg-ninja",
+      "configurePreset": "windows-vcpkg-ninja"
+    },
+    {
+      "name": "linux-ninja",
+      "configurePreset": "linux-ninja"
+    },
+    {
+      "name": "macos-ninja",
+      "configurePreset": "macos-ninja"
+    },
+    {
+      "name": "wasm-emscripten",
+      "configurePreset": "wasm-emscripten"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-vcpkg-ninja",
+      "configurePreset": "windows-vcpkg-ninja",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-ninja",
+      "configurePreset": "linux-ninja",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "macos-ninja",
+      "configurePreset": "macos-ninja",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

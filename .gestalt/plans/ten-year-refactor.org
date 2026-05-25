@@ -245,7 +245,7 @@
 :Done when: Adding one platform adapter does not require editing a long source list in multiple places.
 :END:
 
-** WIP [#A] Add explicit build options
+** DONE [#A] Add explicit build options
 :PROPERTIES:
 :Why: Cross-platform targets need predictable feature toggles instead of only auto-detection.
 :Change: Add options such as HASCIICAM_BUILD_CLI, HASCIICAM_ENABLE_SDL, HASCIICAM_ENABLE_X11, HASCIICAM_ENABLE_CURSES, HASCIICAM_ENABLE_CAPTURE_V4L2, HASCIICAM_ENABLE_CAPTURE_MF, HASCIICAM_ENABLE_CAPTURE_DSHOW, HASCIICAM_ENABLE_TESTS. Defaults should match current platform behavior.
@@ -253,7 +253,7 @@
 :Done when: Feature availability is visible in CMake configure output and can be controlled by packagers.
 :END:
 
-** TODO [#B] Add platform presets
+** DONE [#B] Add platform presets
 :PROPERTIES:
 :Why: Future maintainers should not rediscover Visual Studio/vcpkg, macOS, iOS, Android, and Emscripten flags.
 :Change: Add CMakePresets.json with conservative presets: windows-vcpkg-ninja, linux-ninja, macos-ninja, wasm-emscripten. Add comments in docs because JSON cannot contain comments.
@@ -261,7 +261,7 @@
 :Done when: The documented build command for each platform is one preset plus cmake --build.
 :END:
 
-** TODO [#B] Add library targets for embedding
+** WIP [#B] Add library targets for embedding
 :PROPERTIES:
 :Why: iOS, Android, and WASM should embed hasciicam as a library, not invoke a CLI main.
 :Change: Build hasciicam_core as a static library containing app/session/capture/conversion/render core. Build hasciicam_cli as the executable that links hasciicam_core.
