@@ -33,7 +33,7 @@ static capture_pixel_format map_pixel_format(hasciicam_pixel_format format) {
     case HASCIICAM_PIXFMT_BGRA32:
         return CAPTURE_PIXFMT_BGRA32;
     default:
-        return CAPTURE_PIXFMT_NONE;
+        return CAPTURE_PIXFMT_UNKNOWN;
     }
 }
 
