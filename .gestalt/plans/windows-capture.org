@@ -3,7 +3,7 @@
 #+DATE: 2026-05-25
 #+KEYWORDS: hasciicam windows media-foundation directshow capture aalib yuy2 yuyv
 
-* WIP [#A] Establish a cross-platform capture port
+* DONE [#A] Establish a cross-platform capture port
 :PROPERTIES:
 :Effort: 1 day
 :Goal: Replace direct calls from the main loop to V4L2-specific globals with a small C capture interface that can support Linux V4L2, Windows Media Foundation, and Windows DirectShow without changing AA-lib.
@@ -26,7 +26,7 @@
 :Done when: `src/hasciicam.c` no longer includes Linux video headers or owns V4L2 buffers, and Linux behavior is intended to remain unchanged.
 :END:
 
-** WIP [#A] Make the main loop backend-neutral
+** DONE [#A] Make the main loop backend-neutral
 :PROPERTIES:
 :Why: The render loop should only pull a frame, convert luminance, copy to `aa_image()`, render, flush, and release the frame. It should not know about V4L2, Media Foundation, or DirectShow.
 :Change: Replace direct calls to `vid_detect()`, `vid_init()`, `grab_one()`, and platform cleanup with capture-port calls such as `capture_open()`, `capture_start()`, `capture_read()`, `capture_release()`, `capture_stop()`, and `capture_close()`. Keep the old command-line options mapped into the capture request.
