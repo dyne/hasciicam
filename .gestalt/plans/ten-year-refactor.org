@@ -159,7 +159,7 @@
 :Done when: Windows has a documented, repeatable smoke test for both capture and SDL output.
 :END:
 
-** WIP [#A] Add macOS capture through AVFoundation
+** DONE [#A] Add macOS capture through AVFoundation
 :PROPERTIES:
 :Why: macOS camera access is AVFoundation, not V4L2. This needs an adapter but should not affect the core.
 :Change: Add src/capture/capture_avfoundation.mm behind a C header capture_avfoundation.h. Keep Objective-C++ confined to this file if approved; expose only capture_ops. Request BGRA/NV12 where possible and convert through frame_convert.c.
@@ -167,7 +167,7 @@
 :Done when: capture_open_default() uses AVFoundation on APPLE desktop and the app core has no Apple-specific code.
 :END:
 
-** TODO [#B] Add iOS capture as a host-provided frame source first
+** WIP [#B] Add iOS capture as a host-provided frame source first
 :PROPERTIES:
 :Why: iOS camera lifecycle, permissions, orientation, and app threading are controlled by the app shell. A direct CLI-style camera backend is the wrong first step.
 :Change: Add capture_external.c: a backend where the host pushes frames into hasciicam using hasciicam_session_submit_frame() or similar. Later add an iOS AVFoundation adapter in the app shell that feeds this port.
