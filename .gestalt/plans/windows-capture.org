@@ -65,14 +65,14 @@
 :Done when: The selected Windows camera format drives AA-lib dimensions the same way V4L2 actual format currently does.
 :END:
 
-* TODO [#A] Implement Windows Media Foundation capture first
+* WIP [#A] Implement Windows Media Foundation capture first
 :PROPERTIES:
 :Effort: 2 days
 :Goal: Add the new Windows capture backend using Media Foundation as the preferred API.
 :Notes: Keep Media Foundation details out of `src/hasciicam.c`. Use C-callable functions in a C file if possible. If COM helper code becomes too painful in pure C, isolate any C++/COM boundary in one adapter file and expose only C functions to the rest of the program.
 :END:
 
-** TODO [#A] Add CMake support for Windows system media libraries
+** DONE [#A] Add CMake support for Windows system media libraries
 :PROPERTIES:
 :Why: Media Foundation requires Windows SDK libraries and headers, not vcpkg packages.
 :Change: In CMake, when `WIN32`, compile `src/capture/capture_mf.c` and link only the required Windows libraries, likely `mfplat`, `mf`, `mfreadwrite`, `mfuuid`, `ole32`, and `uuid`. Keep this conditional and do not affect Linux/macOS builds.
