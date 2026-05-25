@@ -45,7 +45,8 @@
 #endif
 
 #include <aalib.h>
-#include "capture/capture_v4l2.h"
+#include "capture/capture.h"
+#include "capture/capture_backend.h"
 
 /* hasciicam modes */
 #define LIVE 0
@@ -121,6 +122,11 @@ int mode = 0;
 int inputch = 0;
 int daemon_mode = 0;
 int invert = 0;
+
+struct geometry {
+  int w, h, size;
+  int bright, contrast, gamma;
+};
 
 struct geometry aa_geo;
 struct geometry vid_geo;
@@ -389,6 +395,11 @@ config_init (int argc, char *argv[]) {
 
 int
 main (int argc, char **argv) {
+  capture_request cap_req;
+  capture_info cap_info;
+  capture_frame cap_frame;
+  capture_device *cap_dev = NULL;
+  const capture_ops *cap_ops = NULL;
 
     /* reminder:
        !!! grabbing height & width should be double
@@ -418,11 +429,67 @@ main (int argc, char **argv) {
 
   /* set hasciicam options */
   config_init (argc, argv);
-  /* detect and init video device */
-  if( vid_detect(device) > 0 ) {
-    vid_init();
-  } else
+  cap_ops = capture_default_ops();
+  if (cap_ops == NULL) {
+    fprintf(stderr, "!! no capture backend is available\n");
     exit(-1);
+  }
+
+  memset(&cap_req, 0, sizeof(cap_req));
+  cap_req.device = device;
+  cap_req.input_channel = inputch;
+  if (whchanged == 1) {
+    cap_req.requested_width = user_w;
+    cap_req.requested_height = user_h;
+  }
+
+  if (!cap_ops->open(&cap_dev, &cap_req)) {
+    fprintf(stderr, "!! cannot open capture backend (%s)\n", cap_ops->name());
+    exit(-1);
+  }
+  if (!cap_ops->describe(cap_dev, &cap_info)) {
+    fprintf(stderr, "!! cannot query capture backend (%s)\n", cap_ops->name());
+    cap_ops->close(cap_dev);
+    exit(-1);
+  }
+  if (!cap_ops->start(cap_dev)) {
+    fprintf(stderr, "!! cannot start capture backend (%s)\n", cap_ops->name());
+    cap_ops->close(cap_dev);
+    exit(-1);
+  }
+
+  vw = cap_info.width;
+  vh = cap_info.height;
+  vbytesperline = cap_info.stride_bytes;
+  if (cap_info.pixel_format != CAPTURE_PIXFMT_YUYV &&
+      cap_info.pixel_format != CAPTURE_PIXFMT_YUY2) {
+    fprintf(stderr, "!! unsupported pixel format from backend: %d\n",
+            cap_info.pixel_format);
+    cap_ops->stop(cap_dev);
+    cap_ops->close(cap_dev);
+    exit(-1);
+  }
+
+  vid_geo.w = vw;
+  vid_geo.h = vh;
+  vid_geo.size = vw * vh;
+
+  xbytestep = xstep + xstep;
+  ybytestep = vbytesperline * (ystep - 1);
+  gw = vw / xstep;
+  gh = vh / ystep;
+  aw = gw / 2;
+  ah = gh / 2;
+
+  greysize = gw * gh;
+  grey = malloc(greysize);
+  if (grey == NULL) {
+    fprintf(stderr, "!! cannot allocate grey buffer\n");
+    cap_ops->stop(cap_dev);
+    cap_ops->close(cap_dev);
+    exit(-1);
+  }
+  fprintf(stderr, "Grey buffer is %i bytes\n", (int)greysize);
 
   /* width/height image setup */
   ascii_hwparms.font = NULL; // default font, thanks
@@ -551,7 +618,31 @@ main (int argc, char **argv) {
 
 
   while (userbreak <1) {
-    grab_one ();
+    if (!cap_ops->read(cap_dev, &cap_frame)) {
+      break;
+    }
+
+    if ((++framenum) == renderhop) {
+      int ascii_width = aa_imgwidth(ascii_context);
+      int ascii_height = aa_imgheight(ascii_context);
+      int grey_size;
+      int dest_size;
+      int copy_size;
+
+      framenum = 0;
+      YUV422_to_grey_scaled((unsigned char *)cap_frame.data, grey,
+                            cap_frame.width, cap_frame.height,
+                            ascii_width, ascii_height);
+      grey_size = ascii_width * ascii_height;
+      dest_size = aa_imgwidth(ascii_context) * aa_imgheight(ascii_context);
+      copy_size = (grey_size < dest_size) ? grey_size : dest_size;
+      if (copy_size > 0) {
+        memcpy(aa_image(ascii_context), grey, copy_size);
+        aa_fastrender(ascii_context, 0, 0, ascii_width / 2, ascii_height / 2);
+      }
+      aa_flush(ascii_context);
+    }
+    cap_ops->release(cap_dev, &cap_frame);
 	/*aa_setpalette (gamma di colori, indice, colore rosso, verde, blu)*/
 
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -567,7 +658,10 @@ main (int argc, char **argv) {
 
   /* CLEAN EXIT */
 
-  vid_close();
+  if (cap_ops != NULL && cap_dev != NULL) {
+    cap_ops->stop(cap_dev);
+    cap_ops->close(cap_dev);
+  }
   aa_close(ascii_context);
   free(grey);
   fprintf (stderr, "cya!\n");
