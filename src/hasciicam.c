@@ -57,32 +57,11 @@
 /* default configuration */
 static hasciicam_config appcfg;
 int quiet = 0;
-int mode = 0;
-int inputch = 0;
-int daemon_mode = 0;
-int invert = 0;
-int refresh = 2;
-int fontsize = 1;
-int linespace = 5;
-int user_w = 0;
-int user_h = 0;
-int whchanged = 0;
-int uid = -1;
-int gid = -1;
-char device[256];
-char aafile[256];
-char background[64];
-char foreground[64];
-char fontface[256];
-char aadriver[64];
 
 struct geometry {
   int w, h, size;
   int bright, contrast, gamma;
 };
-
-struct geometry aa_geo;
-struct geometry vid_geo;
 
 int have_tuner = 0;
 
@@ -114,6 +93,25 @@ main (int argc, char **argv) {
   const capture_info *cap_info = NULL;
   hasciicam_session session;
   hasciicam_render_session render_session;
+  struct geometry aa_geo;
+  struct geometry vid_geo;
+  int mode;
+  int inputch;
+  int daemon_mode;
+  int refresh;
+  int fontsize;
+  int linespace;
+  int user_w;
+  int user_h;
+  int whchanged;
+  int uid;
+  int gid;
+  char *device;
+  char *aafile;
+  char *background;
+  char *foreground;
+  char *fontface;
+  char *aadriver;
 
     /* reminder:
        !!! grabbing height & width should be double
@@ -151,7 +149,6 @@ main (int argc, char **argv) {
   mode = appcfg.mode;
   inputch = appcfg.input_channel;
   daemon_mode = appcfg.daemon_mode;
-  invert = appcfg.invert;
   refresh = appcfg.refresh;
   fontsize = appcfg.fontsize;
   linespace = appcfg.linespace;
@@ -160,18 +157,12 @@ main (int argc, char **argv) {
   whchanged = appcfg.whchanged;
   uid = appcfg.uid;
   gid = appcfg.gid;
-  strncpy(device, appcfg.device, sizeof(device) - 1);
-  device[sizeof(device) - 1] = '\0';
-  strncpy(aafile, appcfg.aafile, sizeof(aafile) - 1);
-  aafile[sizeof(aafile) - 1] = '\0';
-  strncpy(background, appcfg.background, sizeof(background) - 1);
-  background[sizeof(background) - 1] = '\0';
-  strncpy(foreground, appcfg.foreground, sizeof(foreground) - 1);
-  foreground[sizeof(foreground) - 1] = '\0';
-  strncpy(fontface, appcfg.fontface, sizeof(fontface) - 1);
-  fontface[sizeof(fontface) - 1] = '\0';
-  strncpy(aadriver, appcfg.aadriver, sizeof(aadriver) - 1);
-  aadriver[sizeof(aadriver) - 1] = '\0';
+  device = appcfg.device;
+  aafile = appcfg.aafile;
+  background = appcfg.background;
+  foreground = appcfg.foreground;
+  fontface = appcfg.fontface;
+  aadriver = appcfg.aadriver;
   aa_geo.w = 80;
   aa_geo.h = 40;
   aa_geo.bright = appcfg.aa_bright;

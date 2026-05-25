@@ -73,7 +73,7 @@
 :Done when: app_session writes luminance to a renderer through a small function instead of directly owning aa_context details.
 :END:
 
-** WIP [#B] Replace cross-module globals with context structs
+** DONE [#B] Replace cross-module globals with context structs
 :PROPERTIES:
 :Why: Globals block multiple sessions and make mobile/WASM embedding fragile.
 :Change: Move globals from src/hasciicam.c into hasciicam_config, hasciicam_session, and hasciicam_render_session. Leave truly process-wide signal state in the CLI shell until a cleaner shutdown port exists.
@@ -81,7 +81,7 @@
 :Done when: New code does not read or write extern globals for normal operation.
 :END:
 
-** TODO [#B] Introduce a minimal shutdown/request port
+** WIP [#B] Introduce a minimal shutdown/request port
 :PROPERTIES:
 :Why: The CLI currently uses SIGINT, while SDL close, mobile lifecycle, and WASM need cooperative shutdown without process signals.
 :Change: Add a small hasciicam_should_stop callback or flag in app_session. The CLI signal handler sets it; SDL close sets it through the render/session boundary; mobile/WASM hosts can set it directly.
