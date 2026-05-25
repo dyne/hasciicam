@@ -128,6 +128,7 @@ endif()
 add_executable(hasciicam
     src/hasciicam.c
     src/capture/capture_backend.c
+    src/capture/frame_convert.c
     src/capture/capture_v4l2.c
 )
 target_compile_definitions(hasciicam PRIVATE

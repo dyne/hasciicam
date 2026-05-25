@@ -34,14 +34,14 @@
 :Done when: `src/hasciicam.c` contains no platform capture branches except choosing a backend at startup, and AA-lib setup/rendering remains untouched.
 :END:
 
-* TODO [#A] Normalize camera frames to AA-lib-compatible luminance
+* WIP [#A] Normalize camera frames to AA-lib-compatible luminance
 :PROPERTIES:
 :Effort: 1 day
 :Goal: Ensure every capture backend feeds the same grayscale buffer semantics that the V4L2 YUYV path feeds to AA-lib today.
 :Notes: AA-lib does not get YUYV directly. It gets an image buffer filled with luma/grayscale bytes. Preserve that contract. Prefer direct luma extraction over RGB conversion whenever the source format has a Y plane or interleaved Y values.
 :END:
 
-** TODO [#A] Extract conversion into a small module
+** DONE [#A] Extract conversion into a small module
 :PROPERTIES:
 :Why: Conversion is currently inside `src/hasciicam.c`, tied to YUV422 and AA context dimensions. Windows needs format-specific conversion without changing AA-lib.
 :Change: Move `YUV422_to_grey_scaled()` into `src/capture/frame_convert.c` with a header such as `src/capture/frame_convert.h`. Add a single entry point like `capture_frame_to_gray_scaled(frame, dst, dst_w, dst_h)`. Keep the existing nearest-neighbor scaling behavior first.
@@ -49,7 +49,7 @@
 :Done when: The render loop calls one converter function and no longer contains pixel-format-specific code.
 :END:
 
-** TODO [#A] Support Windows camera formats without touching AA-lib
+** DONE [#A] Support Windows camera formats without touching AA-lib
 :PROPERTIES:
 :Why: Media Foundation cameras commonly offer NV12, YUY2, RGB32, and sometimes MJPEG. DirectShow often exposes YUY2, RGB24, RGB32, or MJPEG. We need a predictable internal path.
 :Change: Implement converters in this priority order: `GRAY8` copy/scale, `YUYV/YUY2` luma extraction/scale, `NV12` Y-plane extraction/scale, `BGR24/RGB24` luma conversion/scale, `BGRA32/RGB32` luma conversion/scale. Defer MJPEG unless no uncompressed format is available; prefer asking the API for uncompressed output first.
