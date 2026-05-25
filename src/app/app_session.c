@@ -36,6 +36,8 @@ int hasciicam_session_step(hasciicam_session *session,
 
     if (session == NULL || session->capture_dev == NULL || session->capture_ops == NULL)
         return 0;
+    if (session->stop_requested)
+        return 0;
     if (output_width <= 0 || output_height <= 0)
         return 0;
 
@@ -84,4 +86,16 @@ const capture_info *hasciicam_session_capture_info(const hasciicam_session *sess
     if (session == NULL)
         return NULL;
     return &session->capture_info;
+}
+
+void hasciicam_session_request_stop(hasciicam_session *session) {
+    if (session == NULL)
+        return;
+    session->stop_requested = 1;
+}
+
+int hasciicam_session_should_stop(const hasciicam_session *session) {
+    if (session == NULL)
+        return 1;
+    return session->stop_requested;
 }
