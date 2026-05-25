@@ -166,14 +166,14 @@
 :Done when: stdout mode does not crash and prints changing ASCII frames.
 :END:
 
-* TODO [#B] Polish command-line behavior and documentation
+* DONE [#B] Polish command-line behavior and documentation
 :PROPERTIES:
 :Effort: 0.5 day
 :Goal: Make Windows behavior discoverable without disturbing old Linux usage.
 :Notes: Avoid adding CLI switches unless they solve a real troubleshooting need.
 :END:
 
-** TODO [#B] Document Windows device selection
+** DONE [#B] Document Windows device selection
 :PROPERTIES:
 :Why: `/dev/video0` does not make sense on Windows, but users still need a way to select among multiple cameras.
 :Change: Update README/man/AGENTS as appropriate: on Windows, `-d` matches camera friendly name or symbolic link. Add a short note that Media Foundation is tried first and DirectShow is fallback.
@@ -181,7 +181,7 @@
 :Done when: A Windows user can understand how to build, select a camera, and know which API is preferred.
 :END:
 
-** TODO [#C] Add backend diagnostics without noisy normal output
+** DONE [#C] Add backend diagnostics without noisy normal output
 :PROPERTIES:
 :Why: Camera API failures are hard to diagnose. Useful logs should exist but not spam normal users.
 :Change: Reuse `quiet` semantics and current stderr style. Print selected backend, camera name, pixel format, dimensions, and fallback reason unless `--quiet` is set.

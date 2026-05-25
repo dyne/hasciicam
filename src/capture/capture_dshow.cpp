@@ -233,6 +233,7 @@ static int dshow_open(capture_device **out, const capture_request *req) {
     return 1;
 
 fail:
+    fprintf(stderr, "!! directshow could not open a compatible capture device\n");
     if (moniker) moniker->Release();
     if (enum_moniker) enum_moniker->Release();
     if (dev_enum) dev_enum->Release();

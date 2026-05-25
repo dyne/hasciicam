@@ -109,6 +109,29 @@ and to install it, you can use
 ```
  make install
 ```
+
+With CMake/Ninja (recommended):
+```sh
+mkdir build
+cd build
+cmake .. -G Ninja
+ninja
+```
+
+## Windows Notes
+
+On Windows, video capture backends are tried in this order:
+1. Media Foundation (new API)
+2. DirectShow (old API fallback)
+
+The `-d` option on Windows is treated as a camera matcher (friendly-name substring),
+not as a `/dev/video*` path.
+
+For local MSVC builds in this repo, a Release configuration is recommended:
+```powershell
+cmake -S . -B build-msvc-rel -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+cmake --build build-msvc-rel
+```
 Running it:
 
 people reported success with several pci and usb devices, refer to
