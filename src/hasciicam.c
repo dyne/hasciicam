@@ -45,9 +45,8 @@
 
 #include <aalib.h>
 #include "app/app_config.h"
-#include "capture/capture.h"
+#include "app/app_session.h"
 #include "capture/capture_backend.h"
-#include "capture/frame_convert.h"
 
 /* hasciicam modes */
 #define LIVE 0
@@ -125,7 +124,6 @@ struct aa_format hascii_format = {
 };
 
 /* greyscale image is sampled from Y luminance component */
-unsigned char *grey;
 int YtoRGB[256];
 int xstep=2, ystep=4;
 int xbytestep;
@@ -134,7 +132,6 @@ int renderhop=2, framenum=0; // renderhop is how many frames to guzzle before re
 int gw, gh; // number of cols/rows in grey intermediate representation
 int vw, vh; // video w and h
 int aw, ah; // ascii w and h
-size_t greysize;
 int vbytesperline;
 
 /* here we go (chmicl broz rlz! :)*/
@@ -142,10 +139,8 @@ int vbytesperline;
 int
 main (int argc, char **argv) {
   capture_request cap_req;
-  capture_info cap_info;
-  capture_frame cap_frame;
-  capture_device *cap_dev = NULL;
-  const capture_ops *cap_ops = NULL;
+  const capture_info *cap_info = NULL;
+  hasciicam_session session;
 
     /* reminder:
        !!! grabbing height & width should be double
@@ -218,25 +213,21 @@ main (int argc, char **argv) {
     cap_req.requested_height = user_h;
   }
 
-  if (!capture_open_default(&cap_req, &cap_dev, &cap_ops)) {
+  if (!hasciicam_session_start(&session, &cap_req)) {
     fprintf(stderr, "!! cannot open any capture backend: %s\n",
             capture_last_error());
     exit(-1);
   }
-  if (!cap_ops->describe(cap_dev, &cap_info)) {
-    fprintf(stderr, "!! cannot query capture backend (%s)\n", cap_ops->name());
-    cap_ops->close(cap_dev);
-    exit(-1);
-  }
-  if (!cap_ops->start(cap_dev)) {
-    fprintf(stderr, "!! cannot start capture backend (%s)\n", cap_ops->name());
-    cap_ops->close(cap_dev);
+  cap_info = hasciicam_session_capture_info(&session);
+  if (cap_info == NULL) {
+    fprintf(stderr, "!! cannot query capture backend\n");
+    hasciicam_session_stop(&session);
     exit(-1);
   }
 
-  vw = cap_info.width;
-  vh = cap_info.height;
-  vbytesperline = cap_info.stride_bytes;
+  vw = cap_info->width;
+  vh = cap_info->height;
+  vbytesperline = cap_info->stride_bytes;
   vid_geo.w = vw;
   vid_geo.h = vh;
   vid_geo.size = vw * vh;
@@ -248,15 +239,7 @@ main (int argc, char **argv) {
   aw = gw / 2;
   ah = gh / 2;
 
-  greysize = gw * gh;
-  grey = malloc(greysize);
-  if (grey == NULL) {
-    fprintf(stderr, "!! cannot allocate grey buffer\n");
-    cap_ops->stop(cap_dev);
-    cap_ops->close(cap_dev);
-    exit(-1);
-  }
-  fprintf(stderr, "Grey buffer is %i bytes\n", (int)greysize);
+  fprintf(stderr, "Grey buffer is %i bytes\n", gw * gh);
 
   /* width/height image setup */
   ascii_hwparms.font = NULL; // default font, thanks
@@ -385,37 +368,33 @@ main (int argc, char **argv) {
 
 
   while (userbreak <1) {
-    if (!cap_ops->read(cap_dev, &cap_frame)) {
+    const unsigned char *gray_frame = NULL;
+    int gray_size = 0;
+
+    if (!hasciicam_session_step(&session, aa_imgwidth(ascii_context),
+                                aa_imgheight(ascii_context),
+                                &gray_frame, &gray_size)) {
       break;
     }
 
     if ((++framenum) == renderhop) {
       int ascii_width = aa_imgwidth(ascii_context);
       int ascii_height = aa_imgheight(ascii_context);
-      int grey_size;
       int dest_size;
       int copy_size;
 
       framenum = 0;
-      if (!capture_frame_to_gray_scaled(&cap_frame, grey, ascii_width, ascii_height)) {
-        fprintf(stderr, "!! failed to convert capture frame to grayscale\n");
-        cap_ops->release(cap_dev, &cap_frame);
-        break;
-      }
-      grey_size = ascii_width * ascii_height;
       dest_size = aa_imgwidth(ascii_context) * aa_imgheight(ascii_context);
-      copy_size = (grey_size < dest_size) ? grey_size : dest_size;
+      copy_size = (gray_size < dest_size) ? gray_size : dest_size;
       if (copy_size > 0) {
-        memcpy(aa_image(ascii_context), grey, copy_size);
+        memcpy(aa_image(ascii_context), gray_frame, copy_size);
         aa_fastrender(ascii_context, 0, 0, ascii_width / 2, ascii_height / 2);
       }
       aa_flush(ascii_context);
     }
-    cap_ops->release(cap_dev, &cap_frame);
 	/*aa_setpalette (gamma di colori, indice, colore rosso, verde, blu)*/
 
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-//    memcpy (aa_image (ascii_context), grey, vid_geo.size);
 //    aa_render (ascii_context, ascii_rndparms, 0, 0,
 //	       vid_geo.w,vid_geo.h);
 
@@ -427,12 +406,8 @@ main (int argc, char **argv) {
 
   /* CLEAN EXIT */
 
-  if (cap_ops != NULL && cap_dev != NULL) {
-    cap_ops->stop(cap_dev);
-    cap_ops->close(cap_dev);
-  }
+  hasciicam_session_stop(&session);
   aa_close(ascii_context);
-  free(grey);
   fprintf (stderr, "cya!\n");
   exit (0);
 /*++userbreak;*/
