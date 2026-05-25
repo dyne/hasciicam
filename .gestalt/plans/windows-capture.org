@@ -34,7 +34,7 @@
 :Done when: `src/hasciicam.c` contains no platform capture branches except choosing a backend at startup, and AA-lib setup/rendering remains untouched.
 :END:
 
-* WIP [#A] Normalize camera frames to AA-lib-compatible luminance
+* DONE [#A] Normalize camera frames to AA-lib-compatible luminance
 :PROPERTIES:
 :Effort: 1 day
 :Goal: Ensure every capture backend feeds the same grayscale buffer semantics that the V4L2 YUYV path feeds to AA-lib today.
@@ -57,7 +57,7 @@
 :Done when: Any supported Windows backend can return one of the normalized formats and AA-lib still receives the same grayscale image buffer shape as the V4L2 path.
 :END:
 
-** TODO [#B] Preserve existing ASCII sizing behavior
+** DONE [#B] Preserve existing ASCII sizing behavior
 :PROPERTIES:
 :Why: The current code computes video dimensions, intermediate grayscale dimensions, and ASCII dimensions before initializing AA-lib. Windows camera APIs may choose a different actual size from the request.
 :Change: After opening a backend, use the actual camera width and height to compute the recommended AA-lib size. Keep `-s WxH` as a requested camera size, not a guaranteed size. Log the actual selected format and dimensions.
@@ -65,7 +65,7 @@
 :Done when: The selected Windows camera format drives AA-lib dimensions the same way V4L2 actual format currently does.
 :END:
 
-* WIP [#A] Implement Windows Media Foundation capture first
+* DONE [#A] Implement Windows Media Foundation capture first
 :PROPERTIES:
 :Effort: 2 days
 :Goal: Add the new Windows capture backend using Media Foundation as the preferred API.
@@ -80,7 +80,7 @@
 :Done when: An empty/stub Media Foundation adapter links successfully on Windows.
 :END:
 
-** TODO [#A] Enumerate and select a camera source
+** DONE [#A] Enumerate and select a camera source
 :PROPERTIES:
 :Why: HasciiCam currently accepts `-d` as a device path. Windows cameras are usually selected by symbolic link or friendly name, not `/dev/video0`.
 :Change: In the Media Foundation adapter, enumerate `MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID` devices. Interpret `-d` as either friendly-name substring or symbolic-link exact match. If no `-d` is provided, select the first usable video capture device.
@@ -88,7 +88,7 @@
 :Done when: The backend can pick a camera deterministically and report which one it selected.
 :END:
 
-** TODO [#A] Negotiate an uncompressed camera format
+** DONE [#A] Negotiate an uncompressed camera format
 :PROPERTIES:
 :Why: To avoid changing AA-lib and avoid large dependencies, request formats that are easy to convert to grayscale.
 :Change: Use Media Foundation source reader format enumeration. Prefer formats in this order: YUY2, NV12, RGB32, RGB24, MJPEG only as a deferred last resort. Prefer user-requested size when available; otherwise select a modest default or the first sane camera mode. Store actual width, height, stride, and pixel format in the capture frame metadata.
@@ -96,7 +96,7 @@
 :Done when: Media Foundation opens a source reader and selects an uncompressed format suitable for `capture_frame_to_gray_scaled()`.
 :END:
 
-** TODO [#A] Read frames through Media Foundation
+** DONE [#A] Read frames through Media Foundation
 :PROPERTIES:
 :Why: The render loop needs a blocking or near-blocking `read one frame` operation equivalent to V4L2 dequeue.
 :Change: Implement `capture_read()` using `IMFSourceReader::ReadSample` or the C vtable equivalent. Lock the returned media buffer, expose a frame pointer and size, then unlock/release in `capture_release()`. Handle stream ticks and format changes conservatively.
