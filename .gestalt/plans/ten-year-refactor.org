@@ -26,7 +26,7 @@
 :Done when: The document names every planned port family: capture, output/render, app shell, filesystem/save, and build.
 :END:
 
-** WIP [#A] Freeze the capture API as a stable C port
+** DONE [#A] Freeze the capture API as a stable C port
 :PROPERTIES:
 :Why: src/capture/capture.h is already the best boundary in the refactor. It should be treated as a compatibility contract before adding Apple, Android, and WASM capture.
 :Change: Add native C doc-comments to capture.h. Clarify ownership of capture_frame.data, when release() is mandatory, valid stride rules, and expected pixel formats. Do not add behavior yet.
@@ -34,7 +34,7 @@
 :Done when: Capture adapter authors can implement a backend without reading Media Foundation or V4L2 code first.
 :END:
 
-** TODO [#B] Normalize backend logging and failure reporting
+** WIP [#B] Normalize backend logging and failure reporting
 :PROPERTIES:
 :Why: Platform debugging will be painful if backends silently fail or print inconsistent errors.
 :Change: Add one minimal capture_status style convention: open() returns 0/1 as today, but adapters set a short internal reason exposed through an optional diagnostic function only if needed. Prefer simple stderr messages first; avoid a full error framework.
