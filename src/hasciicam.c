@@ -29,19 +29,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <ctype.h>
-#include <sys/time.h>
 #include <signal.h>
+#include <sys/stat.h>
+
+#if defined(_WIN32)
+#define strcasecmp _stricmp
+#else
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+#endif
 
 #if defined(__linux__)
+#define HASCIICAM_HAVE_V4L2 1
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <pwd.h>
 #include <grp.h>
 #include <linux/types.h>
@@ -189,6 +195,7 @@ struct aa_format hascii_format = {
   html_escapes
 };
 
+#if defined(HASCIICAM_HAVE_V4L2)
 /* v4l2 (thanks Dan)*/
 int buftype = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 struct v4l2_capability capability;
@@ -204,6 +211,8 @@ struct {
 
 
 int fd = -1;
+#endif
+
 /* greyscale image is sampled from Y luminance component */
 unsigned char *grey;
 int YtoRGB[256];
@@ -263,6 +272,7 @@ void YUV422_to_grey_scaled(unsigned char *src, unsigned char *dst, int src_w, in
     }
 }
 
+#if defined(HASCIICAM_HAVE_V4L2)
 int vid_detect(char *devfile) {
     int errno;
     unsigned int i;
@@ -488,6 +498,21 @@ void grab_one () {
 
 }
 
+#else
+int vid_detect(char *devfile) {
+    (void)devfile;
+    fprintf(stderr, "!! video capture is not implemented on this platform yet\n");
+    return -1;
+}
+
+int vid_init() {
+    return -1;
+}
+
+void grab_one () {
+}
+#endif
+
 
 
 void
@@ -637,8 +662,9 @@ config_init (int argc, char *argv[]) {
 
 int
 main (int argc, char **argv) {
+#if defined(HASCIICAM_HAVE_V4L2)
     int i;
-    char temp[160];
+#endif
 
     /* reminder:
        !!! grabbing height & width should be double
@@ -650,8 +676,13 @@ main (int argc, char **argv) {
   fprintf (stderr, version, PACKAGE, VERSION);
 
   /* default values */
+#if defined(_WIN32)
+  uid = 0;
+  gid = 0;
+#else
   uid = getuid ();
   gid = getgid ();
+#endif
 
 
   /* initialize aalib default params */
@@ -692,9 +723,11 @@ main (int argc, char **argv) {
 	    refresh, aafile, linespace, background, foreground, fontsize,
 	    fontface);
 
+#if !defined(_WIN32)
   setgroups(0, NULL);
   setuid (uid);
   setgid (gid);
+#endif
 
   fprintf (stderr, "Ascii size is %dx%d\n", aw, ah);
 
@@ -771,7 +804,7 @@ main (int argc, char **argv) {
 
   ascii_rndparms->bright = aa_geo.bright;
   ascii_rndparms->contrast = aa_geo.contrast;
-  ascii_rndparms->gamma = aa_geo.gamma;
+  ascii_rndparms->gamma = (float)aa_geo.gamma;
   // those are left to be setted by aalib options
   //  ascii_rndparms->dither = AA_FLOYD_S;
   //  ascii_rndparms->inversion = invert;
@@ -784,7 +817,11 @@ main (int argc, char **argv) {
 
 
   if (daemon_mode)
+#if defined(_WIN32)
+    fprintf(stderr, "daemon mode is not supported on this platform\n");
+#else
     daemon (0, 1);
+#endif
 
 
 
@@ -806,6 +843,7 @@ main (int argc, char **argv) {
 
   /* CLEAN EXIT */
 
+#if defined(HASCIICAM_HAVE_V4L2)
   // turn off streaming
   if(-1 == ioctl(fd, VIDIOC_STREAMOFF, &buftype)) {
       perror("VIDIOC_STREAMOFF");
@@ -815,10 +853,13 @@ main (int argc, char **argv) {
 
   for (i = 0; i < reqbuf.count; i++)
       munmap (buffers[i].start, buffers[i].length);
+#endif
 
   aa_close(ascii_context);
   free(grey);
+#if defined(HASCIICAM_HAVE_V4L2)
   if(fd>0) close(fd);
+#endif
   fprintf (stderr, "cya!\n");
   exit (0);
 /*++userbreak;*/
