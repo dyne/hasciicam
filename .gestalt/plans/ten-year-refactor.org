@@ -308,7 +308,7 @@
 :Done when: iOS runs the core pipeline from camera frame to visible ASCII output.
 :END:
 
-** WIP [#B] Add an Android sample host after external capture works
+** DONE [#B] Add an Android sample host after external capture works
 :PROPERTIES:
 :Why: Android support needs Gradle/NDK only at the shell edge. The C core should remain buildable without Gradle.
 :Change: Add examples/android with a minimal NDK shell. Start with synthetic frames, then Camera2/NDK frame submission.
@@ -316,7 +316,7 @@
 :Done when: Android can show ASCII frames using the shared core.
 :END:
 
-** TODO [#B] Add a WASM browser sample
+** WIP [#B] Add a WASM browser sample
 :PROPERTIES:
 :Why: WASM needs JavaScript for camera and canvas/text output. The core should expose memory functions and avoid direct DOM assumptions.
 :Change: Add examples/wasm with Emscripten build docs, a JS bridge that feeds RGBA frames from a canvas/video element, and output to a pre/text canvas.
