@@ -7,21 +7,21 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Options
 option(ENABLE_ASAN "Enable AddressSanitizer for debugging" OFF)
 
-find_package(SDL2)
+find_package(SDL2 QUIET)
 if(TARGET SDL2::SDL2)
   message(STATUS "Found SDL2: ${SDL2_VERSION}")
   add_compile_definitions(SDL_DRIVER)
 endif()
 
 if(UNIX AND NOT APPLE)
-  find_package(X11)
+  find_package(X11 QUIET)
   if(X11_FOUND)
     message(STATUS "Found X11")
     add_compile_definitions(X11_DRIVER)
   endif()
 endif()
 
-find_package(Curses)
+find_package(Curses QUIET)
 if(Curses_FOUND)
     message(STATUS "Found Curses")
     add_compile_definitions(CURSES_DRIVER)
@@ -42,7 +42,6 @@ set(AALIB_SOURCES
     src/aalib/aacurses.c
     src/aalib/aaedit.c
     src/aalib/aafastre.c
-    src/aalib/aafire.c
     src/aalib/aaflush.c
     src/aalib/aafont.c
     src/aalib/aafonts.c
@@ -51,7 +50,6 @@ set(AALIB_SOURCES
     src/aalib/aaimgheight.c
     src/aalib/aaimgwidth.c
     src/aalib/aain.c
-    src/aalib/aainfo.c
     src/aalib/aakbdreg.c
     src/aalib/aalib.c
     src/aalib/aalinux.c
@@ -70,7 +68,6 @@ set(AALIB_SOURCES
     src/aalib/aaregist.c
     src/aalib/aarender.c
     src/aalib/aasave.c
-    src/aalib/aasavefont.c
     src/aalib/aascrheight.c
     src/aalib/aascrwidth.c
     src/aalib/aastdin.c
@@ -87,6 +84,10 @@ set(AALIB_SOURCES
     src/aalib/fontx13.c
     src/aalib/fontx16.c
 )
+
+if(WIN32)
+    list(APPEND AALIB_SOURCES src/compat/getopt.c)
+endif()
 
 # Conditionally add SDL driver
 if(TARGET SDL2::SDL2)
@@ -105,6 +106,10 @@ endif()
 # Create aalib static library
 add_library(aalib STATIC ${AALIB_SOURCES})
 target_include_directories(aalib PUBLIC src/aalib)
+if(WIN32)
+    target_include_directories(aalib PUBLIC src/compat)
+    target_compile_definitions(aalib PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
 
 # Link libraries to aalib
 if(TARGET SDL2::SDL2)
@@ -125,10 +130,16 @@ target_compile_definitions(hasciicam PRIVATE
     PACKAGE="hasciicam"
     VERSION="${PROJECT_VERSION}"
 )
+if(WIN32)
+    target_include_directories(hasciicam PRIVATE src/compat)
+    target_compile_definitions(hasciicam PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
 target_link_libraries(hasciicam PRIVATE aalib)
 
 # Additional system libraries that may be needed
-target_link_libraries(hasciicam PRIVATE m)
+if(NOT MSVC)
+    target_link_libraries(hasciicam PRIVATE m)
+endif()
 
 # Link optional libraries to hasciicam
 if(TARGET SDL2::SDL2)

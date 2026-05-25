@@ -3,8 +3,12 @@
 #include <stdio.h>
 #include <signal.h>
 #include <setjmp.h>
+#ifdef _WIN32
+#include <conio.h>
+#else
 #include <sys/time.h>
 #include <sys/types.h>
+#endif
 #ifdef GPM_MOUSEDRIVER
 #include <gpm.h>
 #endif
@@ -43,6 +47,24 @@ static void stdin_uninit(aa_context * c)
 }
 static int stdin_getchar(aa_context * c1, int wait)
 {
+#ifdef _WIN32
+    int c;
+
+    (void)c1;
+    if (!wait && !_kbhit())
+        return AA_NONE;
+
+    c = _getch();
+    if (c == 27)
+        return AA_ESC;
+    if (c == 10 || c == 13)
+        return 13;
+    if (c == 8)
+        return AA_BACKSPACE;
+    if (c > 0 && c < 127 && c != 127)
+        return c;
+    return AA_UNKNOWN;
+#else
     int c;
     int flag;
     struct timeval tv;
@@ -97,6 +119,7 @@ static int stdin_getchar(aa_context * c1, int wait)
     }
     if(feof(stdin)) return AA_NONE;
     return (AA_UNKNOWN);
+#endif
 }
 
 
