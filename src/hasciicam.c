@@ -210,11 +210,15 @@ config_init (int argc, char *argv[]) {
   /* setup defaults */
 
   { /* device filename */
+#if defined(_WIN32)
+    device[0] = '\0';
+#else
     struct stat st;
     if( stat("/dev/video",&st) <0)
       strcpy(device,"/dev/video0");
     else
       strcpy(device,"/dev/video");
+#endif
   }
   strcpy(background,"000000");
   strcpy(foreground,"00FF00");
@@ -410,15 +414,6 @@ main (int argc, char **argv) {
   vw = cap_info.width;
   vh = cap_info.height;
   vbytesperline = cap_info.stride_bytes;
-  if (cap_info.pixel_format != CAPTURE_PIXFMT_YUYV &&
-      cap_info.pixel_format != CAPTURE_PIXFMT_YUY2) {
-    fprintf(stderr, "!! unsupported pixel format from backend: %d\n",
-            cap_info.pixel_format);
-    cap_ops->stop(cap_dev);
-    cap_ops->close(cap_dev);
-    exit(-1);
-  }
-
   vid_geo.w = vw;
   vid_geo.h = vh;
   vid_geo.size = vw * vh;
