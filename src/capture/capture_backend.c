@@ -1,4 +1,5 @@
 #include "capture_backend.h"
+#include "capture_avfoundation.h"
 #include "capture_dshow.h"
 #include "capture_mf.h"
 #include "capture_v4l2.h"
@@ -26,6 +27,8 @@ const char *capture_last_error(void) {
 const capture_ops *capture_default_ops(void) {
 #if defined(_WIN32)
     return capture_mf_ops();
+#elif defined(__APPLE__)
+    return capture_avfoundation_ops();
 #else
     return capture_v4l2_ops();
 #endif
@@ -45,6 +48,10 @@ int capture_open_default(const capture_request *req,
     ops_try[0] = capture_mf_ops();
     ops_try[1] = capture_dshow_ops();
     ops_try[2] = capture_v4l2_ops();
+#elif defined(__APPLE__)
+    ops_try[0] = capture_avfoundation_ops();
+    ops_try[1] = NULL;
+    ops_try[2] = NULL;
 #else
     ops_try[0] = capture_v4l2_ops();
     ops_try[1] = NULL;
