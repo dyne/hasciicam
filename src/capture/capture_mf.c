@@ -324,52 +324,71 @@ static int mf_start(capture_device *dev) {
 }
 
 static int mf_read(capture_device *dev, capture_frame *frame) {
-    IMFSample *sample = NULL;
-    IMFMediaBuffer *buffer = NULL;
-    DWORD stream_flags = 0;
-    LONGLONG timestamp = 0;
-    DWORD length = 0;
-    BYTE *data = NULL;
     HRESULT hr;
+    int attempt;
 
     if (dev == NULL || frame == NULL || dev->reader == NULL)
         return 0;
 
-    hr = IMFSourceReader_ReadSample(dev->reader, MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0,
-                                    NULL, &stream_flags, &timestamp, &sample);
-    (void)timestamp;
-    if (FAILED(hr) || sample == NULL)
-        return 0;
-    if (stream_flags & MF_SOURCE_READERF_ENDOFSTREAM) {
-        IMFSample_Release(sample);
-        return 0;
+    for (attempt = 0; attempt < 30; attempt++) {
+        IMFSample *sample = NULL;
+        IMFMediaBuffer *buffer = NULL;
+        DWORD stream_flags = 0;
+        LONGLONG timestamp = 0;
+        DWORD length = 0;
+        BYTE *data = NULL;
+
+        hr = IMFSourceReader_ReadSample(dev->reader, MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0,
+                                        NULL, &stream_flags, &timestamp, &sample);
+        (void)timestamp;
+        if (FAILED(hr)) {
+            Sleep(10);
+            continue;
+        }
+        if (stream_flags & MF_SOURCE_READERF_ENDOFSTREAM) {
+            if (sample) IMFSample_Release(sample);
+            return 0;
+        }
+        if (stream_flags & MF_SOURCE_READERF_STREAMTICK) {
+            if (sample) IMFSample_Release(sample);
+            Sleep(10);
+            continue;
+        }
+        if (sample == NULL) {
+            Sleep(10);
+            continue;
+        }
+
+        hr = IMFSample_ConvertToContiguousBuffer(sample, &buffer);
+        if (FAILED(hr) || buffer == NULL) {
+            IMFSample_Release(sample);
+            Sleep(10);
+            continue;
+        }
+
+        hr = IMFMediaBuffer_Lock(buffer, &data, NULL, &length);
+        if (FAILED(hr) || data == NULL || length == 0) {
+            IMFMediaBuffer_Release(buffer);
+            IMFSample_Release(sample);
+            Sleep(10);
+            continue;
+        }
+
+        dev->active_buffer = buffer;
+        dev->active_sample = sample;
+        dev->active_data = data;
+        dev->active_length = length;
+
+        frame->data = data;
+        frame->data_size = (size_t)length;
+        frame->width = dev->info.width;
+        frame->height = dev->info.height;
+        frame->stride_bytes = dev->info.stride_bytes;
+        frame->pixel_format = dev->info.pixel_format;
+        return 1;
     }
 
-    hr = IMFSample_ConvertToContiguousBuffer(sample, &buffer);
-    if (FAILED(hr) || buffer == NULL) {
-        IMFSample_Release(sample);
-        return 0;
-    }
-
-    hr = IMFMediaBuffer_Lock(buffer, &data, NULL, &length);
-    if (FAILED(hr) || data == NULL) {
-        IMFMediaBuffer_Release(buffer);
-        IMFSample_Release(sample);
-        return 0;
-    }
-
-    dev->active_buffer = buffer;
-    dev->active_sample = sample;
-    dev->active_data = data;
-    dev->active_length = length;
-
-    frame->data = data;
-    frame->data_size = (size_t)length;
-    frame->width = dev->info.width;
-    frame->height = dev->info.height;
-    frame->stride_bytes = dev->info.stride_bytes;
-    frame->pixel_format = dev->info.pixel_format;
-    return 1;
+    return 0;
 }
 
 static void mf_release(capture_device *dev, capture_frame *frame) {
