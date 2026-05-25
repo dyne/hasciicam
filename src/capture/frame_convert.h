@@ -11,7 +11,7 @@
  * - dst_w, dst_h, frame->width, and frame->height must be > 0.
  * - frame->stride_bytes should be >= logical row bytes for interleaved formats.
  * - supported pixel formats are those handled by frame_convert.c:
- *   GRAY8, YUYV, YUY2, NV12, RGB24, BGR24, RGB32, BGRA32.
+ *   GRAY8, YUYV, YUY2, NV12, NV21, RGB24, BGR24, RGB32, BGRA32.
  *
  * Returns:
  * - 1 on successful conversion.

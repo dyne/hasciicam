@@ -51,6 +51,11 @@ int capture_frame_to_gray_scaled(const capture_frame *frame,
                 gray = frame->data[idx];
                 break;
             }
+            case CAPTURE_PIXFMT_NV21: {
+                int idx = src_y * frame->stride_bytes + src_x;
+                gray = frame->data[idx];
+                break;
+            }
             case CAPTURE_PIXFMT_RGB24: {
                 int idx = src_y * frame->stride_bytes + (src_x * 3);
                 gray = rgb_to_luma(frame->data[idx], frame->data[idx + 1], frame->data[idx + 2]);
