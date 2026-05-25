@@ -112,7 +112,7 @@
 :Done when: New output adapters consume the same rendered ASCII representation as SDL/stdout.
 :END:
 
-** WIP [#B] Split file outputs from live outputs
+** DONE [#B] Split file outputs from live outputs
 :PROPERTIES:
 :Why: HTML/text file output has different lifecycle rules than live windows, mobile surfaces, or web canvases.
 :Change: Keep save_d support but expose file output as its own adapter family: output_file_text and output_file_html. Move hascii_header construction out of main into file output setup.
@@ -120,7 +120,7 @@
 :Done when: HTML/text modes no longer rely on live-output setup branches.
 :END:
 
-** TODO [#B] Add a memory output adapter
+** WIP [#B] Add a memory output adapter
 :PROPERTIES:
 :Why: Mobile and WASM hosts need to pull rendered frames from memory, and tests need deterministic output without a camera window.
 :Change: Add output_memory that stores the latest rendered text and attrs in a caller-owned or adapter-owned buffer. Keep it independent of SDL.

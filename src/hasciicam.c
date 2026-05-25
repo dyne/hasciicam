@@ -48,6 +48,7 @@
 #include "app/app_session.h"
 #include "capture/capture_backend.h"
 #include "output/output.h"
+#include "output/output_file.h"
 #include "render/render_session.h"
 
 /* hasciicam modes */
@@ -225,15 +226,15 @@ main (int argc, char **argv) {
       break;
 
     case HTML:
-      hasciicam_render_session_configure_save(&render_session, mode, aafile,
-                                              aatmpfile, sizeof(aatmpfile));
+      hasciicam_output_file_prepare(&render_session, mode, aafile,
+                                    aatmpfile, sizeof(aatmpfile));
 
       fprintf (stderr, "using HTML mode dumping to file %s\n", aafile);
       break;
 
     case TEXT:
-      hasciicam_render_session_configure_save(&render_session, mode, aafile,
-                                              aatmpfile, sizeof(aatmpfile));
+      hasciicam_output_file_prepare(&render_session, mode, aafile,
+                                    aatmpfile, sizeof(aatmpfile));
 
       fprintf (stderr, "using TEXT mode dumping to file %s\n", aafile);
 
