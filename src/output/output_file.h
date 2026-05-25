@@ -8,5 +8,6 @@ int hasciicam_output_file_prepare(hasciicam_render_session *render_session,
                                   char *aafile,
                                   char *tmpfile,
                                   size_t tmpfile_size);
+int hasciicam_output_file_publish_html(const char *tmpfile, const char *aafile);
 
 #endif
