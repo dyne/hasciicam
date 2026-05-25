@@ -299,6 +299,7 @@ main (int argc, char **argv) {
   while (userbreak <1 && !hasciicam_session_should_stop(&session)) {
     const unsigned char *gray_frame = NULL;
     int gray_size = 0;
+    int frame_rendered = 0;
 
     if (!hasciicam_session_step(&session, aa_imgwidth(render_session.context),
                                 aa_imgheight(render_session.context),
@@ -319,6 +320,7 @@ main (int argc, char **argv) {
       if (copy_size > 0) {
         memcpy(aa_image(render_session.context), gray_frame, copy_size);
         hasciicam_output_write_ascii_frame(&output, ascii_width, ascii_height);
+        frame_rendered = 1;
       }
     }
 	/*aa_setpalette (gamma di colori, indice, colore rosso, verde, blu)*/
@@ -327,9 +329,11 @@ main (int argc, char **argv) {
 //    aa_render (ascii_context, ascii_rndparms, 0, 0,
 //	       vid_geo.w,vid_geo.h);
 
-    hasciicam_output_poll(&output);
-  //  unlink(aafile);
-    rename(aatmpfile,aafile);
+    if (mode == LIVE) {
+      hasciicam_output_poll(&output);
+    } else if (mode == HTML && frame_rendered) {
+      rename(aatmpfile, aafile);
+    }
 
   }
 
