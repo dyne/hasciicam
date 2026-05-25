@@ -151,7 +151,7 @@
 :Done when: V4L2 remains the baseline adapter and does not depend on Windows or future platform code.
 :END:
 
-** WIP [#A] Keep Windows Media Foundation primary and DirectShow fallback
+** DONE [#A] Keep Windows Media Foundation primary and DirectShow fallback
 :PROPERTIES:
 :Why: Windows capture is now working and should remain the main pattern for fallback orchestration.
 :Change: Keep Media Foundation first, DirectShow second. Add tests/smoke documentation for first-camera default, device-name matching, and supported pixel formats. Avoid changing aalib for Windows capture.
@@ -159,7 +159,7 @@
 :Done when: Windows has a documented, repeatable smoke test for both capture and SDL output.
 :END:
 
-** TODO [#A] Add macOS capture through AVFoundation
+** WIP [#A] Add macOS capture through AVFoundation
 :PROPERTIES:
 :Why: macOS camera access is AVFoundation, not V4L2. This needs an adapter but should not affect the core.
 :Change: Add src/capture/capture_avfoundation.mm behind a C header capture_avfoundation.h. Keep Objective-C++ confined to this file if approved; expose only capture_ops. Request BGRA/NV12 where possible and convert through frame_convert.c.
