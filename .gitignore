@@ -1,4 +1,6 @@
 src/hasciicam
+build/
+build-*/
 *.[oa]
 *.so
 *.la
