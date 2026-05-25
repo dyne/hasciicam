@@ -277,7 +277,7 @@
 :Done when: Running the built executable from its build directory works without manual DLL copying.
 :END:
 
-* WIP [#B] Prepare Platform Host Shells
+* DONE [#B] Prepare Platform Host Shells
 :PROPERTIES:
 :Effort: 2-6 weeks
 :Goal: Let each non-CLI platform own its lifecycle while sharing the same C/C++ core.
@@ -316,7 +316,7 @@
 :Done when: Android can show ASCII frames using the shared core.
 :END:
 
-** WIP [#B] Add a WASM browser sample
+** DONE [#B] Add a WASM browser sample
 :PROPERTIES:
 :Why: WASM needs JavaScript for camera and canvas/text output. The core should expose memory functions and avoid direct DOM assumptions.
 :Change: Add examples/wasm with Emscripten build docs, a JS bridge that feeds RGBA frames from a canvas/video element, and output to a pre/text canvas.
@@ -324,14 +324,14 @@
 :Done when: WASM can render a frame through the same core without native capture or SDL.
 :END:
 
-* TODO [#B] Add A Small Test And Smoke-Test Discipline
+* DONE [#B] Add A Small Test And Smoke-Test Discipline
 :PROPERTIES:
 :Effort: 3-6 days
 :Goal: Make refactoring safe for humans and LLMs.
 :Notes: Keep tests small and C-native. Do not introduce a large test framework unless asked.
 :END:
 
-** TODO [#A] Enable CTest
+** DONE [#A] Enable CTest
 :PROPERTIES:
 :Why: Refactors need repeatable commands beyond manual camera tests.
 :Change: Add enable_testing() behind HASCIICAM_ENABLE_TESTS and simple add_test entries for conversion and public API tests.
@@ -339,7 +339,7 @@
 :Done when: The repository has one standard test command.
 :END:
 
-** TODO [#A] Add synthetic frame smoke tests
+** DONE [#A] Add synthetic frame smoke tests
 :PROPERTIES:
 :Why: Camera hardware and permissions vary by platform. Synthetic frames prove the core pipeline works everywhere.
 :Change: Add tests that create a fixed grayscale or RGB frame, run it through conversion/render/memory output, and verify dimensions and non-empty ASCII.
@@ -347,7 +347,7 @@
 :Done when: A platform without a camera can still validate the core.
 :END:
 
-** TODO [#B] Add documented manual smoke tests
+** DONE [#B] Add documented manual smoke tests
 :PROPERTIES:
 :Why: Camera and window behavior still need manual checks.
 :Change: Add docs/smoke-tests.md with commands for Windows SDL/camera, Linux V4L2, macOS AVFoundation, text/html output, and close-window behavior.
@@ -355,7 +355,7 @@
 :Done when: A maintainer can test a platform in five minutes with copyable commands.
 :END:
 
-** TODO [#C] Add CI only after local tests are stable
+** DONE [#C] Add CI only after local tests are stable
 :PROPERTIES:
 :Why: CI is useful, but premature CI across cameras/mobile will be noisy.
 :Change: Start with build-only CI for Windows/Linux/macOS and unit tests. Do not attempt real camera CI. Add WASM build CI later.
@@ -363,14 +363,14 @@
 :Done when: Pull requests catch build and conversion regressions before manual camera testing.
 :END:
 
-* TODO [#B] Maintain Backward Compatibility Deliberately
+* DONE [#B] Maintain Backward Compatibility Deliberately
 :PROPERTIES:
 :Effort: Ongoing
 :Goal: Keep HasciiCam recognizable while making internals portable.
 :Notes: This is a guardrail for every implementation phase.
 :END:
 
-** TODO [#A] Preserve CLI behavior
+** DONE [#A] Preserve CLI behavior
 :PROPERTIES:
 :Why: Existing users expect the old command-line shape.
 :Change: Keep flags and defaults compatible unless explicitly changed. If a platform cannot support an option such as daemon or uid/gid, print a clear no-op message as Windows does today.
@@ -378,7 +378,7 @@
 :Done when: Existing documented commands still work on supported desktop platforms.
 :END:
 
-** TODO [#A] Keep aalib rendering semantics stable
+** DONE [#A] Keep aalib rendering semantics stable
 :PROPERTIES:
 :Why: The ASCII look is the product. Refactors should not casually change brightness, contrast, gamma, dithering, or font behavior.
 :Change: Treat visual output changes as intentional features. Add a fixed synthetic render fixture before touching renderer internals.
@@ -386,7 +386,7 @@
 :Done when: Renderer changes are rare, explicit, and test-backed.
 :END:
 
-** TODO [#B] Keep platform code isolated
+** DONE [#B] Keep platform code isolated
 :PROPERTIES:
 :Why: Ten years of maintenance depends on not spreading #ifdef blocks through the core.
 :Change: Platform files should live under src/capture, src/output, or examples/platform. Public headers stay portable C. C++/Objective-C++ is allowed only inside adapters that require it.
@@ -394,7 +394,7 @@
 :Done when: Core files compile without including Windows, Linux, Apple, Android, or Emscripten-specific headers.
 :END:
 
-** TODO [#C] Add dependencies only when they replace real platform complexity
+** DONE [#C] Add dependencies only when they replace real platform complexity
 :PROPERTIES:
 :Why: More dependencies increase porting and packaging burden.
 :Change: Prefer platform APIs and SDL where already used. Propose any new dependency in the plan or PR before adding it.
@@ -402,14 +402,14 @@
 :Done when: The dependency list remains short and intentional.
 :END:
 
-* TODO [#C] Implementation Order And Commit Discipline
+* DONE [#C] Implementation Order And Commit Discipline
 :PROPERTIES:
 :Effort: Ongoing
 :Goal: Make the work implementable by small, reviewable steps.
 :Notes: Follow AGENTS.md workflow when implementing this plan.
 :END:
 
-** TODO [#A] Implement in architecture order, not platform excitement order
+** DONE [#A] Implement in architecture order, not platform excitement order
 :PROPERTIES:
 :Why: Jumping straight to iOS/Android/WASM before extracting the core will duplicate logic and make maintenance worse.
 :Change: Complete boundaries, app core, output ports, conversion tests, and CMake library targets before adding mobile/browser hosts.
@@ -417,7 +417,7 @@
 :Done when: Every later platform adapter is mostly glue around stable core APIs.
 :END:
 
-** TODO [#A] Use one conventional commit per L2
+** DONE [#A] Use one conventional commit per L2
 :PROPERTIES:
 :Why: Small commits let maintainers bisect regressions and let LLMs resume work reliably.
 :Change: For each L2 implementation, commit all touched files with a conventional commit. Examples: refactor: extract app config, test: add frame conversion fixtures, feat: add external capture source.
@@ -425,7 +425,7 @@
 :Done when: Git history mirrors the plan and each commit is reviewable alone.
 :END:
 
-** TODO [#B] Update AGENTS.md after major architecture changes
+** DONE [#B] Update AGENTS.md after major architecture changes
 :PROPERTIES:
 :Why: AGENTS.md is the fast path for future coding agents.
 :Change: After completing each L1 that changes architecture, update AGENTS.md with the new source map and build/test commands.
