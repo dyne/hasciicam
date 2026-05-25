@@ -125,7 +125,10 @@ if(CURSES_FOUND)
 endif()
 
 # Main executable
-add_executable(hasciicam src/hasciicam.c)
+add_executable(hasciicam
+    src/hasciicam.c
+    src/capture/capture_v4l2.c
+)
 target_compile_definitions(hasciicam PRIVATE
     PACKAGE="hasciicam"
     VERSION="${PROJECT_VERSION}"

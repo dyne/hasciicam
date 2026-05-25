@@ -18,7 +18,7 @@
 :Done when: The capture interface compiles on Windows and Linux and describes enough metadata for the existing render loop to consume frames without knowing which API produced them.
 :END:
 
-** WIP [#A] Move Linux V4L2 into a Linux adapter
+** DONE [#A] Move Linux V4L2 into a Linux adapter
 :PROPERTIES:
 :Why: `src/hasciicam.c` currently owns V4L2 types, mmap buffers, ioctls, and frame dequeue/requeue. That blocks clean Windows support and makes every platform change touch the main loop.
 :Change: Move `vid_detect()`, `vid_init()`, V4L2 globals, `VIDIOC_*` calls, mmap buffer ownership, and V4L2 cleanup into `src/capture/capture_v4l2.c`. Keep function names close to the current language but expose them through the new capture port. Preserve the current YUYV request via `V4L2_PIX_FMT_YUYV`.
@@ -26,7 +26,7 @@
 :Done when: `src/hasciicam.c` no longer includes Linux video headers or owns V4L2 buffers, and Linux behavior is intended to remain unchanged.
 :END:
 
-** TODO [#A] Make the main loop backend-neutral
+** WIP [#A] Make the main loop backend-neutral
 :PROPERTIES:
 :Why: The render loop should only pull a frame, convert luminance, copy to `aa_image()`, render, flush, and release the frame. It should not know about V4L2, Media Foundation, or DirectShow.
 :Change: Replace direct calls to `vid_detect()`, `vid_init()`, `grab_one()`, and platform cleanup with capture-port calls such as `capture_open()`, `capture_start()`, `capture_read()`, `capture_release()`, `capture_stop()`, and `capture_close()`. Keep the old command-line options mapped into the capture request.
