@@ -18,7 +18,7 @@
 :Done when: A lesser LLM can identify which file owns capture, conversion, rendering, and driver selection without reading all of src/hasciicam.c.
 :END:
 
-** WIP [#A] Add a small architecture map beside the code
+** DONE [#A] Add a small architecture map beside the code
 :PROPERTIES:
 :Why: Cross-platform work will add several adapters; future maintainers need a short source map.
 :Change: Add docs/architecture.md or docs/architecture.org describing modules, public contracts, platform adapters, and build options. Keep it factual and tied to current file paths.
@@ -26,7 +26,7 @@
 :Done when: The document names every planned port family: capture, output/render, app shell, filesystem/save, and build.
 :END:
 
-** TODO [#A] Freeze the capture API as a stable C port
+** WIP [#A] Freeze the capture API as a stable C port
 :PROPERTIES:
 :Why: src/capture/capture.h is already the best boundary in the refactor. It should be treated as a compatibility contract before adding Apple, Android, and WASM capture.
 :Change: Add native C doc-comments to capture.h. Clarify ownership of capture_frame.data, when release() is mandatory, valid stride rules, and expected pixel formats. Do not add behavior yet.
