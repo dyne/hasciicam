@@ -47,6 +47,7 @@
 #include "app/app_config.h"
 #include "app/app_session.h"
 #include "capture/capture_backend.h"
+#include "render/render_session.h"
 
 /* hasciicam modes */
 #define LIVE 0
@@ -94,35 +95,6 @@ char aatmpfile[256];
 void quitproc (int Sig);
 volatile sig_atomic_t userbreak;
 
-/* ascii context & html formatting stuff*/
-aa_context *ascii_context;
-struct aa_renderparams *ascii_rndparms;
-struct aa_hardware_params ascii_hwparms;
-struct aa_savedata ascii_save;
-
-char hascii_header[1024];
-
-const char * const html_escapes[] =
-  { "<", "&lt;", ">", "&gt;", "&", "&amp;", NULL };
-
-struct aa_format hascii_format = {
-  79, 25,
-  0, 0,
-  0,
-  AA_NORMAL_MASK | AA_BOLD_MASK | AA_BOLDFONT_MASK,
-  NULL,
-  "Pure html",
-  ".html",
-  hascii_header,
-  "</PRE>\n</FONT>\n</BODY>\n</HTML>\n",
-  "\n",
-  /*The order is:normal, dim, bold, boldfont, reverse, special */
-  {"%s", "%s", "%s", "%s", "%s"},
-  {"", "", "<B>", "", "<B>"},
-  {"", "", "</B>", "", "</B>"},
-  html_escapes
-};
-
 /* greyscale image is sampled from Y luminance component */
 int YtoRGB[256];
 int xstep=2, ystep=4;
@@ -141,6 +113,7 @@ main (int argc, char **argv) {
   capture_request cap_req;
   const capture_info *cap_info = NULL;
   hasciicam_session session;
+  hasciicam_render_session render_session;
 
     /* reminder:
        !!! grabbing height & width should be double
@@ -166,12 +139,11 @@ main (int argc, char **argv) {
 #endif
 
 
-  /* initialize aalib default params */
-  memcpy (&ascii_hwparms, &aa_defparams, sizeof (struct aa_hardware_params));
-  ascii_rndparms = aa_getrenderparams();
+  /* initialize render session defaults */
+  hasciicam_render_session_init(&render_session);
 
   /* gathering aalib commandline options */
-  aa_parseoptions (&ascii_hwparms, ascii_rndparms, &argc, argv);
+  aa_parseoptions(&render_session.hwparams, render_session.render_params, &argc, argv);
 
   /* set hasciicam options */
   hasciicam_config_parse(&appcfg, argc, argv, aa_help, PACKAGE, VERSION);
@@ -241,28 +213,9 @@ main (int argc, char **argv) {
 
   fprintf(stderr, "Grey buffer is %i bytes\n", gw * gh);
 
-  /* width/height image setup */
-  ascii_hwparms.font = NULL; // default font, thanks
-  /* Use recommended dimensions instead of exact for flexibility with DPI scaling */
-  ascii_hwparms.width = 0;
-  ascii_hwparms.height = 0;
-  ascii_hwparms.recwidth = aw;
-  ascii_hwparms.recheight = ah;
-
-
-  /* init the html header */
-  snprintf (&hascii_header[0], 1024,
-	    "<HTML>\n <HEAD> <TITLE>wow! (h)ascii 4 the masses!</TITLE>\n"
-	    "<META HTTP-EQUIV=\"refresh\" CONTENT=\"%u\"; url=\"%s\">\n"
-	    "<META HTTP-EQUIV=\"Pragma\" CONTENT=\"no-cache\">\n"
-	    "<STYLE TYPE=\"text/css\">\n"
-	    "<!--\npre {\nletter-spacing: 1px;\n"
-	    "layer-background-color: Black;\n"
-	    "left : auto;\nline-height : %upx;\n}\n-->\n"
-	    "</STYLE>\n</HEAD>\n<BODY bgcolor=\"#%s\" text=\"#%s\">\n"
-	    "<FONT SIZE=%u face=\"%s\">\n<PRE>\n",
-	    refresh, aafile, linespace, background, foreground, fontsize,
-	    fontface);
+  hasciicam_render_session_configure_geometry(&render_session, aw, ah);
+  hasciicam_render_session_prepare_html(&render_session, refresh, aafile, linespace,
+                                        background, foreground, fontsize, fontface);
 
 #if !defined(_WIN32)
   setgroups(0, NULL);
@@ -279,18 +232,15 @@ main (int argc, char **argv) {
       break;
 
     case HTML:
-      snprintf(aatmpfile,255,"%s.tmp",aafile);
-      ascii_save.name = aatmpfile;
-      ascii_save.format = &hascii_format;
-      ascii_save.file = NULL;
+      hasciicam_render_session_configure_save(&render_session, mode, aafile,
+                                              aatmpfile, sizeof(aatmpfile));
 
       fprintf (stderr, "using HTML mode dumping to file %s\n", aafile);
       break;
 
     case TEXT:
-      ascii_save.name = aafile;
-      ascii_save.format = &aa_text_format;
-      ascii_save.file = NULL;
+      hasciicam_render_session_configure_save(&render_session, mode, aafile,
+                                              aatmpfile, sizeof(aatmpfile));
 
       fprintf (stderr, "using TEXT mode dumping to file %s\n", aafile);
 
@@ -302,31 +252,10 @@ main (int argc, char **argv) {
 
   fprintf(stderr,"\n");
 
-  /* aalib init */
   if (mode > 0) {
     fprintf(stderr,"Using save mode with file output\n");
-    ascii_context = aa_init (&save_d, &ascii_hwparms, &ascii_save);
-  } else {
-    /* set driver preferences */
-    if(strlen(aadriver) > 0) {
-      /* user specified a driver */
-      if(!quiet)
-        fprintf(stderr,"Driver preference: %s\n", aadriver);
-      aa_recommendhidisplay(aadriver);
-    } else {
-      /* default: prefer SDL, then X11, then text-based */
-      if(!quiet)
-        fprintf(stderr,"Auto-detecting display driver (SDL preferred)\n");
-      aa_recommendhidisplay("SDL");
-      aa_recommendhidisplay("X11");
-      aa_recommendhidisplay("curses");
-      aa_recommendhidisplay("linux");
-      aa_recommendhidisplay("stdout");
-    }
-    ascii_context = aa_autoinit (&ascii_hwparms);
   }
-
-  if(!ascii_context) {
+  if (!hasciicam_render_session_open(&render_session, mode, aadriver, quiet)) {
     fprintf(stderr,"!! cannot initialize aalib\n");
     if(strlen(aadriver) > 0) {
       fprintf(stderr,"!! failed to initialize '%s' driver\n", aadriver);
@@ -336,16 +265,16 @@ main (int argc, char **argv) {
   }
 
   /* report which driver was actually initialized */
-  if(!quiet && ascii_context->driver) {
+  if(!quiet && render_session.context->driver) {
     fprintf(stderr,"Using driver: %s (%s)\n",
-            ascii_context->driver->shortname,
-            ascii_context->driver->name);
+            render_session.context->driver->shortname,
+            render_session.context->driver->name);
   }
 
-
-  ascii_rndparms->bright = aa_geo.bright;
-  ascii_rndparms->contrast = aa_geo.contrast;
-  ascii_rndparms->gamma = (float)aa_geo.gamma;
+  hasciicam_render_session_apply_tuning(&render_session,
+                                        aa_geo.bright,
+                                        aa_geo.contrast,
+                                        (float)aa_geo.gamma);
   // those are left to be setted by aalib options
   //  ascii_rndparms->dither = AA_FLOYD_S;
   //  ascii_rndparms->inversion = invert;
@@ -371,26 +300,26 @@ main (int argc, char **argv) {
     const unsigned char *gray_frame = NULL;
     int gray_size = 0;
 
-    if (!hasciicam_session_step(&session, aa_imgwidth(ascii_context),
-                                aa_imgheight(ascii_context),
+    if (!hasciicam_session_step(&session, aa_imgwidth(render_session.context),
+                                aa_imgheight(render_session.context),
                                 &gray_frame, &gray_size)) {
       break;
     }
 
     if ((++framenum) == renderhop) {
-      int ascii_width = aa_imgwidth(ascii_context);
-      int ascii_height = aa_imgheight(ascii_context);
+      int ascii_width = aa_imgwidth(render_session.context);
+      int ascii_height = aa_imgheight(render_session.context);
       int dest_size;
       int copy_size;
 
       framenum = 0;
-      dest_size = aa_imgwidth(ascii_context) * aa_imgheight(ascii_context);
+      dest_size = aa_imgwidth(render_session.context) * aa_imgheight(render_session.context);
       copy_size = (gray_size < dest_size) ? gray_size : dest_size;
       if (copy_size > 0) {
-        memcpy(aa_image(ascii_context), gray_frame, copy_size);
-        aa_fastrender(ascii_context, 0, 0, ascii_width / 2, ascii_height / 2);
+        memcpy(aa_image(render_session.context), gray_frame, copy_size);
+        aa_fastrender(render_session.context, 0, 0, ascii_width / 2, ascii_height / 2);
       }
-      aa_flush(ascii_context);
+      aa_flush(render_session.context);
     }
 	/*aa_setpalette (gamma di colori, indice, colore rosso, verde, blu)*/
 
@@ -398,7 +327,7 @@ main (int argc, char **argv) {
 //    aa_render (ascii_context, ascii_rndparms, 0, 0,
 //	       vid_geo.w,vid_geo.h);
 
-    aa_flush (ascii_context);
+    aa_flush (render_session.context);
   //  unlink(aafile);
     rename(aatmpfile,aafile);
 
@@ -407,7 +336,7 @@ main (int argc, char **argv) {
   /* CLEAN EXIT */
 
   hasciicam_session_stop(&session);
-  aa_close(ascii_context);
+  hasciicam_render_session_close(&render_session);
   fprintf (stderr, "cya!\n");
   exit (0);
 /*++userbreak;*/
