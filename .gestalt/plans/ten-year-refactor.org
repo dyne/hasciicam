@@ -65,7 +65,7 @@
 :Done when: The CLI main loop is small and the session can be stepped by a non-CLI host.
 :END:
 
-** WIP [#A] Move aalib setup into a render_session module
+** DONE [#A] Move aalib setup into a render_session module
 :PROPERTIES:
 :Why: Output selection and aalib initialization are mixed into application startup. Future outputs need an explicit rendering boundary.
 :Change: Create src/render/render_session.h and src/render/render_session.c. Move aalib hardware params, render params, save mode setup, driver recommendations, aa_init/aa_autoinit, and aa_close there. Keep aalib itself vendored and unchanged except for driver fixes.
@@ -73,7 +73,7 @@
 :Done when: app_session writes luminance to a renderer through a small function instead of directly owning aa_context details.
 :END:
 
-** TODO [#B] Replace cross-module globals with context structs
+** WIP [#B] Replace cross-module globals with context structs
 :PROPERTIES:
 :Why: Globals block multiple sessions and make mobile/WASM embedding fragile.
 :Change: Move globals from src/hasciicam.c into hasciicam_config, hasciicam_session, and hasciicam_render_session. Leave truly process-wide signal state in the CLI shell until a cleaner shutdown port exists.
