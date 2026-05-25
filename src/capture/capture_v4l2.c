@@ -31,14 +31,7 @@ struct capture_device {
     struct v4l2_buffer_map *buffers;
 };
 
-struct geometry {
-    int w;
-    int h;
-    int size;
-    int bright;
-    int contrast;
-    int gamma;
-};
+static void v4l2_stop(capture_device *dev);
 
 static int v4l2_open(capture_device **out, const capture_request *req) {
     struct capture_device *dev;
@@ -192,6 +185,7 @@ static int v4l2_start(capture_device *dev) {
 
         if (ioctl(dev->fd, VIDIOC_QUERYBUF, &buffer) == -1) {
             perror("VIDIOC_QUERYBUF");
+            v4l2_stop(dev);
             return 0;
         }
 
@@ -200,6 +194,7 @@ static int v4l2_start(capture_device *dev) {
                                      MAP_SHARED, dev->fd, buffer.m.offset);
         if (dev->buffers[i].start == MAP_FAILED) {
             perror("mmap");
+            v4l2_stop(dev);
             return 0;
         }
     }
@@ -211,6 +206,7 @@ static int v4l2_start(capture_device *dev) {
         buffer.index = (unsigned int)i;
         if (ioctl(dev->fd, VIDIOC_QBUF, &buffer) == -1) {
             perror("VIDIOC_QBUF");
+            v4l2_stop(dev);
             return 0;
         }
     }
@@ -218,6 +214,7 @@ static int v4l2_start(capture_device *dev) {
     buftype = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (ioctl(dev->fd, VIDIOC_STREAMON, &buftype) == -1) {
         perror("VIDIOC_STREAMON");
+        v4l2_stop(dev);
         return 0;
     }
     dev->streaming = 1;

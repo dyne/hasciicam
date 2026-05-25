@@ -143,7 +143,7 @@
 :Notes: Capture adapters may use C++ where the platform API requires it. Public headers stay C.
 :END:
 
-** WIP [#A] Keep Linux V4L2 as the reference adapter
+** DONE [#A] Keep Linux V4L2 as the reference adapter
 :PROPERTIES:
 :Why: V4L2 is the original behavior and the simplest reference for mmap/dequeue/release semantics.
 :Change: Clean capture_v4l2.c only enough to match the documented capture.h contract. Keep YUYV preference and existing device/input behavior.
@@ -151,7 +151,7 @@
 :Done when: V4L2 remains the baseline adapter and does not depend on Windows or future platform code.
 :END:
 
-** TODO [#A] Keep Windows Media Foundation primary and DirectShow fallback
+** WIP [#A] Keep Windows Media Foundation primary and DirectShow fallback
 :PROPERTIES:
 :Why: Windows capture is now working and should remain the main pattern for fallback orchestration.
 :Change: Keep Media Foundation first, DirectShow second. Add tests/smoke documentation for first-camera default, device-name matching, and supported pixel formats. Avoid changing aalib for Windows capture.
