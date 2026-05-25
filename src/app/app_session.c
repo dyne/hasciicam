@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../capture/capture_backend.h"
+#include "../capture/capture_external.h"
 #include "../capture/frame_convert.h"
 
 int hasciicam_session_start(hasciicam_session *session, const capture_request *req) {
@@ -69,6 +70,15 @@ int hasciicam_session_step(hasciicam_session *session,
     if (gray_size != NULL)
         *gray_size = session->gray_size;
     return 1;
+}
+
+int hasciicam_session_submit_frame(const unsigned char *data,
+                                   size_t data_size,
+                                   int width,
+                                   int height,
+                                   int stride_bytes,
+                                   capture_pixel_format pixel_format) {
+    return capture_external_submit_frame(data, data_size, width, height, stride_bytes, pixel_format);
 }
 
 void hasciicam_session_stop(hasciicam_session *session) {
