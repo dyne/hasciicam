@@ -237,7 +237,7 @@
 :Notes: CMake stays the build system of record. Avoid extra build frameworks unless a platform requires its native wrapper.
 :END:
 
-** WIP [#A] Split CMake sources by target and platform
+** DONE [#A] Split CMake sources by target and platform
 :PROPERTIES:
 :Why: CMakeLists.txt currently mixes aalib, hasciicam, capture sources, optional drivers, and platform libraries in one file.
 :Change: Create cmake/HasciiCamSources.cmake or subdirectory CMakeLists files for aalib, capture, render/output, app core, and CLI. Keep the top-level file readable.
@@ -245,7 +245,7 @@
 :Done when: Adding one platform adapter does not require editing a long source list in multiple places.
 :END:
 
-** TODO [#A] Add explicit build options
+** WIP [#A] Add explicit build options
 :PROPERTIES:
 :Why: Cross-platform targets need predictable feature toggles instead of only auto-detection.
 :Change: Add options such as HASCIICAM_BUILD_CLI, HASCIICAM_ENABLE_SDL, HASCIICAM_ENABLE_X11, HASCIICAM_ENABLE_CURSES, HASCIICAM_ENABLE_CAPTURE_V4L2, HASCIICAM_ENABLE_CAPTURE_MF, HASCIICAM_ENABLE_CAPTURE_DSHOW, HASCIICAM_ENABLE_TESTS. Defaults should match current platform behavior.

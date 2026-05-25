@@ -35,69 +35,16 @@ if(ENABLE_ASAN)
     add_link_options(-fsanitize=address)
 endif()
 
-set(AALIB_SOURCES
-    src/aalib/aaattrs.c
-    src/aalib/aacurkbd.c
-    src/aalib/aacurmou.c
-    src/aalib/aacurrfnt.c
-    src/aalib/aacurses.c
-    src/aalib/aaedit.c
-    src/aalib/aafastre.c
-    src/aalib/aaflush.c
-    src/aalib/aafont.c
-    src/aalib/aafonts.c
-    src/aalib/aahelp.c
-    src/aalib/aaimage.c
-    src/aalib/aaimgheight.c
-    src/aalib/aaimgwidth.c
-    src/aalib/aain.c
-    src/aalib/aakbdreg.c
-    src/aalib/aalib.c
-    src/aalib/aalinux.c
-    src/aalib/aalinuxkbd.c
-    src/aalib/aamem.c
-    src/aalib/aamktabl.c
-    src/aalib/aammheight.c
-    src/aalib/aammwidth.c
-    src/aalib/aamoureg.c
-    src/aalib/aaout.c
-    src/aalib/aaparse.c
-    src/aalib/aaprintf.c
-    src/aalib/aaputpixel.c
-    src/aalib/aarec.c
-    src/aalib/aarecfunc.c
-    src/aalib/aaregist.c
-    src/aalib/aarender.c
-    src/aalib/aasave.c
-    src/aalib/aascrheight.c
-    src/aalib/aascrwidth.c
-    src/aalib/aastdin.c
-    src/aalib/aastdout.c
-    src/aalib/aatext.c
-    src/aalib/font14.c
-    src/aalib/font16.c
-    src/aalib/font8.c
-    src/aalib/font9.c
-    src/aalib/fontcour.c
-    src/aalib/fontgl.c
-    src/aalib/fontline.c
-    src/aalib/fontx13b.c
-    src/aalib/fontx13.c
-    src/aalib/fontx16.c
-)
-
-if(WIN32)
-    list(APPEND AALIB_SOURCES src/compat/getopt.c)
-endif()
+include(cmake/HasciiCamSources.cmake)
 
 # Conditionally add SDL driver
 if(TARGET SDL2::SDL2)
-    list(APPEND AALIB_SOURCES src/aalib/aasdl.c)
+    list(APPEND HASCIICAM_AALIB_SOURCES src/aalib/aasdl.c)
 endif()
 
 # Conditionally add X11 driver
 if(X11_FOUND)
-    list(APPEND AALIB_SOURCES
+    list(APPEND HASCIICAM_AALIB_SOURCES
         src/aalib/aax.c
         src/aalib/aaxkbd.c
         src/aalib/aaxmouse.c
@@ -105,7 +52,7 @@ if(X11_FOUND)
 endif()
 
 # Create aalib static library
-add_library(aalib STATIC ${AALIB_SOURCES})
+add_library(aalib STATIC ${HASCIICAM_AALIB_SOURCES})
 target_include_directories(aalib PUBLIC src/aalib)
 if(WIN32)
     target_include_directories(aalib PUBLIC src/compat)
@@ -127,19 +74,11 @@ endif()
 
 # Main executable
 add_executable(hasciicam
-    src/app/app_config.c
-    src/app/app_session.c
-    src/output/output.c
-    src/output/output_file.c
-    src/output/output_memory.c
-    src/render/render_session.c
+    ${HASCIICAM_APP_SOURCES}
+    ${HASCIICAM_OUTPUT_SOURCES}
+    ${HASCIICAM_RENDER_SOURCES}
     src/hasciicam.c
-    src/capture/capture_backend.c
-    src/capture/capture_external.c
-    src/capture/capture_dshow.cpp
-    src/capture/capture_mf.c
-    src/capture/frame_convert.c
-    src/capture/capture_v4l2.c
+    ${HASCIICAM_CAPTURE_SOURCES}
 )
 if(APPLE)
   target_sources(hasciicam PRIVATE src/capture/capture_avfoundation.mm)
