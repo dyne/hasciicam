@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Options
 option(ENABLE_ASAN "Enable AddressSanitizer for debugging" OFF)
+option(HASCIICAM_ENABLE_TESTS "Enable hasciicam unit tests" ON)
 
 find_package(SDL2 QUIET)
 if(TARGET SDL2::SDL2)
@@ -188,3 +189,13 @@ endif()
 # Install targets
 install(TARGETS hasciicam DESTINATION bin)
 install(FILES doc/hasciicam.1 DESTINATION share/man/man1 OPTIONAL)
+
+if(HASCIICAM_ENABLE_TESTS)
+  enable_testing()
+  add_executable(test_frame_convert
+    tests/test_frame_convert.c
+    src/capture/frame_convert.c
+  )
+  target_include_directories(test_frame_convert PRIVATE src/capture)
+  add_test(NAME frame_convert COMMAND test_frame_convert)
+endif()

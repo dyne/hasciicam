@@ -206,7 +206,7 @@
 :Done when: Adapter authors know exactly how to call conversion functions.
 :END:
 
-** WIP [#A] Add deterministic conversion tests
+** DONE [#A] Add deterministic conversion tests
 :PROPERTIES:
 :Why: Live camera smoke tests cannot prove RGB/NV12/YUYV conversion stays correct.
 :Change: Add a small C test executable under tests/ that feeds tiny fixed frames for GRAY8, YUYV/YUY2, NV12, RGB24/BGR24, RGB32/BGRA32 and checks expected grayscale values.
@@ -214,7 +214,7 @@
 :Done when: Conversion changes fail fast without needing a camera.
 :END:
 
-** TODO [#B] Add NV21 and platform-common mobile formats if needed
+** WIP [#B] Add NV21 and platform-common mobile formats if needed
 :PROPERTIES:
 :Why: Android often exposes NV21/YUV_420_888-like layouts. iOS often exposes NV12/BGRA.
 :Change: Add only formats actually needed by an adapter or host bridge. Prefer explicit planar metadata before guessing layout from one pointer.
