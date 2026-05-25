@@ -133,6 +133,17 @@ void hasciicam_render_session_apply_tuning(hasciicam_render_session *session,
     session->render_params->gamma = gamma;
 }
 
+int hasciicam_render_session_get_ascii_frame(const hasciicam_render_session *session,
+                                             hasciicam_ascii_frame *frame) {
+    if (session == NULL || session->context == NULL || frame == NULL)
+        return 0;
+    frame->text = aa_text(session->context);
+    frame->attrs = aa_attrs(session->context);
+    frame->width = aa_scrwidth(session->context);
+    frame->height = aa_scrheight(session->context);
+    return frame->text != NULL && frame->attrs != NULL;
+}
+
 void hasciicam_render_session_close(hasciicam_render_session *session) {
     if (session == NULL)
         return;
