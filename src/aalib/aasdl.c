@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <signal.h>
 
 #ifdef SDL_DRIVER
 #include <SDL2/SDL.h>
@@ -11,6 +12,23 @@
 __AA_CONST struct aa_driver SDL_d;
 
 static void SDL_flush(aa_context *c);
+static void SDL_process_events(void);
+
+static void SDL_process_events(void)
+{
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_QUIT) {
+            raise(SIGINT);
+            return;
+        }
+        if (event.type == SDL_WINDOWEVENT &&
+            event.window.event == SDL_WINDOWEVENT_CLOSE) {
+            raise(SIGINT);
+            return;
+        }
+    }
+}
 
 static void SDL_render_char(struct sdldriverdata *d, unsigned char ch, int x, int y, int fg_color, int bg_color)
 {
@@ -358,7 +376,9 @@ static void SDL_flush(aa_context *c)
 {
     struct sdldriverdata *d = c->driverdata;
     int pos;
-    
+
+    SDL_process_events();
+
     int scrwidth = aa_scrwidth(c);
     int scrheight = aa_scrheight(c);
     int bufsize = scrwidth * scrheight;
