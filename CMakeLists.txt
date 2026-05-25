@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(hasciicam VERSION 2.0 LANGUAGES C)
+project(hasciicam VERSION 2.0 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -128,7 +128,7 @@ endif()
 add_executable(hasciicam
     src/hasciicam.c
     src/capture/capture_backend.c
-    src/capture/capture_dshow.c
+    src/capture/capture_dshow.cpp
     src/capture/capture_mf.c
     src/capture/frame_convert.c
     src/capture/capture_v4l2.c
