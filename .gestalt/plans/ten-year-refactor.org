@@ -42,7 +42,7 @@
 :Done when: Failed backend selection clearly says which backend failed and why, without changing the public CLI.
 :END:
 
-* WIP [#A] Extract A Portable Application Core
+* DONE [#A] Extract A Portable Application Core
 :PROPERTIES:
 :Effort: 3-5 days
 :Goal: Split src/hasciicam.c into small use-case slices while preserving the command-line program.
@@ -89,14 +89,14 @@
 :Done when: The core loop stops through a shared flag and no new adapter needs to raise SIGINT.
 :END:
 
-* TODO [#A] Define Output Ports Before Adding More Renderers
+* WIP [#A] Define Output Ports Before Adding More Renderers
 :PROPERTIES:
 :Effort: 3-6 days
 :Goal: Make live, file, mobile, and web outputs replaceable without touching capture or conversion.
 :Notes: Do not replace aalib. First wrap it. Then add adapters only when a platform needs them.
 :END:
 
-** TODO [#A] Create a C output port around rendered frames
+** DONE [#A] Create a C output port around rendered frames
 :PROPERTIES:
 :Why: aalib currently combines ASCII conversion and output drivers. That is fine for CLI, but mobile/WASM will likely need a texture, canvas, native surface, or memory buffer.
 :Change: Define src/output/output.h with open, write_ascii_frame, resize, poll, close, and name operations. Keep the first implementation backed by existing aalib drivers so behavior stays the same.
@@ -104,7 +104,7 @@
 :Done when: App code can send an ASCII/text+attributes frame to an output adapter without knowing SDL, stdout, or save internals.
 :END:
 
-** TODO [#A] Preserve aalib as the canonical ASCII renderer
+** WIP [#A] Preserve aalib as the canonical ASCII renderer
 :PROPERTIES:
 :Why: The software identity is the aalib ASCII conversion path. New outputs should display aalib output, not bypass it with unrelated renderers.
 :Change: Keep aa_image(), aa_fastrender(), textbuffer, and attrbuffer as the core render path. Wrap access to textbuffer/attrbuffer behind a tiny render_frame view.

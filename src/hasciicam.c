@@ -47,6 +47,7 @@
 #include "app/app_config.h"
 #include "app/app_session.h"
 #include "capture/capture_backend.h"
+#include "output/output.h"
 #include "render/render_session.h"
 
 /* hasciicam modes */
@@ -93,6 +94,7 @@ main (int argc, char **argv) {
   const capture_info *cap_info = NULL;
   hasciicam_session session;
   hasciicam_render_session render_session;
+  hasciicam_output output;
   struct geometry aa_geo;
   struct geometry vid_geo;
   int mode;
@@ -261,6 +263,12 @@ main (int argc, char **argv) {
             render_session.context->driver->shortname,
             render_session.context->driver->name);
   }
+  if (!hasciicam_output_open_aalib(&output, render_session.context)) {
+    fprintf(stderr, "!! cannot initialize output adapter\n");
+    hasciicam_session_stop(&session);
+    hasciicam_render_session_close(&render_session);
+    exit(-1);
+  }
 
   hasciicam_render_session_apply_tuning(&render_session,
                                         aa_geo.bright,
@@ -309,9 +317,8 @@ main (int argc, char **argv) {
       copy_size = (gray_size < dest_size) ? gray_size : dest_size;
       if (copy_size > 0) {
         memcpy(aa_image(render_session.context), gray_frame, copy_size);
-        aa_fastrender(render_session.context, 0, 0, ascii_width / 2, ascii_height / 2);
+        hasciicam_output_write_ascii_frame(&output, ascii_width, ascii_height);
       }
-      aa_flush(render_session.context);
     }
 	/*aa_setpalette (gamma di colori, indice, colore rosso, verde, blu)*/
 
@@ -319,7 +326,7 @@ main (int argc, char **argv) {
 //    aa_render (ascii_context, ascii_rndparms, 0, 0,
 //	       vid_geo.w,vid_geo.h);
 
-    aa_flush (render_session.context);
+    hasciicam_output_poll(&output);
   //  unlink(aafile);
     rename(aatmpfile,aafile);
 
@@ -328,6 +335,7 @@ main (int argc, char **argv) {
   /* CLEAN EXIT */
 
   hasciicam_session_stop(&session);
+  hasciicam_output_close(&output);
   hasciicam_render_session_close(&render_session);
   fprintf (stderr, "cya!\n");
   exit (0);
