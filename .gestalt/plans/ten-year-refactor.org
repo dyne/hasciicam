@@ -191,7 +191,7 @@
 :Done when: WASM builds can run the render pipeline without native capture APIs.
 :END:
 
-* WIP [#A] Harden Frame Conversion As A Tested Core Library
+* DONE [#A] Harden Frame Conversion As A Tested Core Library
 :PROPERTIES:
 :Effort: 2-4 days
 :Goal: Make all platform camera formats converge into aalib luminance safely.
@@ -222,7 +222,7 @@
 :Done when: Mobile frame formats convert through frame_convert.c instead of custom adapter code.
 :END:
 
-** WIP [#C] Consider scaling quality options after correctness
+** DONE [#C] Consider scaling quality options after correctness
 :PROPERTIES:
 :Why: The current nearest-neighbor style scaling is simple and fast. Better scaling may improve output but can complicate maintenance.
 :Change: Evaluate nearest-neighbor, box average, and ordered sampling. Keep nearest-neighbor as default unless a simple box average materially improves ASCII output.
@@ -230,14 +230,14 @@
 :Done when: Scaling behavior is documented and intentionally simple.
 :END:
 
-* TODO [#A] Modernize CMake Without Hiding The Build
+* WIP [#A] Modernize CMake Without Hiding The Build
 :PROPERTIES:
 :Effort: 3-5 days
 :Goal: Make native, mobile, and WASM builds selectable and predictable.
 :Notes: CMake stays the build system of record. Avoid extra build frameworks unless a platform requires its native wrapper.
 :END:
 
-** TODO [#A] Split CMake sources by target and platform
+** WIP [#A] Split CMake sources by target and platform
 :PROPERTIES:
 :Why: CMakeLists.txt currently mixes aalib, hasciicam, capture sources, optional drivers, and platform libraries in one file.
 :Change: Create cmake/HasciiCamSources.cmake or subdirectory CMakeLists files for aalib, capture, render/output, app core, and CLI. Keep the top-level file readable.
