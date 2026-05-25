@@ -120,7 +120,7 @@
 :Done when: HTML/text modes no longer rely on live-output setup branches.
 :END:
 
-** WIP [#B] Add a memory output adapter
+** DONE [#B] Add a memory output adapter
 :PROPERTIES:
 :Why: Mobile and WASM hosts need to pull rendered frames from memory, and tests need deterministic output without a camera window.
 :Change: Add output_memory that stores the latest rendered text and attrs in a caller-owned or adapter-owned buffer. Keep it independent of SDL.
@@ -128,7 +128,7 @@
 :Done when: A non-CLI host can obtain the latest ASCII frame without opening a terminal or window.
 :END:
 
-** TODO [#C] Revisit the SDL driver as an output adapter
+** WIP [#C] Revisit the SDL driver as an output adapter
 :PROPERTIES:
 :Why: Current SDL is inside aalib as aasdl.c. That works, but long-term it may be easier to support SDL desktop/mobile through a hasciicam-owned output adapter consuming rendered frames.
 :Change: Evaluate two alternatives before coding: keep aasdl.c as the desktop adapter, or add a new output_sdl.c that renders aalib text/attrs directly. Prefer keeping aasdl.c unless mobile SDL needs cleaner lifecycle hooks.
