@@ -167,7 +167,7 @@
 :Done when: capture_open_default() uses AVFoundation on APPLE desktop and the app core has no Apple-specific code.
 :END:
 
-** WIP [#B] Add iOS capture as a host-provided frame source first
+** DONE [#B] Add iOS capture as a host-provided frame source first
 :PROPERTIES:
 :Why: iOS camera lifecycle, permissions, orientation, and app threading are controlled by the app shell. A direct CLI-style camera backend is the wrong first step.
 :Change: Add capture_external.c: a backend where the host pushes frames into hasciicam using hasciicam_session_submit_frame() or similar. Later add an iOS AVFoundation adapter in the app shell that feeds this port.
@@ -175,7 +175,7 @@
 :Done when: iOS can integrate camera frames without changing hasciicam core or pretending there is a CLI camera device.
 :END:
 
-** TODO [#B] Add Android capture as a host-provided frame source first
+** WIP [#B] Add Android capture as a host-provided frame source first
 :PROPERTIES:
 :Why: Android Camera2/NDK ownership belongs to an Activity or native app shell. The portable core should accept frames, not own Android UI lifecycle.
 :Change: Reuse capture_external.c for Android. Add documentation for expected frame formats: NV12/NV21/RGBA/BGRA if supported by frame_convert.c. Add a later adapter plan for ACameraManager only if a native-only shell is desired.
@@ -183,7 +183,7 @@
 :Done when: Android can feed frames into the same session path used by desktop capture adapters.
 :END:
 
-** TODO [#B] Add WebAssembly capture as JavaScript-provided frames
+** WIP [#B] Add WebAssembly capture as JavaScript-provided frames
 :PROPERTIES:
 :Why: Browsers expose cameras through getUserMedia and canvas/video APIs, not native capture devices.
 :Change: Add a WASM-friendly external frame API that accepts RGBA or luminance buffers from JavaScript. Keep the C core ignorant of DOM APIs. Provide a tiny example JS bridge later.

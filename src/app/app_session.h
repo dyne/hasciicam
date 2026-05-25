@@ -18,6 +18,12 @@ int hasciicam_session_step(hasciicam_session *session,
                            int output_height,
                            const unsigned char **gray_frame,
                            int *gray_size);
+int hasciicam_session_submit_frame(const unsigned char *data,
+                                   size_t data_size,
+                                   int width,
+                                   int height,
+                                   int stride_bytes,
+                                   capture_pixel_format pixel_format);
 void hasciicam_session_stop(hasciicam_session *session);
 const capture_info *hasciicam_session_capture_info(const hasciicam_session *session);
 void hasciicam_session_request_stop(hasciicam_session *session);

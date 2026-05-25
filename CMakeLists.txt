@@ -134,6 +134,7 @@ add_executable(hasciicam
     src/render/render_session.c
     src/hasciicam.c
     src/capture/capture_backend.c
+    src/capture/capture_external.c
     src/capture/capture_dshow.cpp
     src/capture/capture_mf.c
     src/capture/frame_convert.c

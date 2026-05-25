@@ -97,6 +97,13 @@ Planned capture adapters:
 - Android: host-provided frame source first, then camera host integration.
 - WASM: JavaScript-provided frame source into the same conversion/render path.
 
+Current host-fed capture path:
+
+- `src/capture/capture_external.c` backend selected with device `external://`.
+- Host submits frames through `hasciicam_session_submit_frame(...)`.
+- Accepted frame formats are the same `capture_pixel_format` values used by
+  `frame_convert.c` (for example `GRAY8`, `NV12`, `BGRA32`, `RGB24`).
+
 Planned output adapters:
 
 - Keep AA-lib as the canonical ASCII renderer.
