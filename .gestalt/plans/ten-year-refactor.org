@@ -89,7 +89,7 @@
 :Done when: The core loop stops through a shared flag and no new adapter needs to raise SIGINT.
 :END:
 
-* WIP [#A] Define Output Ports Before Adding More Renderers
+* DONE [#A] Define Output Ports Before Adding More Renderers
 :PROPERTIES:
 :Effort: 3-6 days
 :Goal: Make live, file, mobile, and web outputs replaceable without touching capture or conversion.
@@ -128,7 +128,7 @@
 :Done when: A non-CLI host can obtain the latest ASCII frame without opening a terminal or window.
 :END:
 
-** WIP [#C] Revisit the SDL driver as an output adapter
+** DONE [#C] Revisit the SDL driver as an output adapter
 :PROPERTIES:
 :Why: Current SDL is inside aalib as aasdl.c. That works, but long-term it may be easier to support SDL desktop/mobile through a hasciicam-owned output adapter consuming rendered frames.
 :Change: Evaluate two alternatives before coding: keep aasdl.c as the desktop adapter, or add a new output_sdl.c that renders aalib text/attrs directly. Prefer keeping aasdl.c unless mobile SDL needs cleaner lifecycle hooks.
@@ -136,14 +136,14 @@
 :Done when: The project has one documented SDL strategy for desktop and mobile.
 :END:
 
-* TODO [#A] Make Capture Backends Platform-Complete
+* WIP [#A] Make Capture Backends Platform-Complete
 :PROPERTIES:
 :Effort: 1-3 weeks
 :Goal: Add camera capture support by platform while keeping the app core unchanged.
 :Notes: Capture adapters may use C++ where the platform API requires it. Public headers stay C.
 :END:
 
-** TODO [#A] Keep Linux V4L2 as the reference adapter
+** WIP [#A] Keep Linux V4L2 as the reference adapter
 :PROPERTIES:
 :Why: V4L2 is the original behavior and the simplest reference for mmap/dequeue/release semantics.
 :Change: Clean capture_v4l2.c only enough to match the documented capture.h contract. Keep YUYV preference and existing device/input behavior.
