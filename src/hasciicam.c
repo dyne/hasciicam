@@ -332,7 +332,7 @@ main (int argc, char **argv) {
     if (mode == LIVE) {
       hasciicam_output_poll(&output);
     } else if (mode == HTML && frame_rendered) {
-      rename(aatmpfile, aafile);
+      hasciicam_output_file_publish_html(aatmpfile, aafile);
     }
 
   }
