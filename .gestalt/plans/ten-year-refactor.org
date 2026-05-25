@@ -284,7 +284,7 @@
 :Notes: These are intentionally separate from core refactors so desktop remains stable.
 :END:
 
-** WIP [#A] Define the embedding API
+** DONE [#A] Define the embedding API
 :PROPERTIES:
 :Why: Mobile and WASM need a small stable C API: create config, submit frame or start capture, step, get output, stop, destroy.
 :Change: Add include/hasciicam/hasciicam.h or src/public/hasciicam.h with opaque handles and C ABI functions. Keep structs versioned or use create/setter functions to avoid ABI churn.
@@ -292,7 +292,7 @@
 :Done when: A sample host can use hasciicam without including internal aalib or capture headers.
 :END:
 
-** TODO [#B] Add a macOS desktop sample host
+** WIP [#B] Add a macOS desktop sample host
 :PROPERTIES:
 :Why: macOS can validate AVFoundation plus SDL/memory output before iOS constraints are added.
 :Change: Build the normal CLI first. Then optionally add examples/macos-host if the public embedding API needs validation outside CLI.

@@ -52,6 +52,7 @@ set(HASCIICAM_AALIB_SOURCES
 set(HASCIICAM_APP_SOURCES
     src/app/app_config.c
     src/app/app_session.c
+    src/public/hasciicam_api.c
 )
 
 set(HASCIICAM_OUTPUT_SOURCES

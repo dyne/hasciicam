@@ -58,7 +58,7 @@
 
 /* default configuration */
 static hasciicam_config appcfg;
-int quiet = 0;
+extern int quiet;
 
 struct geometry {
   int w, h, size;
