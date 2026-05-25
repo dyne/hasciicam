@@ -139,6 +139,9 @@ add_executable(hasciicam
     src/capture/frame_convert.c
     src/capture/capture_v4l2.c
 )
+if(APPLE)
+  target_sources(hasciicam PRIVATE src/capture/capture_avfoundation.mm)
+endif()
 target_compile_definitions(hasciicam PRIVATE
     PACKAGE="hasciicam"
     VERSION="${PROJECT_VERSION}"
@@ -170,6 +173,15 @@ endif()
 
 if(WIN32)
   target_link_libraries(hasciicam PRIVATE mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+endif()
+
+if(APPLE)
+  target_link_libraries(hasciicam PRIVATE
+    "-framework AVFoundation"
+    "-framework CoreMedia"
+    "-framework CoreVideo"
+    "-framework Foundation"
+  )
 endif()
 
 # Install targets
