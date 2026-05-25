@@ -101,6 +101,9 @@ Planned output adapters:
 
 - Keep AA-lib as the canonical ASCII renderer.
 - Add a memory output path for embedded hosts and deterministic tests.
+- Keep AA-lib SDL (`src/aalib/aasdl.c`) as the active desktop SDL path for now.
+  A separate `output_sdl` adapter remains deferred until a concrete mobile SDL
+  lifecycle gap appears.
 
 ## Maintenance Rules
 
