@@ -6,26 +6,51 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Options
 option(ENABLE_ASAN "Enable AddressSanitizer for debugging" OFF)
+option(HASCIICAM_BUILD_CLI "Build hasciicam CLI executable" ON)
 option(HASCIICAM_ENABLE_TESTS "Enable hasciicam unit tests" ON)
-
-find_package(SDL2 QUIET)
-if(TARGET SDL2::SDL2)
-  message(STATUS "Found SDL2: ${SDL2_VERSION}")
-  add_compile_definitions(SDL_DRIVER)
+option(HASCIICAM_ENABLE_SDL "Enable SDL output driver" ON)
+option(HASCIICAM_ENABLE_X11 "Enable X11 output driver" ON)
+option(HASCIICAM_ENABLE_CURSES "Enable curses output driver" ON)
+option(HASCIICAM_ENABLE_CAPTURE_V4L2 "Enable V4L2 capture backend" ON)
+if(WIN32)
+  option(HASCIICAM_ENABLE_CAPTURE_MF "Enable Media Foundation capture backend" ON)
+  option(HASCIICAM_ENABLE_CAPTURE_DSHOW "Enable DirectShow capture backend fallback" ON)
+else()
+  option(HASCIICAM_ENABLE_CAPTURE_MF "Enable Media Foundation capture backend" OFF)
+  option(HASCIICAM_ENABLE_CAPTURE_DSHOW "Enable DirectShow capture backend fallback" OFF)
+endif()
+if(APPLE)
+  option(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION "Enable AVFoundation capture backend" ON)
+else()
+  option(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION "Enable AVFoundation capture backend" OFF)
 endif()
 
-if(UNIX AND NOT APPLE)
+set(HASCIICAM_WITH_SDL OFF)
+set(HASCIICAM_WITH_X11 OFF)
+set(HASCIICAM_WITH_CURSES OFF)
+
+if(HASCIICAM_ENABLE_SDL)
+  find_package(SDL2 QUIET)
+  if(TARGET SDL2::SDL2)
+    set(HASCIICAM_WITH_SDL ON)
+    add_compile_definitions(SDL_DRIVER)
+  endif()
+endif()
+
+if(HASCIICAM_ENABLE_X11 AND UNIX AND NOT APPLE)
   find_package(X11 QUIET)
   if(X11_FOUND)
-    message(STATUS "Found X11")
+    set(HASCIICAM_WITH_X11 ON)
     add_compile_definitions(X11_DRIVER)
   endif()
 endif()
 
-find_package(Curses QUIET)
-if(Curses_FOUND)
-    message(STATUS "Found Curses")
+if(HASCIICAM_ENABLE_CURSES)
+  find_package(Curses QUIET)
+  if(Curses_FOUND)
+    set(HASCIICAM_WITH_CURSES ON)
     add_compile_definitions(CURSES_DRIVER)
+  endif()
 endif()
 
 # ASAN flags
@@ -38,12 +63,12 @@ endif()
 include(cmake/HasciiCamSources.cmake)
 
 # Conditionally add SDL driver
-if(TARGET SDL2::SDL2)
+if(HASCIICAM_WITH_SDL)
     list(APPEND HASCIICAM_AALIB_SOURCES src/aalib/aasdl.c)
 endif()
 
 # Conditionally add X11 driver
-if(X11_FOUND)
+if(HASCIICAM_WITH_X11)
     list(APPEND HASCIICAM_AALIB_SOURCES
         src/aalib/aax.c
         src/aalib/aaxkbd.c
@@ -60,73 +85,112 @@ if(WIN32)
 endif()
 
 # Link libraries to aalib
-if(TARGET SDL2::SDL2)
+if(HASCIICAM_WITH_SDL)
     target_include_directories(aalib PRIVATE ${SDL2_INCLUDE_DIRS})
 endif()
 
-if(X11_FOUND)
+if(HASCIICAM_WITH_X11)
     target_include_directories(aalib PRIVATE ${X11_INCLUDE_DIR})
 endif()
 
-if(CURSES_FOUND)
+if(HASCIICAM_WITH_CURSES)
     target_include_directories(aalib PRIVATE ${CURSES_INCLUDE_DIR})
 endif()
 
-# Main executable
-add_executable(hasciicam
-    ${HASCIICAM_APP_SOURCES}
-    ${HASCIICAM_OUTPUT_SOURCES}
-    ${HASCIICAM_RENDER_SOURCES}
-    src/hasciicam.c
-    ${HASCIICAM_CAPTURE_SOURCES}
-)
-if(APPLE)
-  target_sources(hasciicam PRIVATE src/capture/capture_avfoundation.mm)
-endif()
-target_compile_definitions(hasciicam PRIVATE
-    PACKAGE="hasciicam"
-    VERSION="${PROJECT_VERSION}"
-)
-if(WIN32)
-    target_include_directories(hasciicam PRIVATE src/compat)
-    target_compile_definitions(hasciicam PRIVATE _CRT_SECURE_NO_WARNINGS)
-endif()
-target_link_libraries(hasciicam PRIVATE aalib)
-
-# Additional system libraries that may be needed
-if(NOT MSVC)
-    target_link_libraries(hasciicam PRIVATE m)
+set(HASCIICAM_CAPTURE_DEFINITIONS)
+if(HASCIICAM_ENABLE_CAPTURE_V4L2)
+  list(APPEND HASCIICAM_CAPTURE_DEFINITIONS HASCIICAM_ENABLE_CAPTURE_V4L2=1)
+else()
+  list(REMOVE_ITEM HASCIICAM_CAPTURE_SOURCES src/capture/capture_v4l2.c)
 endif()
 
-# Link optional libraries to hasciicam
-if(TARGET SDL2::SDL2)
-  target_link_libraries(hasciicam PRIVATE SDL2::SDL2 SDL2::SDL2main)
+if(HASCIICAM_ENABLE_CAPTURE_MF)
+  list(APPEND HASCIICAM_CAPTURE_DEFINITIONS HASCIICAM_ENABLE_CAPTURE_MF=1)
+else()
+  list(REMOVE_ITEM HASCIICAM_CAPTURE_SOURCES src/capture/capture_mf.c)
 endif()
 
-if(X11_FOUND)
-  target_link_libraries(hasciicam PRIVATE X11::X11)
+if(HASCIICAM_ENABLE_CAPTURE_DSHOW)
+  list(APPEND HASCIICAM_CAPTURE_DEFINITIONS HASCIICAM_ENABLE_CAPTURE_DSHOW=1)
+else()
+  list(REMOVE_ITEM HASCIICAM_CAPTURE_SOURCES src/capture/capture_dshow.cpp)
 endif()
 
-if(Curses_FOUND)
-  target_link_libraries(hasciicam PRIVATE ${CURSES_LIBRARIES})
-  target_include_directories(hasciicam PRIVATE ${CURSES_INCLUDE_DIRS})
+if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
+  list(APPEND HASCIICAM_CAPTURE_DEFINITIONS HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION=1)
 endif()
 
-if(WIN32)
-  target_link_libraries(hasciicam PRIVATE mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
-endif()
-
-if(APPLE)
-  target_link_libraries(hasciicam PRIVATE
-    "-framework AVFoundation"
-    "-framework CoreMedia"
-    "-framework CoreVideo"
-    "-framework Foundation"
+if(HASCIICAM_BUILD_CLI)
+  # Main executable
+  add_executable(hasciicam
+      ${HASCIICAM_APP_SOURCES}
+      ${HASCIICAM_OUTPUT_SOURCES}
+      ${HASCIICAM_RENDER_SOURCES}
+      src/hasciicam.c
+      ${HASCIICAM_CAPTURE_SOURCES}
   )
+  if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
+    target_sources(hasciicam PRIVATE src/capture/capture_avfoundation.mm)
+  endif()
+  target_compile_definitions(hasciicam PRIVATE
+      PACKAGE="hasciicam"
+      VERSION="${PROJECT_VERSION}"
+      ${HASCIICAM_CAPTURE_DEFINITIONS}
+  )
+  if(WIN32)
+      target_include_directories(hasciicam PRIVATE src/compat)
+      target_compile_definitions(hasciicam PRIVATE _CRT_SECURE_NO_WARNINGS)
+  endif()
+  target_link_libraries(hasciicam PRIVATE aalib)
+
+  # Additional system libraries that may be needed
+  if(NOT MSVC)
+      target_link_libraries(hasciicam PRIVATE m)
+  endif()
+
+  # Link optional libraries to hasciicam
+  if(HASCIICAM_WITH_SDL)
+    target_link_libraries(hasciicam PRIVATE SDL2::SDL2 SDL2::SDL2main)
+  endif()
+
+  if(HASCIICAM_WITH_X11)
+    target_link_libraries(hasciicam PRIVATE X11::X11)
+  endif()
+
+  if(HASCIICAM_WITH_CURSES)
+    target_link_libraries(hasciicam PRIVATE ${CURSES_LIBRARIES})
+    target_include_directories(hasciicam PRIVATE ${CURSES_INCLUDE_DIRS})
+  endif()
+
+  if(HASCIICAM_ENABLE_CAPTURE_MF OR HASCIICAM_ENABLE_CAPTURE_DSHOW)
+    target_link_libraries(hasciicam PRIVATE mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+  endif()
+
+  if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
+    target_link_libraries(hasciicam PRIVATE
+      "-framework AVFoundation"
+      "-framework CoreMedia"
+      "-framework CoreVideo"
+      "-framework Foundation"
+    )
+  endif()
 endif()
+
+message(STATUS "hasciicam options:")
+message(STATUS "  HASCIICAM_BUILD_CLI=${HASCIICAM_BUILD_CLI}")
+message(STATUS "  HASCIICAM_ENABLE_TESTS=${HASCIICAM_ENABLE_TESTS}")
+message(STATUS "  HASCIICAM_ENABLE_SDL=${HASCIICAM_ENABLE_SDL} (found=${HASCIICAM_WITH_SDL})")
+message(STATUS "  HASCIICAM_ENABLE_X11=${HASCIICAM_ENABLE_X11} (found=${HASCIICAM_WITH_X11})")
+message(STATUS "  HASCIICAM_ENABLE_CURSES=${HASCIICAM_ENABLE_CURSES} (found=${HASCIICAM_WITH_CURSES})")
+message(STATUS "  HASCIICAM_ENABLE_CAPTURE_V4L2=${HASCIICAM_ENABLE_CAPTURE_V4L2}")
+message(STATUS "  HASCIICAM_ENABLE_CAPTURE_MF=${HASCIICAM_ENABLE_CAPTURE_MF}")
+message(STATUS "  HASCIICAM_ENABLE_CAPTURE_DSHOW=${HASCIICAM_ENABLE_CAPTURE_DSHOW}")
+message(STATUS "  HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION=${HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION}")
 
 # Install targets
-install(TARGETS hasciicam DESTINATION bin)
+if(HASCIICAM_BUILD_CLI)
+  install(TARGETS hasciicam DESTINATION bin)
+endif()
 install(FILES doc/hasciicam.1 DESTINATION share/man/man1 OPTIONAL)
 
 if(HASCIICAM_ENABLE_TESTS)

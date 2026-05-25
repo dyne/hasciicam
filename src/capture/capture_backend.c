@@ -1,9 +1,17 @@
 #include "capture_backend.h"
+#if defined(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
 #include "capture_avfoundation.h"
+#endif
+#if defined(HASCIICAM_ENABLE_CAPTURE_DSHOW)
 #include "capture_dshow.h"
+#endif
 #include "capture_external.h"
+#if defined(HASCIICAM_ENABLE_CAPTURE_MF)
 #include "capture_mf.h"
+#endif
+#if defined(HASCIICAM_ENABLE_CAPTURE_V4L2)
 #include "capture_v4l2.h"
+#endif
 #include <stdio.h>
 #include <string.h>
 
@@ -27,11 +35,27 @@ const char *capture_last_error(void) {
 
 const capture_ops *capture_default_ops(void) {
 #if defined(_WIN32)
+#if defined(HASCIICAM_ENABLE_CAPTURE_MF)
     return capture_mf_ops();
+#elif defined(HASCIICAM_ENABLE_CAPTURE_DSHOW)
+    return capture_dshow_ops();
+#elif defined(HASCIICAM_ENABLE_CAPTURE_V4L2)
+    return capture_v4l2_ops();
+#else
+    return capture_external_ops();
+#endif
 #elif defined(__APPLE__)
+#if defined(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
     return capture_avfoundation_ops();
 #else
+    return capture_external_ops();
+#endif
+#else
+#if defined(HASCIICAM_ENABLE_CAPTURE_V4L2)
     return capture_v4l2_ops();
+#else
+    return capture_external_ops();
+#endif
 #endif
 }
 
@@ -59,15 +83,35 @@ int capture_open_default(const capture_request *req,
     }
 
 #if defined(_WIN32)
+#if defined(HASCIICAM_ENABLE_CAPTURE_MF)
     ops_try[0] = capture_mf_ops();
+#else
+    ops_try[0] = NULL;
+#endif
+#if defined(HASCIICAM_ENABLE_CAPTURE_DSHOW)
     ops_try[1] = capture_dshow_ops();
+#else
+    ops_try[1] = NULL;
+#endif
+#if defined(HASCIICAM_ENABLE_CAPTURE_V4L2)
     ops_try[2] = capture_v4l2_ops();
+#else
+    ops_try[2] = NULL;
+#endif
 #elif defined(__APPLE__)
+#if defined(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
     ops_try[0] = capture_avfoundation_ops();
+#else
+    ops_try[0] = NULL;
+#endif
     ops_try[1] = NULL;
     ops_try[2] = NULL;
 #else
+#if defined(HASCIICAM_ENABLE_CAPTURE_V4L2)
     ops_try[0] = capture_v4l2_ops();
+#else
+    ops_try[0] = NULL;
+#endif
     ops_try[1] = NULL;
     ops_try[2] = NULL;
 #endif
