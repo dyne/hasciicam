@@ -118,11 +118,27 @@ cmake .. -G Ninja
 ninja
 ```
 
+## Runtime Pipeline (2.0)
+
+The executable pipeline is now split into explicit capture and conversion stages:
+
+1. Parse CLI and AA-lib options.
+2. Open a capture backend through `src/capture/capture_backend.c`.
+3. Read frames through the backend `capture_ops` contract in `src/capture/capture.h`.
+4. Convert backend pixel formats to grayscale via `src/capture/frame_convert.c`.
+5. Write grayscale into AA-lib image memory and render ASCII with `aa_fastrender`.
+6. Flush output through AA-lib driver selection (`SDL`, `stdout`, save drivers).
+
+This keeps platform camera code out of the render path and lets new backends
+plug in without changing AA-lib behavior.
+
 ## Windows Notes
 
 On Windows, video capture backends are tried in this order:
 1. Media Foundation (new API)
 2. DirectShow (old API fallback)
+
+Live output preference remains SDL first when available.
 
 The `-d` option on Windows is treated as a camera matcher (friendly-name substring),
 not as a `/dev/video*` path.

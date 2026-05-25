@@ -1,0 +1,434 @@
+#+TITLE: Ten Year Refactor
+#+SUBTITLE: Maintainable C/C++ architecture for desktop, mobile, and WebAssembly
+#+DATE: 2026-05-25
+#+KEYWORDS: hasciicam refactor portability capture rendering cmake ios android wasm
+
+* WIP [#A] Stabilize The Current 2.0 Boundaries
+:PROPERTIES:
+:Effort: 1-2 days
+:Goal: Make the existing Windows/Linux 2.0 shape explicit before moving code.
+:Notes: This step protects working camera capture and SDL output while preparing smaller future changes.
+:END:
+
+** DONE [#A] Document the supported runtime pipeline
+:PROPERTIES:
+:Why: The current program has a working pipeline, but the responsibilities are still partly implicit in file names and globals.
+:Change: Update AGENTS.md and README.md with the actual 2.0 pipeline: CLI config, capture backend selection, frame conversion, aalib image write, aalib render, output flush, cleanup. Mention Media Foundation then DirectShow fallback on Windows, V4L2 on Linux, and SDL/stdout/save output behavior.
+:Tests: Documentation-only change; skip build unless source files are touched.
+:Done when: A lesser LLM can identify which file owns capture, conversion, rendering, and driver selection without reading all of src/hasciicam.c.
+:END:
+
+** WIP [#A] Add a small architecture map beside the code
+:PROPERTIES:
+:Why: Cross-platform work will add several adapters; future maintainers need a short source map.
+:Change: Add docs/architecture.md or docs/architecture.org describing modules, public contracts, platform adapters, and build options. Keep it factual and tied to current file paths.
+:Tests: Documentation-only change; skip build unless source files are touched.
+:Done when: The document names every planned port family: capture, output/render, app shell, filesystem/save, and build.
+:END:
+
+** TODO [#A] Freeze the capture API as a stable C port
+:PROPERTIES:
+:Why: src/capture/capture.h is already the best boundary in the refactor. It should be treated as a compatibility contract before adding Apple, Android, and WASM capture.
+:Change: Add native C doc-comments to capture.h. Clarify ownership of capture_frame.data, when release() is mandatory, valid stride rules, and expected pixel formats. Do not add behavior yet.
+:Tests: Run CMake/Ninja build on the current platform because headers are touched.
+:Done when: Capture adapter authors can implement a backend without reading Media Foundation or V4L2 code first.
+:END:
+
+** TODO [#B] Normalize backend logging and failure reporting
+:PROPERTIES:
+:Why: Platform debugging will be painful if backends silently fail or print inconsistent errors.
+:Change: Add one minimal capture_status style convention: open() returns 0/1 as today, but adapters set a short internal reason exposed through an optional diagnostic function only if needed. Prefer simple stderr messages first; avoid a full error framework.
+:Tests: Build on Windows. Run hasciicam -h and one capture smoke test. On Linux, build and run help if available.
+:Done when: Failed backend selection clearly says which backend failed and why, without changing the public CLI.
+:END:
+
+* TODO [#A] Extract A Portable Application Core
+:PROPERTIES:
+:Effort: 3-5 days
+:Goal: Split src/hasciicam.c into small use-case slices while preserving the command-line program.
+:Notes: This is the main maintainability step. Keep it C-first and avoid framework naming beyond simple ports/adapters.
+:END:
+
+** TODO [#A] Move CLI parsing into an app_config module
+:PROPERTIES:
+:Why: src/hasciicam.c still owns globals, defaults, getopt handling, and runtime behavior. Mobile and WASM should not depend on command-line parsing.
+:Change: Create src/app/app_config.h and src/app/app_config.c. Move config defaults, option parsing, and validation there. Expose a plain struct hasciicam_config with capture settings, output mode, render settings, file settings, and privilege settings. Keep aa_parseoptions ordering in the CLI shell.
+:Tests: Build. Run hasciicam -h, hasciicam -H, and a smoke run with -O SDL -d "" on Windows. Verify text/html modes still select output filenames.
+:Done when: main() can ask for a fully populated config without owning getopt details.
+:END:
+
+** TODO [#A] Move the live frame loop into an app_session module
+:PROPERTIES:
+:Why: The loop is the actual use-case: read camera, convert to luminance, write aalib image, render, flush. It should be callable by CLI, desktop app shells, mobile shells, and WASM.
+:Change: Create src/app/app_session.h and src/app/app_session.c. Define hasciicam_session_start(), hasciicam_session_step(), and hasciicam_session_stop(). Move capture open/start/read/release/stop and grey buffer ownership there. Keep the first version synchronous and single-threaded.
+:Tests: Build. Run CLI live smoke test. Run text mode for one frame if a bounded mode exists; otherwise add a temporary developer-only smoke path only if necessary.
+:Done when: The CLI main loop is small and the session can be stepped by a non-CLI host.
+:END:
+
+** TODO [#A] Move aalib setup into a render_session module
+:PROPERTIES:
+:Why: Output selection and aalib initialization are mixed into application startup. Future outputs need an explicit rendering boundary.
+:Change: Create src/render/render_session.h and src/render/render_session.c. Move aalib hardware params, render params, save mode setup, driver recommendations, aa_init/aa_autoinit, and aa_close there. Keep aalib itself vendored and unchanged except for driver fixes.
+:Tests: Build. Run hasciicam -H. Run live SDL, text, and HTML smoke tests where supported.
+:Done when: app_session writes luminance to a renderer through a small function instead of directly owning aa_context details.
+:END:
+
+** TODO [#B] Replace cross-module globals with context structs
+:PROPERTIES:
+:Why: Globals block multiple sessions and make mobile/WASM embedding fragile.
+:Change: Move globals from src/hasciicam.c into hasciicam_config, hasciicam_session, and hasciicam_render_session. Leave truly process-wide signal state in the CLI shell until a cleaner shutdown port exists.
+:Tests: Build with warnings visible. Run CLI help and at least one live or text smoke test.
+:Done when: New code does not read or write extern globals for normal operation.
+:END:
+
+** TODO [#B] Introduce a minimal shutdown/request port
+:PROPERTIES:
+:Why: The CLI currently uses SIGINT, while SDL close, mobile lifecycle, and WASM need cooperative shutdown without process signals.
+:Change: Add a small hasciicam_should_stop callback or flag in app_session. The CLI signal handler sets it; SDL close sets it through the render/session boundary; mobile/WASM hosts can set it directly.
+:Tests: Build. Verify Ctrl-C exits in console. Verify closing SDL window exits without a hung process.
+:Done when: The core loop stops through a shared flag and no new adapter needs to raise SIGINT.
+:END:
+
+* TODO [#A] Define Output Ports Before Adding More Renderers
+:PROPERTIES:
+:Effort: 3-6 days
+:Goal: Make live, file, mobile, and web outputs replaceable without touching capture or conversion.
+:Notes: Do not replace aalib. First wrap it. Then add adapters only when a platform needs them.
+:END:
+
+** TODO [#A] Create a C output port around rendered frames
+:PROPERTIES:
+:Why: aalib currently combines ASCII conversion and output drivers. That is fine for CLI, but mobile/WASM will likely need a texture, canvas, native surface, or memory buffer.
+:Change: Define src/output/output.h with open, write_ascii_frame, resize, poll, close, and name operations. Keep the first implementation backed by existing aalib drivers so behavior stays the same.
+:Tests: Build. Run live SDL and stdout/text smoke tests.
+:Done when: App code can send an ASCII/text+attributes frame to an output adapter without knowing SDL, stdout, or save internals.
+:END:
+
+** TODO [#A] Preserve aalib as the canonical ASCII renderer
+:PROPERTIES:
+:Why: The software identity is the aalib ASCII conversion path. New outputs should display aalib output, not bypass it with unrelated renderers.
+:Change: Keep aa_image(), aa_fastrender(), textbuffer, and attrbuffer as the core render path. Wrap access to textbuffer/attrbuffer behind a tiny render_frame view.
+:Tests: Add a small conversion/render smoke test if feasible: feed a fixed grey gradient and assert the produced text buffer is non-empty and stable enough for regression use.
+:Done when: New output adapters consume the same rendered ASCII representation as SDL/stdout.
+:END:
+
+** TODO [#B] Split file outputs from live outputs
+:PROPERTIES:
+:Why: HTML/text file output has different lifecycle rules than live windows, mobile surfaces, or web canvases.
+:Change: Keep save_d support but expose file output as its own adapter family: output_file_text and output_file_html. Move hascii_header construction out of main into file output setup.
+:Tests: Build. Run -m text and -m html, then verify files are created and renamed from tmp as before.
+:Done when: HTML/text modes no longer rely on live-output setup branches.
+:END:
+
+** TODO [#B] Add a memory output adapter
+:PROPERTIES:
+:Why: Mobile and WASM hosts need to pull rendered frames from memory, and tests need deterministic output without a camera window.
+:Change: Add output_memory that stores the latest rendered text and attrs in a caller-owned or adapter-owned buffer. Keep it independent of SDL.
+:Tests: Add a small test executable or CTest that renders one synthetic frame to memory and validates dimensions and non-empty content.
+:Done when: A non-CLI host can obtain the latest ASCII frame without opening a terminal or window.
+:END:
+
+** TODO [#C] Revisit the SDL driver as an output adapter
+:PROPERTIES:
+:Why: Current SDL is inside aalib as aasdl.c. That works, but long-term it may be easier to support SDL desktop/mobile through a hasciicam-owned output adapter consuming rendered frames.
+:Change: Evaluate two alternatives before coding: keep aasdl.c as the desktop adapter, or add a new output_sdl.c that renders aalib text/attrs directly. Prefer keeping aasdl.c unless mobile SDL needs cleaner lifecycle hooks.
+:Tests: Prototype only if the evaluation shows clear benefit. Otherwise document the decision.
+:Done when: The project has one documented SDL strategy for desktop and mobile.
+:END:
+
+* TODO [#A] Make Capture Backends Platform-Complete
+:PROPERTIES:
+:Effort: 1-3 weeks
+:Goal: Add camera capture support by platform while keeping the app core unchanged.
+:Notes: Capture adapters may use C++ where the platform API requires it. Public headers stay C.
+:END:
+
+** TODO [#A] Keep Linux V4L2 as the reference adapter
+:PROPERTIES:
+:Why: V4L2 is the original behavior and the simplest reference for mmap/dequeue/release semantics.
+:Change: Clean capture_v4l2.c only enough to match the documented capture.h contract. Keep YUYV preference and existing device/input behavior.
+:Tests: Linux build. Run live smoke test with a camera. Run text output smoke test.
+:Done when: V4L2 remains the baseline adapter and does not depend on Windows or future platform code.
+:END:
+
+** TODO [#A] Keep Windows Media Foundation primary and DirectShow fallback
+:PROPERTIES:
+:Why: Windows capture is now working and should remain the main pattern for fallback orchestration.
+:Change: Keep Media Foundation first, DirectShow second. Add tests/smoke documentation for first-camera default, device-name matching, and supported pixel formats. Avoid changing aalib for Windows capture.
+:Tests: Windows build. Run camera smoke with default camera. Run -O SDL and close-window smoke.
+:Done when: Windows has a documented, repeatable smoke test for both capture and SDL output.
+:END:
+
+** TODO [#A] Add macOS capture through AVFoundation
+:PROPERTIES:
+:Why: macOS camera access is AVFoundation, not V4L2. This needs an adapter but should not affect the core.
+:Change: Add src/capture/capture_avfoundation.mm behind a C header capture_avfoundation.h. Keep Objective-C++ confined to this file if approved; expose only capture_ops. Request BGRA/NV12 where possible and convert through frame_convert.c.
+:Tests: macOS CMake build with an Apple generator or Ninja. Run help. Run camera smoke with permission prompt documented. Verify SDL or memory output receives frames.
+:Done when: capture_open_default() uses AVFoundation on APPLE desktop and the app core has no Apple-specific code.
+:END:
+
+** TODO [#B] Add iOS capture as a host-provided frame source first
+:PROPERTIES:
+:Why: iOS camera lifecycle, permissions, orientation, and app threading are controlled by the app shell. A direct CLI-style camera backend is the wrong first step.
+:Change: Add capture_external.c: a backend where the host pushes frames into hasciicam using hasciicam_session_submit_frame() or similar. Later add an iOS AVFoundation adapter in the app shell that feeds this port.
+:Tests: Add a synthetic host test that pushes a fixed NV12/BGRA frame and verifies rendered memory output. On iOS, build an example shell only after the core external source works.
+:Done when: iOS can integrate camera frames without changing hasciicam core or pretending there is a CLI camera device.
+:END:
+
+** TODO [#B] Add Android capture as a host-provided frame source first
+:PROPERTIES:
+:Why: Android Camera2/NDK ownership belongs to an Activity or native app shell. The portable core should accept frames, not own Android UI lifecycle.
+:Change: Reuse capture_external.c for Android. Add documentation for expected frame formats: NV12/NV21/RGBA/BGRA if supported by frame_convert.c. Add a later adapter plan for ACameraManager only if a native-only shell is desired.
+:Tests: Run external-frame unit test on desktop. Later run Android NDK build and smoke through an example shell.
+:Done when: Android can feed frames into the same session path used by desktop capture adapters.
+:END:
+
+** TODO [#B] Add WebAssembly capture as JavaScript-provided frames
+:PROPERTIES:
+:Why: Browsers expose cameras through getUserMedia and canvas/video APIs, not native capture devices.
+:Change: Add a WASM-friendly external frame API that accepts RGBA or luminance buffers from JavaScript. Keep the C core ignorant of DOM APIs. Provide a tiny example JS bridge later.
+:Tests: Desktop external-frame test first. Later Emscripten build that renders a synthetic frame into memory output.
+:Done when: WASM builds can run the render pipeline without native capture APIs.
+:END:
+
+* TODO [#A] Harden Frame Conversion As A Tested Core Library
+:PROPERTIES:
+:Effort: 2-4 days
+:Goal: Make all platform camera formats converge into aalib luminance safely.
+:Notes: This is high leverage: every platform depends on conversion quality and bounds safety.
+:END:
+
+** TODO [#A] Define conversion invariants in frame_convert.h
+:PROPERTIES:
+:Why: Camera adapters will produce different strides, dimensions, and formats. The conversion layer must define what is accepted.
+:Change: Document stride >= width * bytes_per_pixel where applicable, destination width/height rules, accepted formats, and failure behavior. Keep functions returning 0/1.
+:Tests: Build because headers are touched.
+:Done when: Adapter authors know exactly how to call conversion functions.
+:END:
+
+** TODO [#A] Add deterministic conversion tests
+:PROPERTIES:
+:Why: Live camera smoke tests cannot prove RGB/NV12/YUYV conversion stays correct.
+:Change: Add a small C test executable under tests/ that feeds tiny fixed frames for GRAY8, YUYV/YUY2, NV12, RGB24/BGR24, RGB32/BGRA32 and checks expected grayscale values.
+:Tests: Add CTest integration. Run cmake --build and ctest.
+:Done when: Conversion changes fail fast without needing a camera.
+:END:
+
+** TODO [#B] Add NV21 and platform-common mobile formats if needed
+:PROPERTIES:
+:Why: Android often exposes NV21/YUV_420_888-like layouts. iOS often exposes NV12/BGRA.
+:Change: Add only formats actually needed by an adapter or host bridge. Prefer explicit planar metadata before guessing layout from one pointer.
+:Tests: Add tiny fixed-frame tests for every new format.
+:Done when: Mobile frame formats convert through frame_convert.c instead of custom adapter code.
+:END:
+
+** TODO [#C] Consider scaling quality options after correctness
+:PROPERTIES:
+:Why: The current nearest-neighbor style scaling is simple and fast. Better scaling may improve output but can complicate maintenance.
+:Change: Evaluate nearest-neighbor, box average, and ordered sampling. Keep nearest-neighbor as default unless a simple box average materially improves ASCII output.
+:Tests: Add deterministic tests for any new scaler and compare output visually with one camera smoke frame.
+:Done when: Scaling behavior is documented and intentionally simple.
+:END:
+
+* TODO [#A] Modernize CMake Without Hiding The Build
+:PROPERTIES:
+:Effort: 3-5 days
+:Goal: Make native, mobile, and WASM builds selectable and predictable.
+:Notes: CMake stays the build system of record. Avoid extra build frameworks unless a platform requires its native wrapper.
+:END:
+
+** TODO [#A] Split CMake sources by target and platform
+:PROPERTIES:
+:Why: CMakeLists.txt currently mixes aalib, hasciicam, capture sources, optional drivers, and platform libraries in one file.
+:Change: Create cmake/HasciiCamSources.cmake or subdirectory CMakeLists files for aalib, capture, render/output, app core, and CLI. Keep the top-level file readable.
+:Tests: Configure and build on Windows. Configure on Linux if available. Run help smoke.
+:Done when: Adding one platform adapter does not require editing a long source list in multiple places.
+:END:
+
+** TODO [#A] Add explicit build options
+:PROPERTIES:
+:Why: Cross-platform targets need predictable feature toggles instead of only auto-detection.
+:Change: Add options such as HASCIICAM_BUILD_CLI, HASCIICAM_ENABLE_SDL, HASCIICAM_ENABLE_X11, HASCIICAM_ENABLE_CURSES, HASCIICAM_ENABLE_CAPTURE_V4L2, HASCIICAM_ENABLE_CAPTURE_MF, HASCIICAM_ENABLE_CAPTURE_DSHOW, HASCIICAM_ENABLE_TESTS. Defaults should match current platform behavior.
+:Tests: Configure default build. Configure with SDL disabled. Configure tests enabled.
+:Done when: Feature availability is visible in CMake configure output and can be controlled by packagers.
+:END:
+
+** TODO [#B] Add platform presets
+:PROPERTIES:
+:Why: Future maintainers should not rediscover Visual Studio/vcpkg, macOS, iOS, Android, and Emscripten flags.
+:Change: Add CMakePresets.json with conservative presets: windows-vcpkg-ninja, linux-ninja, macos-ninja, wasm-emscripten. Add comments in docs because JSON cannot contain comments.
+:Tests: Run at least the current platform preset. Validate cmake --list-presets.
+:Done when: The documented build command for each platform is one preset plus cmake --build.
+:END:
+
+** TODO [#B] Add library targets for embedding
+:PROPERTIES:
+:Why: iOS, Android, and WASM should embed hasciicam as a library, not invoke a CLI main.
+:Change: Build hasciicam_core as a static library containing app/session/capture/conversion/render core. Build hasciicam_cli as the executable that links hasciicam_core.
+:Tests: Build. Run CLI smoke. Link one small test executable against hasciicam_core.
+:Done when: The CLI is just one host of the reusable core.
+:END:
+
+** TODO [#C] Add packaging/runtime DLL handling for Windows SDL
+:PROPERTIES:
+:Why: Windows SDL builds work only when SDL2.dll is available near the executable or on PATH.
+:Change: Add a post-build copy rule for SDL2.dll when using the imported SDL target if CMake can do so cleanly. Otherwise document the exact vcpkg runtime path.
+:Tests: Clean build. Verify SDL2.dll appears beside hasciicam.exe. Run -O SDL.
+:Done when: Running the built executable from its build directory works without manual DLL copying.
+:END:
+
+* TODO [#B] Prepare Platform Host Shells
+:PROPERTIES:
+:Effort: 2-6 weeks
+:Goal: Let each non-CLI platform own its lifecycle while sharing the same C/C++ core.
+:Notes: These are intentionally separate from core refactors so desktop remains stable.
+:END:
+
+** TODO [#A] Define the embedding API
+:PROPERTIES:
+:Why: Mobile and WASM need a small stable C API: create config, submit frame or start capture, step, get output, stop, destroy.
+:Change: Add include/hasciicam/hasciicam.h or src/public/hasciicam.h with opaque handles and C ABI functions. Keep structs versioned or use create/setter functions to avoid ABI churn.
+:Tests: Add a host-style C test that uses only the public header.
+:Done when: A sample host can use hasciicam without including internal aalib or capture headers.
+:END:
+
+** TODO [#B] Add a macOS desktop sample host
+:PROPERTIES:
+:Why: macOS can validate AVFoundation plus SDL/memory output before iOS constraints are added.
+:Change: Build the normal CLI first. Then optionally add examples/macos-host if the public embedding API needs validation outside CLI.
+:Tests: macOS build, camera permission smoke, SDL or memory output smoke.
+:Done when: macOS is supported either by CLI or a small host without changing core code.
+:END:
+
+** TODO [#B] Add an iOS sample host after external capture works
+:PROPERTIES:
+:Why: iOS requires app lifecycle, permissions, orientation, and a render surface. This should be a sample shell around the core, not a fork.
+:Change: Add examples/ios with a minimal native shell that captures frames using AVFoundation, submits them to hasciicam, and displays memory-rendered ASCII in a simple native text or pixel surface.
+:Tests: Build for simulator first. Then device smoke if available.
+:Done when: iOS runs the core pipeline from camera frame to visible ASCII output.
+:END:
+
+** TODO [#B] Add an Android sample host after external capture works
+:PROPERTIES:
+:Why: Android support needs Gradle/NDK only at the shell edge. The C core should remain buildable without Gradle.
+:Change: Add examples/android with a minimal NDK shell. Start with synthetic frames, then Camera2/NDK frame submission.
+:Tests: Build native library with Android toolchain. Run emulator/device smoke when available.
+:Done when: Android can show ASCII frames using the shared core.
+:END:
+
+** TODO [#B] Add a WASM browser sample
+:PROPERTIES:
+:Why: WASM needs JavaScript for camera and canvas/text output. The core should expose memory functions and avoid direct DOM assumptions.
+:Change: Add examples/wasm with Emscripten build docs, a JS bridge that feeds RGBA frames from a canvas/video element, and output to a pre/text canvas.
+:Tests: Build with emcc. Run synthetic-frame smoke in browser or node where possible.
+:Done when: WASM can render a frame through the same core without native capture or SDL.
+:END:
+
+* TODO [#B] Add A Small Test And Smoke-Test Discipline
+:PROPERTIES:
+:Effort: 3-6 days
+:Goal: Make refactoring safe for humans and LLMs.
+:Notes: Keep tests small and C-native. Do not introduce a large test framework unless asked.
+:END:
+
+** TODO [#A] Enable CTest
+:PROPERTIES:
+:Why: Refactors need repeatable commands beyond manual camera tests.
+:Change: Add enable_testing() behind HASCIICAM_ENABLE_TESTS and simple add_test entries for conversion and public API tests.
+:Tests: Configure with HASCIICAM_ENABLE_TESTS=ON. Run ctest --output-on-failure.
+:Done when: The repository has one standard test command.
+:END:
+
+** TODO [#A] Add synthetic frame smoke tests
+:PROPERTIES:
+:Why: Camera hardware and permissions vary by platform. Synthetic frames prove the core pipeline works everywhere.
+:Change: Add tests that create a fixed grayscale or RGB frame, run it through conversion/render/memory output, and verify dimensions and non-empty ASCII.
+:Tests: Run on Windows. Later run on Linux/macOS/WASM where possible.
+:Done when: A platform without a camera can still validate the core.
+:END:
+
+** TODO [#B] Add documented manual smoke tests
+:PROPERTIES:
+:Why: Camera and window behavior still need manual checks.
+:Change: Add docs/smoke-tests.md with commands for Windows SDL/camera, Linux V4L2, macOS AVFoundation, text/html output, and close-window behavior.
+:Tests: Documentation-only unless commands are also scripted.
+:Done when: A maintainer can test a platform in five minutes with copyable commands.
+:END:
+
+** TODO [#C] Add CI only after local tests are stable
+:PROPERTIES:
+:Why: CI is useful, but premature CI across cameras/mobile will be noisy.
+:Change: Start with build-only CI for Windows/Linux/macOS and unit tests. Do not attempt real camera CI. Add WASM build CI later.
+:Tests: CI passes build-only matrix.
+:Done when: Pull requests catch build and conversion regressions before manual camera testing.
+:END:
+
+* TODO [#B] Maintain Backward Compatibility Deliberately
+:PROPERTIES:
+:Effort: Ongoing
+:Goal: Keep HasciiCam recognizable while making internals portable.
+:Notes: This is a guardrail for every implementation phase.
+:END:
+
+** TODO [#A] Preserve CLI behavior
+:PROPERTIES:
+:Why: Existing users expect the old command-line shape.
+:Change: Keep flags and defaults compatible unless explicitly changed. If a platform cannot support an option such as daemon or uid/gid, print a clear no-op message as Windows does today.
+:Tests: Run -h and -H after CLI changes. Run text/html output tests after output changes.
+:Done when: Existing documented commands still work on supported desktop platforms.
+:END:
+
+** TODO [#A] Keep aalib rendering semantics stable
+:PROPERTIES:
+:Why: The ASCII look is the product. Refactors should not casually change brightness, contrast, gamma, dithering, or font behavior.
+:Change: Treat visual output changes as intentional features. Add a fixed synthetic render fixture before touching renderer internals.
+:Tests: Run synthetic render fixture and one manual visual smoke if renderer behavior changes.
+:Done when: Renderer changes are rare, explicit, and test-backed.
+:END:
+
+** TODO [#B] Keep platform code isolated
+:PROPERTIES:
+:Why: Ten years of maintenance depends on not spreading #ifdef blocks through the core.
+:Change: Platform files should live under src/capture, src/output, or examples/platform. Public headers stay portable C. C++/Objective-C++ is allowed only inside adapters that require it.
+:Tests: Build at least one non-target platform after adding a platform adapter to catch leaked headers.
+:Done when: Core files compile without including Windows, Linux, Apple, Android, or Emscripten-specific headers.
+:END:
+
+** TODO [#C] Add dependencies only when they replace real platform complexity
+:PROPERTIES:
+:Why: More dependencies increase porting and packaging burden.
+:Change: Prefer platform APIs and SDL where already used. Propose any new dependency in the plan or PR before adding it.
+:Tests: Build with dependency disabled if optional.
+:Done when: The dependency list remains short and intentional.
+:END:
+
+* TODO [#C] Implementation Order And Commit Discipline
+:PROPERTIES:
+:Effort: Ongoing
+:Goal: Make the work implementable by small, reviewable steps.
+:Notes: Follow AGENTS.md workflow when implementing this plan.
+:END:
+
+** TODO [#A] Implement in architecture order, not platform excitement order
+:PROPERTIES:
+:Why: Jumping straight to iOS/Android/WASM before extracting the core will duplicate logic and make maintenance worse.
+:Change: Complete boundaries, app core, output ports, conversion tests, and CMake library targets before adding mobile/browser hosts.
+:Tests: Each L2 that changes code must build and run touched tests before commit.
+:Done when: Every later platform adapter is mostly glue around stable core APIs.
+:END:
+
+** TODO [#A] Use one conventional commit per L2
+:PROPERTIES:
+:Why: Small commits let maintainers bisect regressions and let LLMs resume work reliably.
+:Change: For each L2 implementation, commit all touched files with a conventional commit. Examples: refactor: extract app config, test: add frame conversion fixtures, feat: add external capture source.
+:Tests: Run the tests listed in the L2 before committing.
+:Done when: Git history mirrors the plan and each commit is reviewable alone.
+:END:
+
+** TODO [#B] Update AGENTS.md after major architecture changes
+:PROPERTIES:
+:Why: AGENTS.md is the fast path for future coding agents.
+:Change: After completing each L1 that changes architecture, update AGENTS.md with the new source map and build/test commands.
+:Tests: Documentation-only unless code is touched in the same L2.
+:Done when: A future agent can start from AGENTS.md and avoid rediscovering the architecture.
+:END:
