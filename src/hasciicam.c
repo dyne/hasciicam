@@ -47,6 +47,7 @@
 #include <aalib.h>
 #include "capture/capture.h"
 #include "capture/capture_backend.h"
+#include "capture/frame_convert.h"
 
 /* hasciicam modes */
 #define LIVE 0
@@ -201,52 +202,6 @@ int vw, vh; // video w and h
 int aw, ah; // ascii w and h
 size_t greysize;
 int vbytesperline;
-
-void YUV422_to_grey(unsigned char *src, unsigned char *dst, int w, int h) {
-    unsigned char *writehead, *readhead;
-    int x,y;
-    writehead = dst;
-    readhead  = src;
-    for(y=0; y<gh; ++y){
-        for(x=0; x<gw; ++x){
-            *(writehead++) = *readhead;
-            readhead += xbytestep;
-        }
-        readhead += ybytestep;
-    }
-}
-
-/* New function to scale YUV422 to grey at target dimensions */
-void YUV422_to_grey_scaled(unsigned char *src, unsigned char *dst, int src_w, int src_h, int dst_w, int dst_h) {
-    unsigned char *writehead = dst;
-    unsigned char *readhead = src;
-
-    /* Calculate scaling factors */
-    float x_scale = (float)src_w / (float)dst_w;
-    float y_scale = (float)src_h / (float)dst_h;
-
-    int xstep_bytes = (int)(x_scale * 2); /* YUV422 has 2 bytes per pixel */
-    int ystep_lines = (int)(y_scale);
-
-    if (xstep_bytes < 2) xstep_bytes = 2;
-    if (ystep_lines < 1) ystep_lines = 1;
-
-    int y_stride = src_w * 2; /* YUV422: 2 bytes per pixel */
-
-    for(int y = 0; y < dst_h; ++y) {
-        /* Calculate source row */
-        int src_y = (int)(y * y_scale);
-        unsigned char *row_ptr = src + src_y * y_stride;
-
-        for(int x = 0; x < dst_w; ++x) {
-            /* Calculate source column */
-            int src_x = (int)(x * x_scale);
-            /* In YUV422, we want the Y component, which is at even byte positions */
-            int src_byte = src_x * 2;
-            *(writehead++) = row_ptr[src_byte];
-        }
-    }
-}
 
 void
 config_init (int argc, char *argv[]) {
@@ -630,9 +585,11 @@ main (int argc, char **argv) {
       int copy_size;
 
       framenum = 0;
-      YUV422_to_grey_scaled((unsigned char *)cap_frame.data, grey,
-                            cap_frame.width, cap_frame.height,
-                            ascii_width, ascii_height);
+      if (!capture_frame_to_gray_scaled(&cap_frame, grey, ascii_width, ascii_height)) {
+        fprintf(stderr, "!! failed to convert capture frame to grayscale\n");
+        cap_ops->release(cap_dev, &cap_frame);
+        break;
+      }
       grey_size = ascii_width * ascii_height;
       dest_size = aa_imgwidth(ascii_context) * aa_imgheight(ascii_context);
       copy_size = (grey_size < dest_size) ? grey_size : dest_size;
