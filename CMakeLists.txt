@@ -128,6 +128,7 @@ endif()
 add_executable(hasciicam
     src/hasciicam.c
     src/capture/capture_backend.c
+    src/capture/capture_dshow.c
     src/capture/capture_mf.c
     src/capture/frame_convert.c
     src/capture/capture_v4l2.c
@@ -162,7 +163,7 @@ if(Curses_FOUND)
 endif()
 
 if(WIN32)
-  target_link_libraries(hasciicam PRIVATE mfplat mf mfreadwrite mfuuid ole32 uuid)
+  target_link_libraries(hasciicam PRIVATE mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
 endif()
 
 # Install targets
