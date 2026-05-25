@@ -108,6 +108,13 @@ Current host-fed capture path:
 - WASM-facing recommendation: JavaScript `getUserMedia`/canvas pipelines should
   submit RGBA/BGRA or grayscale frames through the same external backend path.
 
+Scaling decision:
+
+- Current scaling in `frame_convert.c` stays nearest-neighbor sampling.
+- This keeps CPU cost low and behavior deterministic across backends.
+- Box-filter scaling remains a future optional mode if quality needs justify
+  extra complexity.
+
 Planned output adapters:
 
 - Keep AA-lib as the canonical ASCII renderer.
