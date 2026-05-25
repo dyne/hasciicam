@@ -104,14 +104,14 @@
 :Done when: Media Foundation can deliver frames repeatedly without leaking buffers and the frame data reaches the grayscale converter.
 :END:
 
-* TODO [#A] Implement DirectShow fallback
+* WIP [#A] Implement DirectShow fallback
 :PROPERTIES:
 :Effort: 2 days
 :Goal: Add the old Windows capture backend and use it automatically when Media Foundation cannot open or read frames.
 :Notes: DirectShow is old but useful for legacy webcams and capture devices. Keep it behind the same capture port so the main loop does not care which backend is active.
 :END:
 
-** TODO [#A] Add a DirectShow adapter behind the same C port
+** WIP [#A] Add a DirectShow adapter behind the same C port
 :PROPERTIES:
 :Why: Some devices fail under Media Foundation but still work through DirectShow.
 :Change: Add `src/capture/capture_dshow.c` or a small C++ adapter if COM callback code is too awkward in C. Use a Sample Grabber-style path if available, or a custom sample grabber callback if needed. Expose only C functions to the rest of the program.
@@ -127,7 +127,7 @@
 :Done when: DirectShow can select a frame format that the shared converter can handle.
 :END:
 
-** TODO [#A] Read frames and fallback automatically
+** WIP [#A] Read frames and fallback automatically
 :PROPERTIES:
 :Why: The user asked for fallback from new API to old API, so the application should try Media Foundation first and DirectShow second without manual flags.
 :Change: Implement Windows backend selection as: try Media Foundation open/start/read-one-probe; if it fails, close it and try DirectShow. Keep an optional debug log naming the chosen backend. Do not require a new CLI option unless troubleshooting proves it is needed.

@@ -384,12 +384,6 @@ main (int argc, char **argv) {
 
   /* set hasciicam options */
   config_init (argc, argv);
-  cap_ops = capture_default_ops();
-  if (cap_ops == NULL) {
-    fprintf(stderr, "!! no capture backend is available\n");
-    exit(-1);
-  }
-
   memset(&cap_req, 0, sizeof(cap_req));
   cap_req.device = device;
   cap_req.input_channel = inputch;
@@ -398,8 +392,8 @@ main (int argc, char **argv) {
     cap_req.requested_height = user_h;
   }
 
-  if (!cap_ops->open(&cap_dev, &cap_req)) {
-    fprintf(stderr, "!! cannot open capture backend (%s)\n", cap_ops->name());
+  if (!capture_open_default(&cap_req, &cap_dev, &cap_ops)) {
+    fprintf(stderr, "!! cannot open any capture backend\n");
     exit(-1);
   }
   if (!cap_ops->describe(cap_dev, &cap_info)) {
