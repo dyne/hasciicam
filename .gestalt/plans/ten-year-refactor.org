@@ -104,7 +104,7 @@
 :Done when: App code can send an ASCII/text+attributes frame to an output adapter without knowing SDL, stdout, or save internals.
 :END:
 
-** WIP [#A] Preserve aalib as the canonical ASCII renderer
+** DONE [#A] Preserve aalib as the canonical ASCII renderer
 :PROPERTIES:
 :Why: The software identity is the aalib ASCII conversion path. New outputs should display aalib output, not bypass it with unrelated renderers.
 :Change: Keep aa_image(), aa_fastrender(), textbuffer, and attrbuffer as the core render path. Wrap access to textbuffer/attrbuffer behind a tiny render_frame view.
@@ -112,7 +112,7 @@
 :Done when: New output adapters consume the same rendered ASCII representation as SDL/stdout.
 :END:
 
-** TODO [#B] Split file outputs from live outputs
+** WIP [#B] Split file outputs from live outputs
 :PROPERTIES:
 :Why: HTML/text file output has different lifecycle rules than live windows, mobile surfaces, or web canvases.
 :Change: Keep save_d support but expose file output as its own adapter family: output_file_text and output_file_html. Move hascii_header construction out of main into file output setup.

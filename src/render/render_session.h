@@ -12,6 +12,13 @@ typedef struct hasciicam_render_session {
     char html_header[1024];
 } hasciicam_render_session;
 
+typedef struct hasciicam_ascii_frame {
+    const char *text;
+    const char *attrs;
+    int width;
+    int height;
+} hasciicam_ascii_frame;
+
 void hasciicam_render_session_init(hasciicam_render_session *session);
 void hasciicam_render_session_configure_geometry(hasciicam_render_session *session,
                                                  int rec_width,
@@ -37,6 +44,8 @@ void hasciicam_render_session_apply_tuning(hasciicam_render_session *session,
                                            int bright,
                                            int contrast,
                                            float gamma);
+int hasciicam_render_session_get_ascii_frame(const hasciicam_render_session *session,
+                                             hasciicam_ascii_frame *frame);
 void hasciicam_render_session_close(hasciicam_render_session *session);
 
 #endif
