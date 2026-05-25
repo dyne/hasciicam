@@ -292,7 +292,7 @@
 :Done when: A sample host can use hasciicam without including internal aalib or capture headers.
 :END:
 
-** WIP [#B] Add a macOS desktop sample host
+** DONE [#B] Add a macOS desktop sample host
 :PROPERTIES:
 :Why: macOS can validate AVFoundation plus SDL/memory output before iOS constraints are added.
 :Change: Build the normal CLI first. Then optionally add examples/macos-host if the public embedding API needs validation outside CLI.
@@ -300,7 +300,7 @@
 :Done when: macOS is supported either by CLI or a small host without changing core code.
 :END:
 
-** TODO [#B] Add an iOS sample host after external capture works
+** WIP [#B] Add an iOS sample host after external capture works
 :PROPERTIES:
 :Why: iOS requires app lifecycle, permissions, orientation, and a render surface. This should be a sample shell around the core, not a fork.
 :Change: Add examples/ios with a minimal native shell that captures frames using AVFoundation, submits them to hasciicam, and displays memory-rendered ASCII in a simple native text or pixel surface.
