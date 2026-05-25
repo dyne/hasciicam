@@ -214,7 +214,7 @@
 :Done when: Conversion changes fail fast without needing a camera.
 :END:
 
-** WIP [#B] Add NV21 and platform-common mobile formats if needed
+** DONE [#B] Add NV21 and platform-common mobile formats if needed
 :PROPERTIES:
 :Why: Android often exposes NV21/YUV_420_888-like layouts. iOS often exposes NV12/BGRA.
 :Change: Add only formats actually needed by an adapter or host bridge. Prefer explicit planar metadata before guessing layout from one pointer.
@@ -222,7 +222,7 @@
 :Done when: Mobile frame formats convert through frame_convert.c instead of custom adapter code.
 :END:
 
-** TODO [#C] Consider scaling quality options after correctness
+** WIP [#C] Consider scaling quality options after correctness
 :PROPERTIES:
 :Why: The current nearest-neighbor style scaling is simple and fast. Better scaling may improve output but can complicate maintenance.
 :Change: Evaluate nearest-neighbor, box average, and ordered sampling. Keep nearest-neighbor as default unless a simple box average materially improves ASCII output.

@@ -55,6 +55,23 @@ static int test_nv12_reads_y_plane(void) {
     return dst[0] == 7 && dst[1] == 8 && dst[2] == 9 && dst[3] == 10;
 }
 
+static int test_nv21_reads_y_plane(void) {
+    unsigned char src[6] = {11, 12, 13, 14, 128, 128};
+    unsigned char dst[4] = {0, 0, 0, 0};
+    capture_frame frame;
+    memset(&frame, 0, sizeof(frame));
+    frame.data = src;
+    frame.data_size = sizeof(src);
+    frame.width = 2;
+    frame.height = 2;
+    frame.stride_bytes = 2;
+    frame.pixel_format = CAPTURE_PIXFMT_NV21;
+
+    if (!capture_frame_to_gray_scaled(&frame, dst, 2, 2))
+        return 0;
+    return dst[0] == 11 && dst[1] == 12 && dst[2] == 13 && dst[3] == 14;
+}
+
 static int test_bgra_luma_for_red_pixel(void) {
     /* B, G, R, A */
     unsigned char src[4] = {0, 0, 255, 255};
@@ -91,6 +108,7 @@ int main(void) {
     if (!test_gray8_passthrough()) return 1;
     if (!test_yuyv_reads_luma_bytes()) return 1;
     if (!test_nv12_reads_y_plane()) return 1;
+    if (!test_nv21_reads_y_plane()) return 1;
     if (!test_bgra_luma_for_red_pixel()) return 1;
     if (!test_invalid_format_fails()) return 1;
     printf("frame_convert tests passed\n");
