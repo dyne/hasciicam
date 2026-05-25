@@ -198,7 +198,7 @@
 :Notes: This is high leverage: every platform depends on conversion quality and bounds safety.
 :END:
 
-** WIP [#A] Define conversion invariants in frame_convert.h
+** DONE [#A] Define conversion invariants in frame_convert.h
 :PROPERTIES:
 :Why: Camera adapters will produce different strides, dimensions, and formats. The conversion layer must define what is accepted.
 :Change: Document stride >= width * bytes_per_pixel where applicable, destination width/height rules, accepted formats, and failure behavior. Keep functions returning 0/1.
@@ -206,7 +206,7 @@
 :Done when: Adapter authors know exactly how to call conversion functions.
 :END:
 
-** TODO [#A] Add deterministic conversion tests
+** WIP [#A] Add deterministic conversion tests
 :PROPERTIES:
 :Why: Live camera smoke tests cannot prove RGB/NV12/YUYV conversion stays correct.
 :Change: Add a small C test executable under tests/ that feeds tiny fixed frames for GRAY8, YUYV/YUY2, NV12, RGB24/BGR24, RGB32/BGRA32 and checks expected grayscale values.
