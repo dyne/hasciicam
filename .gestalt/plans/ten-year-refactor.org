@@ -230,7 +230,7 @@
 :Done when: Scaling behavior is documented and intentionally simple.
 :END:
 
-* WIP [#A] Modernize CMake Without Hiding The Build
+* DONE [#A] Modernize CMake Without Hiding The Build
 :PROPERTIES:
 :Effort: 3-5 days
 :Goal: Make native, mobile, and WASM builds selectable and predictable.
@@ -261,7 +261,7 @@
 :Done when: The documented build command for each platform is one preset plus cmake --build.
 :END:
 
-** WIP [#B] Add library targets for embedding
+** DONE [#B] Add library targets for embedding
 :PROPERTIES:
 :Why: iOS, Android, and WASM should embed hasciicam as a library, not invoke a CLI main.
 :Change: Build hasciicam_core as a static library containing app/session/capture/conversion/render core. Build hasciicam_cli as the executable that links hasciicam_core.
@@ -269,7 +269,7 @@
 :Done when: The CLI is just one host of the reusable core.
 :END:
 
-** TODO [#C] Add packaging/runtime DLL handling for Windows SDL
+** WIP [#C] Add packaging/runtime DLL handling for Windows SDL
 :PROPERTIES:
 :Why: Windows SDL builds work only when SDL2.dll is available near the executable or on PATH.
 :Change: Add a post-build copy rule for SDL2.dll when using the imported SDL target if CMake can do so cleanly. Otherwise document the exact vcpkg runtime path.
@@ -277,14 +277,14 @@
 :Done when: Running the built executable from its build directory works without manual DLL copying.
 :END:
 
-* TODO [#B] Prepare Platform Host Shells
+* WIP [#B] Prepare Platform Host Shells
 :PROPERTIES:
 :Effort: 2-6 weeks
 :Goal: Let each non-CLI platform own its lifecycle while sharing the same C/C++ core.
 :Notes: These are intentionally separate from core refactors so desktop remains stable.
 :END:
 
-** TODO [#A] Define the embedding API
+** WIP [#A] Define the embedding API
 :PROPERTIES:
 :Why: Mobile and WASM need a small stable C API: create config, submit frame or start capture, step, get output, stop, destroy.
 :Change: Add include/hasciicam/hasciicam.h or src/public/hasciicam.h with opaque handles and C ABI functions. Keep structs versioned or use create/setter functions to avoid ABI churn.

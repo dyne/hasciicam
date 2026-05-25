@@ -120,60 +120,67 @@ if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
   list(APPEND HASCIICAM_CAPTURE_DEFINITIONS HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION=1)
 endif()
 
-if(HASCIICAM_BUILD_CLI)
-  # Main executable
-  add_executable(hasciicam
-      ${HASCIICAM_APP_SOURCES}
-      ${HASCIICAM_OUTPUT_SOURCES}
-      ${HASCIICAM_RENDER_SOURCES}
-      src/hasciicam.c
-      ${HASCIICAM_CAPTURE_SOURCES}
+add_library(hasciicam_core STATIC
+    ${HASCIICAM_APP_SOURCES}
+    ${HASCIICAM_OUTPUT_SOURCES}
+    ${HASCIICAM_RENDER_SOURCES}
+    ${HASCIICAM_CAPTURE_SOURCES}
+)
+if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
+  target_sources(hasciicam_core PRIVATE src/capture/capture_avfoundation.mm)
+endif()
+target_compile_definitions(hasciicam_core PRIVATE ${HASCIICAM_CAPTURE_DEFINITIONS})
+target_link_libraries(hasciicam_core PUBLIC aalib)
+if(WIN32)
+  target_include_directories(hasciicam_core PRIVATE src/compat)
+  target_compile_definitions(hasciicam_core PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+
+# Additional system libraries that may be needed
+if(NOT MSVC)
+    target_link_libraries(hasciicam_core PUBLIC m)
+endif()
+
+# Link optional libraries to hasciicam core
+if(HASCIICAM_WITH_SDL)
+  target_link_libraries(hasciicam_core PUBLIC SDL2::SDL2 SDL2::SDL2main)
+endif()
+
+if(HASCIICAM_WITH_X11)
+  target_link_libraries(hasciicam_core PUBLIC X11::X11)
+endif()
+
+if(HASCIICAM_WITH_CURSES)
+  target_link_libraries(hasciicam_core PUBLIC ${CURSES_LIBRARIES})
+  target_include_directories(hasciicam_core PUBLIC ${CURSES_INCLUDE_DIRS})
+endif()
+
+if(HASCIICAM_ENABLE_CAPTURE_MF OR HASCIICAM_ENABLE_CAPTURE_DSHOW)
+  target_link_libraries(hasciicam_core PUBLIC mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+endif()
+
+if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
+  target_link_libraries(hasciicam_core PUBLIC
+    "-framework AVFoundation"
+    "-framework CoreMedia"
+    "-framework CoreVideo"
+    "-framework Foundation"
   )
-  if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
-    target_sources(hasciicam PRIVATE src/capture/capture_avfoundation.mm)
-  endif()
+endif()
+
+if(HASCIICAM_BUILD_CLI)
+  # CLI host executable
+  add_executable(hasciicam src/hasciicam.c)
   target_compile_definitions(hasciicam PRIVATE
       PACKAGE="hasciicam"
       VERSION="${PROJECT_VERSION}"
-      ${HASCIICAM_CAPTURE_DEFINITIONS}
   )
   if(WIN32)
       target_include_directories(hasciicam PRIVATE src/compat)
       target_compile_definitions(hasciicam PRIVATE _CRT_SECURE_NO_WARNINGS)
   endif()
-  target_link_libraries(hasciicam PRIVATE aalib)
+  target_link_libraries(hasciicam PRIVATE hasciicam_core)
 
-  # Additional system libraries that may be needed
-  if(NOT MSVC)
-      target_link_libraries(hasciicam PRIVATE m)
-  endif()
-
-  # Link optional libraries to hasciicam
-  if(HASCIICAM_WITH_SDL)
-    target_link_libraries(hasciicam PRIVATE SDL2::SDL2 SDL2::SDL2main)
-  endif()
-
-  if(HASCIICAM_WITH_X11)
-    target_link_libraries(hasciicam PRIVATE X11::X11)
-  endif()
-
-  if(HASCIICAM_WITH_CURSES)
-    target_link_libraries(hasciicam PRIVATE ${CURSES_LIBRARIES})
-    target_include_directories(hasciicam PRIVATE ${CURSES_INCLUDE_DIRS})
-  endif()
-
-  if(HASCIICAM_ENABLE_CAPTURE_MF OR HASCIICAM_ENABLE_CAPTURE_DSHOW)
-    target_link_libraries(hasciicam PRIVATE mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
-  endif()
-
-  if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
-    target_link_libraries(hasciicam PRIVATE
-      "-framework AVFoundation"
-      "-framework CoreMedia"
-      "-framework CoreVideo"
-      "-framework Foundation"
-    )
-  endif()
 endif()
 
 message(STATUS "hasciicam options:")
@@ -201,4 +208,8 @@ if(HASCIICAM_ENABLE_TESTS)
   )
   target_include_directories(test_frame_convert PRIVATE src/capture)
   add_test(NAME frame_convert COMMAND test_frame_convert)
+
+  add_executable(test_core_link tests/test_core_link.c)
+  target_link_libraries(test_core_link PRIVATE hasciicam_core)
+  add_test(NAME core_link COMMAND test_core_link)
 endif()
