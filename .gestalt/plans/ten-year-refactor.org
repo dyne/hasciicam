@@ -57,7 +57,7 @@
 :Done when: main() can ask for a fully populated config without owning getopt details.
 :END:
 
-** WIP [#A] Move the live frame loop into an app_session module
+** DONE [#A] Move the live frame loop into an app_session module
 :PROPERTIES:
 :Why: The loop is the actual use-case: read camera, convert to luminance, write aalib image, render, flush. It should be callable by CLI, desktop app shells, mobile shells, and WASM.
 :Change: Create src/app/app_session.h and src/app/app_session.c. Define hasciicam_session_start(), hasciicam_session_step(), and hasciicam_session_stop(). Move capture open/start/read/release/stop and grey buffer ownership there. Keep the first version synchronous and single-threaded.
@@ -65,7 +65,7 @@
 :Done when: The CLI main loop is small and the session can be stepped by a non-CLI host.
 :END:
 
-** TODO [#A] Move aalib setup into a render_session module
+** WIP [#A] Move aalib setup into a render_session module
 :PROPERTIES:
 :Why: Output selection and aalib initialization are mixed into application startup. Future outputs need an explicit rendering boundary.
 :Change: Create src/render/render_session.h and src/render/render_session.c. Move aalib hardware params, render params, save mode setup, driver recommendations, aa_init/aa_autoinit, and aa_close there. Keep aalib itself vendored and unchanged except for driver fixes.
