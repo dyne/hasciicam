@@ -126,6 +126,7 @@ endif()
 
 # Main executable
 add_executable(hasciicam
+    src/app/app_config.c
     src/hasciicam.c
     src/capture/capture_backend.c
     src/capture/capture_dshow.cpp

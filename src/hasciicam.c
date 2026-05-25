@@ -29,7 +29,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <getopt.h>
 #include <errno.h>
 #include <ctype.h>
 #include <signal.h>
@@ -45,6 +44,7 @@
 #endif
 
 #include <aalib.h>
+#include "app/app_config.h"
 #include "capture/capture.h"
 #include "capture/capture_backend.h"
 #include "capture/frame_convert.h"
@@ -54,75 +54,27 @@
 #define HTML 1
 #define TEXT 2
 
-/* commandline stuff */
-
-char *version =
-    "\n%s %s - (h)ascii 4 the masses! - https://ascii.dyne.org\n"
-    "(c)2000-2025 RASTASOFT by Jaromil @ Dyne.org\n\n";
-
-char *help =
-/* "\x1B" "c" <--- SCREEN CLEANING ESCAPE CODE
-   why here? just a reminder for a shamanic secret told by bernie@codewiz.org */
-"Usage: hasciicam [options] [rendering options] [aalib options]\n"
-"options:\n"
-" -h --help         this help\n"
-" -H --aahelp       aalib complete help\n"
-" -v --version      version information\n"
-" -q --quiet        be quiet\n"
-" -m --mode         mode: live|html|text      - default live\n"
-" -d --device       video grabbing device     - default /dev/video\n"
-" -i --input        input channel number      - default 1\n"
-" -s --size         ascii image size WxH      - webcam's smallest default\n"
-" -o --aafile       dumped file               - default hasciicam.[txt|html]\n"
-" -O --aadriver     aalib driver: X11|curses|SDL|stdout - default auto\n"
-" -D --daemon       run in background         - default foregrond\n"
-" -U --uid          setuid (int)              - default current\n"
-" -G --gid          setgid (int)              - default current\n"
-"rendering options:\n"
-" -S --font-size    html font size (1-4)      - default 1\n"
-" -a --font-face    html font to use          - default courier\n"
-" -r --refresh      refresh delay             - default 2\n"
-" -b --aabright     ascii brightness          - default 60\n"
-" -c --aacontrast   ascii contrast            - default 4\n"
-" -g --aagamma      ascii gamma               - default 3\n"
-" -I --invert       invert colors             - default off\n"
-" -B --background   background color (hex)    - default 000000\n"
-" -F --foreground   foreground color (hex)    - default 00FF00\n";
-
-const struct option long_options[] = {
-  {"help", no_argument, NULL, 'h'},
-  {"aahelp", no_argument, NULL, 'H'},
-  {"version", no_argument, NULL, 'v'},
-  {"quiet", no_argument, NULL, 'q'},
-  {"mode", required_argument, NULL, 'm'},
-  {"device", required_argument, NULL, 'd'},
-  {"input", required_argument, NULL, 'i'},
-  {"size", required_argument, NULL, 's'},
-  {"aafile", required_argument, NULL, 'o'},
-  {"aadriver", required_argument, NULL, 'O'},
-  {"daemon", no_argument, NULL, 'D'},
-  {"font-size", required_argument, NULL, 'S'},
-  {"font-face", required_argument, NULL, 'a'},
-  {"refresh", required_argument, NULL, 'r'},
-  {"aabright", required_argument, NULL, 'b'},
-  {"aacontrast", required_argument, NULL, 'c'},
-  {"aagamma", required_argument, NULL, 'g'},
-  {"invert", no_argument, NULL, 'I'},
-  {"background", required_argument, NULL, 'B'},
-  {"foreground", required_argument, NULL, 'F'},
-  {"uid", required_argument, NULL, 'U'},
-  {"gid", required_argument, NULL, 'G'},
-  {0, 0, 0, 0}
-};
-
-char *short_options = "hHvqm:d:i:s:f:DS:a:r:o:b:c:g:IB:F:O:Q:U:G:";
-
 /* default configuration */
+static hasciicam_config appcfg;
 int quiet = 0;
 int mode = 0;
 int inputch = 0;
 int daemon_mode = 0;
 int invert = 0;
+int refresh = 2;
+int fontsize = 1;
+int linespace = 5;
+int user_w = 0;
+int user_h = 0;
+int whchanged = 0;
+int uid = -1;
+int gid = -1;
+char device[256];
+char aafile[256];
+char background[64];
+char foreground[64];
+char fontface[256];
+char aadriver[64];
 
 struct geometry {
   int w, h, size;
@@ -131,29 +83,11 @@ struct geometry {
 
 struct geometry aa_geo;
 struct geometry vid_geo;
-/* if width&height have been manually changed */
-int whchanged = 0;
 
-char device[256];
 int have_tuner = 0;
-
-int refresh = 2;
-int fontsize = 1;
-int linespace = 5;
-char background[64];
-char foreground[64];
-char fontface[256];
-char aadriver[64];
-
-int user_w = 0;
-int user_h = 0;
-
-int uid = -1;
-int gid = -1;
 
 /* buffers */
 unsigned char *image = NULL; /* mmapped */
-char aafile[256];
 char aatmpfile[256];
 
 
@@ -203,153 +137,6 @@ int aw, ah; // ascii w and h
 size_t greysize;
 int vbytesperline;
 
-void
-config_init (int argc, char *argv[]) {
-  int res;
-
-  /* setup defaults */
-
-  { /* device filename */
-#if defined(_WIN32)
-    device[0] = '\0';
-#else
-    struct stat st;
-    if( stat("/dev/video",&st) <0)
-      strcpy(device,"/dev/video0");
-    else
-      strcpy(device,"/dev/video");
-#endif
-  }
-  strcpy(background,"000000");
-  strcpy(foreground,"00FF00");
-  strcpy(fontface,"courier"); /* you'd better choose monospace fonts */
-  strcpy(aadriver,""); /* empty means auto-detect */
-
-  aa_geo.w = 80; // 96;
-  aa_geo.h = 40; // 72;
-  aa_geo.bright =  60;
-  aa_geo.contrast = 4;
-  aa_geo.gamma = 3;
-
-  do {
-    res = getopt_long (argc, argv, short_options, long_options, NULL);
-
-    switch (res) {
-    case 'h':
-      fprintf (stderr, "%s", help);
-      exit (0);
-      break;
-    case 'H':
-      fprintf (stderr, "%s", help);
-      fprintf (stderr, "\naalib options:\n%s",aa_help);
-      exit(0);
-    case 'v':
-      exit (0);
-      break;
-    case 'q':
-      quiet = 1;
-      break;
-    case 'm':
-      if (strcasecmp (optarg, "live") == 0) {
-        mode = LIVE;
-      } else if (strcasecmp (optarg, "html") == 0) {
-        mode = HTML;
-        strcpy(aafile,"hasciicam.html");
-      } else if (strcasecmp (optarg, "text") == 0) {
-        mode = TEXT;
-        strcpy(aafile,"hasciicam.asc");
-      } else {
-        fprintf (stderr, "!! invalid mode selected, using live\n");
-        mode = LIVE;
-      }
-      break;
-    case 'd':
-      strncpy(device,optarg,256);
-      break;
-    case 'i':
-      inputch = atoi (optarg);
-      /*
-	 here we assume that capture cards have maximum 3 channels
-	 (usually the 4th, when present, is the radio tuner)
-      */
-      if (inputch > 3) {
-	fprintf (stderr, "invalid input selected\n");
-	exit (1);
-      }
-      break;
-
-    case 's':
-      {
-	char *t;
-	char *tt;
-	t = optarg;
-	while (isdigit (*t))
-	  t++;
-	*t = 0;
-	user_w = atoi (optarg);
-	tt = ++t;
-	while (isdigit (*tt))
-	  tt++;
-	*tt = 0;
-	user_h = atoi (t);
-	whchanged = 1;
-      }
-      break;
-    case 'S':
-      fontsize = atoi (optarg);
-      switch (fontsize) {
-      case 1: linespace = 5; break;
-      case 2: linespace = 10; break;
-      case 3: linespace = 11; break;
-      case 4: linespace = 13; break;
-      default: linespace = 15; break;
-      }
-      break;
-    case 'a':
-      strncpy(fontface,optarg,256);
-      break;
-    case 'r':
-      refresh = atoi (optarg);
-      break;
-    case 'o':
-      if(mode>0)
-	strncpy(aafile,optarg,256);
-      break;
-    case 'O':
-      strncpy(aadriver,optarg,64);
-      break;
-    case 'D':
-      daemon_mode = 1;
-      break;
-    case 'b':
-      aa_geo.bright = atoi (optarg);
-      break;
-    case 'c':
-      aa_geo.contrast = atoi (optarg);
-      break;
-    case 'g':
-      aa_geo.gamma = atoi (optarg);
-      break;
-    case 'I':
-      invert = 1;
-      break;
-    case 'B':
-      strncpy(background,optarg,64);
-      break;
-    case 'F':
-      strncpy(foreground,optarg,64);
-      break;
-    case 'U':
-      uid = atoi (optarg);
-      break;
-    case 'G':
-      gid = atoi (optarg);
-      break;
-    }
-  } while (res > 0);
-
-}
-
 /* here we go (chmicl broz rlz! :)*/
 
 int
@@ -367,7 +154,12 @@ main (int argc, char **argv) {
   /* register signal traps */
   if (signal (SIGINT, quitproc) == SIG_ERR) {
       perror ("Couldn't install SIGINT handler"); exit (1); }
-  fprintf (stderr, version, PACKAGE, VERSION);
+  fprintf(stderr,
+          "\n%s %s - (h)ascii 4 the masses! - https://ascii.dyne.org\n"
+          "(c)2000-2025 RASTASOFT by Jaromil @ Dyne.org\n\n",
+          PACKAGE, VERSION);
+
+  hasciicam_config_init_defaults(&appcfg);
 
   /* default values */
 #if defined(_WIN32)
@@ -387,7 +179,37 @@ main (int argc, char **argv) {
   aa_parseoptions (&ascii_hwparms, ascii_rndparms, &argc, argv);
 
   /* set hasciicam options */
-  config_init (argc, argv);
+  hasciicam_config_parse(&appcfg, argc, argv, aa_help, PACKAGE, VERSION);
+  quiet = appcfg.quiet;
+  mode = appcfg.mode;
+  inputch = appcfg.input_channel;
+  daemon_mode = appcfg.daemon_mode;
+  invert = appcfg.invert;
+  refresh = appcfg.refresh;
+  fontsize = appcfg.fontsize;
+  linespace = appcfg.linespace;
+  user_w = appcfg.user_w;
+  user_h = appcfg.user_h;
+  whchanged = appcfg.whchanged;
+  uid = appcfg.uid;
+  gid = appcfg.gid;
+  strncpy(device, appcfg.device, sizeof(device) - 1);
+  device[sizeof(device) - 1] = '\0';
+  strncpy(aafile, appcfg.aafile, sizeof(aafile) - 1);
+  aafile[sizeof(aafile) - 1] = '\0';
+  strncpy(background, appcfg.background, sizeof(background) - 1);
+  background[sizeof(background) - 1] = '\0';
+  strncpy(foreground, appcfg.foreground, sizeof(foreground) - 1);
+  foreground[sizeof(foreground) - 1] = '\0';
+  strncpy(fontface, appcfg.fontface, sizeof(fontface) - 1);
+  fontface[sizeof(fontface) - 1] = '\0';
+  strncpy(aadriver, appcfg.aadriver, sizeof(aadriver) - 1);
+  aadriver[sizeof(aadriver) - 1] = '\0';
+  aa_geo.w = 80;
+  aa_geo.h = 40;
+  aa_geo.bright = appcfg.aa_bright;
+  aa_geo.contrast = appcfg.aa_contrast;
+  aa_geo.gamma = appcfg.aa_gamma;
   memset(&cap_req, 0, sizeof(cap_req));
   cap_req.device = device;
   cap_req.input_channel = inputch;
