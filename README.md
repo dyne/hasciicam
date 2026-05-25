@@ -142,6 +142,14 @@ Live output preference remains SDL first when available.
 
 The `-d` option on Windows is treated as a camera matcher (friendly-name substring),
 not as a `/dev/video*` path.
+Use `-d ""` to select the first available camera.
+
+Quick live smoke test:
+```powershell
+.\build-sdl-rel\hasciicam.exe -q -d "" -O SDL
+```
+
+When a matcher does not resolve, startup logs show backend fallback attempts.
 
 For local MSVC builds in this repo, a Release configuration is recommended:
 ```powershell
