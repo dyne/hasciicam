@@ -4,6 +4,8 @@
 #include "capture_v4l2.h"
 #include <stdio.h>
 
+extern int quiet;
+
 const capture_ops *capture_default_ops(void) {
 #if defined(_WIN32)
     return capture_mf_ops();
@@ -36,9 +38,12 @@ int capture_open_default(const capture_request *req,
             continue;
         if (ops_try[i]->open(out_dev, req)) {
             *out_ops = ops_try[i];
-            fprintf(stderr, "Capture backend: %s\n", ops_try[i]->name());
+            if (!quiet)
+                fprintf(stderr, "Capture backend: %s\n", ops_try[i]->name());
             return 1;
         }
+        if (!quiet)
+            fprintf(stderr, "Capture backend failed: %s\n", ops_try[i]->name());
     }
 
     return 0;
