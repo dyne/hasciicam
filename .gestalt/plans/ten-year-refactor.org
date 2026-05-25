@@ -175,7 +175,7 @@
 :Done when: iOS can integrate camera frames without changing hasciicam core or pretending there is a CLI camera device.
 :END:
 
-** WIP [#B] Add Android capture as a host-provided frame source first
+** DONE [#B] Add Android capture as a host-provided frame source first
 :PROPERTIES:
 :Why: Android Camera2/NDK ownership belongs to an Activity or native app shell. The portable core should accept frames, not own Android UI lifecycle.
 :Change: Reuse capture_external.c for Android. Add documentation for expected frame formats: NV12/NV21/RGBA/BGRA if supported by frame_convert.c. Add a later adapter plan for ACameraManager only if a native-only shell is desired.

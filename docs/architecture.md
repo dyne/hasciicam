@@ -103,6 +103,8 @@ Current host-fed capture path:
 - Host submits frames through `hasciicam_session_submit_frame(...)`.
 - Accepted frame formats are the same `capture_pixel_format` values used by
   `frame_convert.c` (for example `GRAY8`, `NV12`, `BGRA32`, `RGB24`).
+- Android-facing recommendation: feed `NV12` or `BGRA32` first; add `NV21`
+  explicitly only when the host camera pipeline cannot emit supported formats.
 
 Planned output adapters:
 
