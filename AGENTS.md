@@ -74,28 +74,27 @@ plain C functions. Do not introduce a framework.
 
 ## Runtime Flow
 
-The main path in `src/hasciicam.c` is:
+The current path in `src/hasciicam.c` is:
 
 1. Install `SIGINT` handling through `quitproc()`.
-2. Initialize AA-lib default hardware and render parameters.
-3. Let AA-lib consume its own options with `aa_parseoptions()`.
-4. Parse HasciiCam options in `config_init()`.
-5. Open and configure the capture device in `vid_detect()`.
-6. Allocate capture and grayscale buffers in `vid_init()`.
-7. Build the HTML header used by HTML save mode.
-8. Drop to the requested uid/gid when configured.
-9. Initialize an AA-lib context:
+2. Initialize AA-lib defaults and let AA-lib parse AA options with `aa_parseoptions()`.
+3. Parse HasciiCam CLI options in `config_init()`.
+4. Build a `capture_request` and open capture through `capture_open_default()`:
+   - Windows order: Media Foundation, then DirectShow fallback.
+   - Non-Windows order: V4L2.
+5. Query capture geometry/pixel format via `describe()`, then `start()`.
+6. Allocate grayscale buffer and configure AA-lib hardware parameters.
+7. Initialize AA-lib output:
    - `save_d` for HTML/text modes.
    - `aa_autoinit()` for live mode, after display-driver recommendations.
-10. Enter the loop:
-    - `grab_one()` dequeues a V4L2 buffer.
-    - YUYV/YUV422 luminance is sampled into the grayscale buffer.
-    - Grayscale data is copied into `aa_image(ascii_context)`.
-    - `aa_fastrender()` converts pixels to characters.
-    - `aa_flush()` displays or writes the rendered frame.
-    - the V4L2 buffer is queued again.
-11. On exit, stop streaming, unmap buffers, close AA-lib, free memory, and close
-    the video device.
+8. Enter the loop:
+   - `read()` one frame from the active capture backend.
+   - Convert frame format to grayscale with `capture_frame_to_gray_scaled()`.
+   - Copy grayscale into `aa_image(ascii_context)`.
+   - Render with `aa_fastrender()`.
+   - Output through `aa_flush()`.
+   - `release()` the capture frame.
+9. On exit, `stop()` and `close()` capture backend, close AA-lib, and free buffers.
 
 ## CLI
 
@@ -136,28 +135,22 @@ changing CLI parsing, preserve that ordering.
 
 ## Video Capture
 
-Current capture is Linux V4L2:
-
-- Linux-only headers are included under `#if defined(__linux__)`, but many V4L2
-  globals and functions are still compiled unconditionally.
-- `vid_detect()` opens the device, checks `V4L2_CAP_VIDEO_CAPTURE` and
-  `V4L2_CAP_STREAMING`, selects the requested input, reads current format, and
-  requests `V4L2_PIX_FMT_YUYV`.
-- `vid_init()` uses memory-mapped streaming buffers with `VIDIOC_REQBUFS`,
-  `VIDIOC_QUERYBUF`, `mmap()`, `VIDIOC_QBUF`, and `VIDIOC_STREAMON`.
-- `grab_one()` uses `VIDIOC_DQBUF`/`VIDIOC_QBUF` around each frame.
-
-For Windows and macOS support, do not spread platform checks through the render
-loop. Move capture behind a small C port:
+Capture is now behind a small C port in `src/capture/capture.h`:
 
 - request: desired device/input/size.
 - response: actual width, height, stride, and pixel format.
 - operations: open, start, read/dequeue one frame, release/requeue frame, stop,
   close.
 
-Then keep the existing V4L2 implementation as the Linux adapter, and add macOS
-and Windows adapters separately. The render loop should only see a frame buffer
-and metadata.
+Current adapters:
+
+- Linux: `src/capture/capture_v4l2.c`.
+- Windows primary: `src/capture/capture_mf.c` (Media Foundation).
+- Windows fallback: `src/capture/capture_dshow.cpp` (DirectShow).
+
+Backend selection lives in `src/capture/capture_backend.c`. The render loop
+sees only `capture_frame` and metadata and does not perform platform-specific
+I/O.
 
 ## Frame Conversion
 
@@ -262,9 +255,8 @@ Known Linux/POSIX assumptions in the current code:
 - Some AA-lib drivers are guarded by compile definitions, but the source list
   still includes several Unix-oriented files.
 
-The Windows build currently compiles and runs CLI help, but camera capture is
-not implemented there yet. The Linux V4L2 path is guarded so Windows can build
-while the Windows capture adapter is added separately.
+The Windows build includes working camera capture with backend fallback:
+Media Foundation first, DirectShow second.
 
 Preferred direction:
 
