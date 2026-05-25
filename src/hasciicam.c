@@ -287,13 +287,14 @@ main (int argc, char **argv) {
 
 
 
-  while (userbreak <1) {
+  while (userbreak <1 && !hasciicam_session_should_stop(&session)) {
     const unsigned char *gray_frame = NULL;
     int gray_size = 0;
 
     if (!hasciicam_session_step(&session, aa_imgwidth(render_session.context),
                                 aa_imgheight(render_session.context),
                                 &gray_frame, &gray_size)) {
+      hasciicam_session_request_stop(&session);
       break;
     }
 

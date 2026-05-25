@@ -9,6 +9,7 @@ typedef struct hasciicam_session {
     capture_info capture_info;
     unsigned char *gray_buffer;
     int gray_size;
+    int stop_requested;
 } hasciicam_session;
 
 int hasciicam_session_start(hasciicam_session *session, const capture_request *req);
@@ -19,5 +20,7 @@ int hasciicam_session_step(hasciicam_session *session,
                            int *gray_size);
 void hasciicam_session_stop(hasciicam_session *session);
 const capture_info *hasciicam_session_capture_info(const hasciicam_session *session);
+void hasciicam_session_request_stop(hasciicam_session *session);
+int hasciicam_session_should_stop(const hasciicam_session *session);
 
 #endif
