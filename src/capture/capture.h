@@ -32,10 +32,18 @@ typedef struct capture_frame {
     capture_pixel_format pixel_format;
 } capture_frame;
 
+typedef struct capture_info {
+    int width;
+    int height;
+    int stride_bytes;
+    capture_pixel_format pixel_format;
+} capture_info;
+
 typedef struct capture_device capture_device;
 
 typedef struct capture_ops {
     int (*open)(capture_device **out, const capture_request *req);
+    int (*describe)(capture_device *dev, capture_info *info);
     int (*start)(capture_device *dev);
     int (*read)(capture_device *dev, capture_frame *frame);
     void (*release)(capture_device *dev, capture_frame *frame);
