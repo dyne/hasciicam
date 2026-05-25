@@ -269,7 +269,7 @@
 :Done when: The CLI is just one host of the reusable core.
 :END:
 
-** WIP [#C] Add packaging/runtime DLL handling for Windows SDL
+** DONE [#C] Add packaging/runtime DLL handling for Windows SDL
 :PROPERTIES:
 :Why: Windows SDL builds work only when SDL2.dll is available near the executable or on PATH.
 :Change: Add a post-build copy rule for SDL2.dll when using the imported SDL target if CMake can do so cleanly. Otherwise document the exact vcpkg runtime path.

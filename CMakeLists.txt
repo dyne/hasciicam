@@ -180,6 +180,14 @@ if(HASCIICAM_BUILD_CLI)
       target_compile_definitions(hasciicam PRIVATE _CRT_SECURE_NO_WARNINGS)
   endif()
   target_link_libraries(hasciicam PRIVATE hasciicam_core)
+  if(WIN32 AND HASCIICAM_WITH_SDL)
+    add_custom_command(TARGET hasciicam POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      $<TARGET_RUNTIME_DLLS:hasciicam>
+      $<TARGET_FILE_DIR:hasciicam>
+      COMMAND_EXPAND_LISTS
+    )
+  endif()
 
 endif()
 
