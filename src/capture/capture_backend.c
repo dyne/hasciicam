@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 
-extern int quiet;
+int quiet = 0;
 static char g_capture_last_error[160];
 
 static void capture_set_last_error(const char *message) {

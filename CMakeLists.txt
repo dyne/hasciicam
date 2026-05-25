@@ -126,6 +126,7 @@ add_library(hasciicam_core STATIC
     ${HASCIICAM_RENDER_SOURCES}
     ${HASCIICAM_CAPTURE_SOURCES}
 )
+target_include_directories(hasciicam_core PUBLIC include)
 if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
   target_sources(hasciicam_core PRIVATE src/capture/capture_avfoundation.mm)
 endif()
@@ -218,6 +219,7 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME frame_convert COMMAND test_frame_convert)
 
   add_executable(test_core_link tests/test_core_link.c)
+  target_include_directories(test_core_link PRIVATE include)
   target_link_libraries(test_core_link PRIVATE hasciicam_core)
   add_test(NAME core_link COMMAND test_core_link)
 endif()
