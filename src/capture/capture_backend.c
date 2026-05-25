@@ -1,6 +1,7 @@
 #include "capture_backend.h"
 #include "capture_avfoundation.h"
 #include "capture_dshow.h"
+#include "capture_external.h"
 #include "capture_mf.h"
 #include "capture_v4l2.h"
 #include <stdio.h>
@@ -43,6 +44,19 @@ int capture_open_default(const capture_request *req,
     if (out_dev == NULL || out_ops == NULL)
         return 0;
     capture_set_last_error(NULL);
+
+    if (req != NULL && req->device != NULL &&
+        strcmp(req->device, "external://") == 0) {
+        const capture_ops *external_ops = capture_external_ops();
+        if (external_ops->open(out_dev, req)) {
+            *out_ops = external_ops;
+            if (!quiet)
+                fprintf(stderr, "Capture backend: %s\n", external_ops->name());
+            return 1;
+        }
+        capture_set_last_error("open failed in backend: external");
+        return 0;
+    }
 
 #if defined(_WIN32)
     ops_try[0] = capture_mf_ops();
