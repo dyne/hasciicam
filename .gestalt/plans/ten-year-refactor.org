@@ -49,7 +49,7 @@
 :Notes: This is the main maintainability step. Keep it C-first and avoid framework naming beyond simple ports/adapters.
 :END:
 
-** WIP [#A] Move CLI parsing into an app_config module
+** DONE [#A] Move CLI parsing into an app_config module
 :PROPERTIES:
 :Why: src/hasciicam.c still owns globals, defaults, getopt handling, and runtime behavior. Mobile and WASM should not depend on command-line parsing.
 :Change: Create src/app/app_config.h and src/app/app_config.c. Move config defaults, option parsing, and validation there. Expose a plain struct hasciicam_config with capture settings, output mode, render settings, file settings, and privilege settings. Keep aa_parseoptions ordering in the CLI shell.
@@ -57,7 +57,7 @@
 :Done when: main() can ask for a fully populated config without owning getopt details.
 :END:
 
-** TODO [#A] Move the live frame loop into an app_session module
+** WIP [#A] Move the live frame loop into an app_session module
 :PROPERTIES:
 :Why: The loop is the actual use-case: read camera, convert to luminance, write aalib image, render, flush. It should be callable by CLI, desktop app shells, mobile shells, and WASM.
 :Change: Create src/app/app_session.h and src/app/app_session.c. Define hasciicam_session_start(), hasciicam_session_step(), and hasciicam_session_stop(). Move capture open/start/read/release/stop and grey buffer ownership there. Keep the first version synchronous and single-threaded.
