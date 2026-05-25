@@ -397,7 +397,8 @@ main (int argc, char **argv) {
   }
 
   if (!capture_open_default(&cap_req, &cap_dev, &cap_ops)) {
-    fprintf(stderr, "!! cannot open any capture backend\n");
+    fprintf(stderr, "!! cannot open any capture backend: %s\n",
+            capture_last_error());
     exit(-1);
   }
   if (!cap_ops->describe(cap_dev, &cap_info)) {

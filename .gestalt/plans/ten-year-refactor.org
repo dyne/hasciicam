@@ -3,7 +3,7 @@
 #+DATE: 2026-05-25
 #+KEYWORDS: hasciicam refactor portability capture rendering cmake ios android wasm
 
-* WIP [#A] Stabilize The Current 2.0 Boundaries
+* DONE [#A] Stabilize The Current 2.0 Boundaries
 :PROPERTIES:
 :Effort: 1-2 days
 :Goal: Make the existing Windows/Linux 2.0 shape explicit before moving code.
@@ -34,7 +34,7 @@
 :Done when: Capture adapter authors can implement a backend without reading Media Foundation or V4L2 code first.
 :END:
 
-** WIP [#B] Normalize backend logging and failure reporting
+** DONE [#B] Normalize backend logging and failure reporting
 :PROPERTIES:
 :Why: Platform debugging will be painful if backends silently fail or print inconsistent errors.
 :Change: Add one minimal capture_status style convention: open() returns 0/1 as today, but adapters set a short internal reason exposed through an optional diagnostic function only if needed. Prefer simple stderr messages first; avoid a full error framework.
@@ -42,14 +42,14 @@
 :Done when: Failed backend selection clearly says which backend failed and why, without changing the public CLI.
 :END:
 
-* TODO [#A] Extract A Portable Application Core
+* WIP [#A] Extract A Portable Application Core
 :PROPERTIES:
 :Effort: 3-5 days
 :Goal: Split src/hasciicam.c into small use-case slices while preserving the command-line program.
 :Notes: This is the main maintainability step. Keep it C-first and avoid framework naming beyond simple ports/adapters.
 :END:
 
-** TODO [#A] Move CLI parsing into an app_config module
+** WIP [#A] Move CLI parsing into an app_config module
 :PROPERTIES:
 :Why: src/hasciicam.c still owns globals, defaults, getopt handling, and runtime behavior. Mobile and WASM should not depend on command-line parsing.
 :Change: Create src/app/app_config.h and src/app/app_config.c. Move config defaults, option parsing, and validation there. Expose a plain struct hasciicam_config with capture settings, output mode, render settings, file settings, and privilege settings. Keep aa_parseoptions ordering in the CLI shell.
