@@ -105,6 +105,8 @@ Current host-fed capture path:
   `frame_convert.c` (for example `GRAY8`, `NV12`, `BGRA32`, `RGB24`).
 - Android-facing recommendation: feed `NV12` or `BGRA32` first; add `NV21`
   explicitly only when the host camera pipeline cannot emit supported formats.
+- WASM-facing recommendation: JavaScript `getUserMedia`/canvas pipelines should
+  submit RGBA/BGRA or grayscale frames through the same external backend path.
 
 Planned output adapters:
 
