@@ -130,6 +130,7 @@ add_executable(hasciicam
     src/app/app_session.c
     src/output/output.c
     src/output/output_file.c
+    src/output/output_memory.c
     src/render/render_session.c
     src/hasciicam.c
     src/capture/capture_backend.c
