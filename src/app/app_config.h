@@ -1,0 +1,37 @@
+#ifndef HASCIICAM_APP_CONFIG_H
+#define HASCIICAM_APP_CONFIG_H
+
+typedef struct hasciicam_config {
+    int quiet;
+    int mode;
+    int input_channel;
+    int daemon_mode;
+    int invert;
+    int refresh;
+    int aa_bright;
+    int aa_contrast;
+    int aa_gamma;
+    int fontsize;
+    int linespace;
+    int user_w;
+    int user_h;
+    int whchanged;
+    int uid;
+    int gid;
+    char device[256];
+    char aafile[256];
+    char background[64];
+    char foreground[64];
+    char fontface[256];
+    char aadriver[64];
+} hasciicam_config;
+
+void hasciicam_config_init_defaults(hasciicam_config *cfg);
+void hasciicam_config_parse(hasciicam_config *cfg,
+                            int argc,
+                            char *argv[],
+                            const char *aa_help_text,
+                            const char *package,
+                            const char *version);
+
+#endif
