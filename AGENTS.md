@@ -42,6 +42,25 @@ CMake optionally enables display backends when development packages are found:
 - `X11_DRIVER` on non-Apple Unix when X11 is found.
 - `CURSES_DRIVER` when curses is found.
 
+Main feature toggles are explicit:
+
+- `HASCIICAM_BUILD_CLI`
+- `HASCIICAM_ENABLE_TESTS`
+- `HASCIICAM_ENABLE_SDL`
+- `HASCIICAM_ENABLE_X11`
+- `HASCIICAM_ENABLE_CURSES`
+- `HASCIICAM_ENABLE_CAPTURE_V4L2`
+- `HASCIICAM_ENABLE_CAPTURE_MF`
+- `HASCIICAM_ENABLE_CAPTURE_DSHOW`
+- `HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION`
+
+Cross-platform configure presets are in `CMakePresets.json`:
+
+- `windows-vcpkg-ninja`
+- `linux-ninja`
+- `macos-ninja`
+- `wasm-emscripten`
+
 With vcpkg on Windows, configure with the vcpkg toolchain file when optional
 packages should be discovered:
 
@@ -151,6 +170,33 @@ Current adapters:
 Backend selection lives in `src/capture/capture_backend.c`. The render loop
 sees only `capture_frame` and metadata and does not perform platform-specific
 I/O.
+
+## Public Embedding API
+
+The reusable host-facing API is in `include/hasciicam/hasciicam.h`.
+
+Core lifecycle:
+
+- `hasciicam_create()`
+- `hasciicam_start_external(...)`
+- `hasciicam_submit_frame(...)`
+- `hasciicam_render_frame()`
+- `hasciicam_get_ascii_frame(...)`
+- `hasciicam_stop()`
+- `hasciicam_destroy()`
+
+This API is implemented in `src/public/hasciicam_api.c` and linked from
+`hasciicam_core`.
+
+## Host Samples
+
+Host samples live under `examples/`:
+
+- `examples/macos-host`: minimal C sample using synthetic external frames.
+- `examples/ios`: Objective-C++ bridge scaffold for AVFoundation app shells.
+- `examples/android`: JNI bridge scaffold for Android app shells.
+- `examples/wasm`: browser sample scaffold (`wasm_entry.c`, `index.html`,
+  `main.js`) for Emscripten builds.
 
 ## Frame Conversion
 
@@ -289,18 +335,33 @@ keep its shape while making the OS-specific edges replaceable.
 
 ## Testing
 
-There is no dedicated test suite at the moment. For code changes:
+Run tests with CTest:
+
+```sh
+ctest --output-on-failure --test-dir build
+```
+
+Current tests:
+
+- `frame_convert`: deterministic conversion coverage.
+- `core_link`: public embedding API link/creation smoke.
+- `pipeline_smoke`: synthetic frame end-to-end render smoke via public API.
+
+For code changes:
 
 1. Run the CMake/Ninja build.
-2. Run `hasciicam -h`.
-3. Run `hasciicam -H` when AA-lib option parsing changed.
-4. On Linux with a camera, smoke-test:
+2. Run `ctest --output-on-failure`.
+3. Run `hasciicam -h`.
+4. Run `hasciicam -H` when AA-lib option parsing changed.
+5. On Linux with a camera, smoke-test:
    - live mode with `-O SDL` or `-O curses`.
    - text mode with `-m text -o hasciicam.asc`.
    - HTML mode with `-m html -o hasciicam.html`.
-5. When changing conversion code, add a small testable helper or standalone
+6. When changing conversion code, add a small testable helper or standalone
    check rather than relying only on live camera output.
 
 On Windows or macOS, the minimum useful smoke test is: configure with CMake,
 build with Ninja, run help output, and run a display/capture smoke test if the
 platform capture adapter exists.
+
+See `docs/smoke-tests.md` for copyable per-platform manual smoke commands.

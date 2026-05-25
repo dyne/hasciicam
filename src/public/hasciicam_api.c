@@ -73,6 +73,8 @@ int hasciicam_start_external(hasciicam_instance *instance,
         return 0;
 
     hasciicam_render_session_configure_geometry(&instance->render, ascii_width, ascii_height);
+    instance->render.hwparams.width = ascii_width;
+    instance->render.hwparams.height = ascii_height;
     instance->render.context = aa_init(&mem_d, &instance->render.hwparams, NULL);
     if (instance->render.context == NULL) {
         hasciicam_session_stop(&instance->session);
