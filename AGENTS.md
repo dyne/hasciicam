@@ -135,7 +135,9 @@ Core options:
 - `-d`, `--device`: capture device, defaulting to `/dev/video` or
   `/dev/video0`.
 - `-i`, `--input`: capture input channel.
-- `-s`, `--size WxH`: requested capture size.
+- `-s`, `--size WxH`: contextual size (`html`: chars, `live|text`: pixels).
+- `--pixel-size WxH`: requested capture pixel size (not allowed in `html` mode).
+- `--char-size WxH`: requested output character size.
 - `-o`, `--aafile`: HTML/text output file.
 - `-O`, `--aadriver`: preferred live AA-lib driver, such as `SDL`, `X11`,
   `curses`, or `stdout`.
@@ -156,6 +158,15 @@ Rendering options:
 
 AA-lib also parses its own options before HasciiCam parses its options. When
 changing CLI parsing, preserve that ordering.
+
+Size intent and negotiation:
+
+- Pixel intent means camera input size target.
+- Char intent means output ASCII grid target; the app derives capture target.
+- HTML mode uses char intent by design.
+- Capture adapters should choose the nearest supported capture size when exact
+  dimensions are not available, then report negotiated capture and final ASCII
+  dimensions in startup logs.
 
 ## Video Capture
 
