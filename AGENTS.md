@@ -335,6 +335,16 @@ keep its shape while making the OS-specific edges replaceable.
 
 ## Testing
 
+Testing policy:
+
+- Use CTest as the single automated test runner.
+- Prefer plain C test executables and small CMake/CTest wrappers.
+- Do not add a unit-test framework unless plain C + CTest becomes clearly
+  insufficient.
+- Keep CI deterministic: no real camera requirement and no mandatory windowed
+  display requirement.
+- Put generated test artifacts under the build tree, not the source tree.
+
 Run tests with CTest:
 
 ```sh
@@ -346,6 +356,27 @@ Current tests:
 - `frame_convert`: deterministic conversion coverage.
 - `core_link`: public embedding API link/creation smoke.
 - `pipeline_smoke`: synthetic frame end-to-end render smoke via public API.
+
+Planned test tiers are documented in `.gestalt/plans/test-coverage.org`:
+
+- Unit/core tests: plain C executables for conversion, public API, and
+  synthetic pipeline behavior.
+- Deterministic CLI smoke tests: run the real `hasciicam` executable with a
+  synthetic capture source and bounded frame count, then check stdout/text/HTML
+  contents.
+- Visual tests: opt-in CTest tests that open SDL with a synthetic source and
+  verify clean exit.
+- Camera tests: opt-in CTest tests that require a maintainer-provided real
+  camera selector.
+
+When implementing the planned CLI tests, add:
+
+- `synthetic://` capture backend selected only by explicit device string.
+- `--frames N` bounded run option that stops after N rendered frames.
+- CTest checks for `-h`, `-H`, `-O stdout`, `-m text`, and `-m html`.
+
+Do not let synthetic capture become a fallback for failed real camera backends;
+it must be explicit so camera regressions stay visible.
 
 For code changes:
 
