@@ -26,7 +26,7 @@
 :Done when: ctest lists all non-manual tests and no separate test command is required.
 :END:
 
-* WIP [#A] Add A Deterministic Synthetic CLI Source
+* DONE [#A] Add A Deterministic Synthetic CLI Source
 :PROPERTIES:
 :Effort: 1-2 days
 :Goal: Let the real CLI run for a bounded number of frames without camera hardware.
@@ -41,7 +41,7 @@
 :Done when: The CLI can run without a physical camera by passing -d synthetic://.
 :END:
 
-** WIP [#A] Add a bounded frame-count option
+** DONE [#A] Add a bounded frame-count option
 :PROPERTIES:
 :Why: CLI smoke tests need hasciicam to exit on its own after rendering a known number of frames.
 :Change: Add a small option such as --frames N to hasciicam_config. Keep it documented as a test/smoke option. In the main loop, request session stop after N rendered frames, not N capture reads.
@@ -49,7 +49,7 @@
 :Done when: Every output mode can be exercised by CTest without killing a long-running process.
 :END:
 
-** TODO [#B] Keep synthetic source out of default real-camera selection
+** DONE [#B] Keep synthetic source out of default real-camera selection
 :PROPERTIES:
 :Why: Synthetic capture is a test tool and should never hide a broken platform camera backend in normal use.
 :Change: Only select synthetic capture when the device string is exactly synthetic://. Do not use it as fallback after real backends fail.
@@ -57,14 +57,14 @@
 :Done when: Synthetic behavior is explicit and cannot mask production capture regressions.
 :END:
 
-* TODO [#A] Add Deterministic CLI Smoke Tests
+* WIP [#A] Add Deterministic CLI Smoke Tests
 :PROPERTIES:
 :Effort: 1-2 days
 :Goal: Verify the executable behavior users rely on: help, stdout, text, HTML, and clean exit.
 :Notes: Prefer small CMake/CTest wrappers. Use PowerShell/cmd only where Windows shell semantics are unavoidable.
 :END:
 
-** TODO [#A] Add help and AA help tests
+** WIP [#A] Add help and AA help tests
 :PROPERTIES:
 :Why: CLI option parsing is compatibility-sensitive and cheap to verify.
 :Change: Add CTest tests for hasciicam -h and hasciicam -H. Check for expected strings such as "Usage: hasciicam" and "aalib options".
@@ -164,3 +164,4 @@
 :Tests: Local ctest; CI validates on push/PR.
 :Done when: CI covers help, stdout, text, HTML, conversion, core link, and synthetic pipeline smoke.
 :END:
+

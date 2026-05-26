@@ -16,6 +16,7 @@ typedef struct hasciicam_config {
     int user_w;
     int user_h;
     int whchanged;
+    int max_frames;
     int uid;
     int gid;
     char device[256];
