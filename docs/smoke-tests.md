@@ -36,6 +36,32 @@ Checks:
 - live ASCII updates
 - closing window exits process
 
+## Windows (size negotiation)
+
+Nearest-size pixel request (Media Foundation path):
+
+```powershell
+.\build-sdl-rel\hasciicam.exe -d "" --pixel-size 641x359 -m text -o C:\temp\hasciicam-size.txt
+```
+
+Checks:
+
+- startup logs show requested pixel size
+- startup logs show negotiated capture size
+- startup logs show final ASCII size
+
+DirectShow fallback size check (disable MF at configure time):
+
+```powershell
+cmd /c "C:\PROGRA~1\MICROS~3\18\COMMUN~1\VC\Auxiliary\Build\vcvarsall.bat x64 && cmake -S . -B build-dshow -G Ninja -DHASCIICAM_ENABLE_CAPTURE_MF=OFF -DHASCIICAM_ENABLE_CAPTURE_DSHOW=ON && cmake --build build-dshow"
+.\build-dshow\hasciicam.exe -d "" --pixel-size 641x359 -m text -o C:\temp\hasciicam-dshow-size.txt
+```
+
+Checks:
+
+- DirectShow backend opens
+- capture starts with nearest available size
+
 ## Windows (HTML output)
 
 ```powershell
@@ -58,6 +84,17 @@ Checks:
 
 - V4L2 backend selected
 - live ASCII updates
+
+## Linux (size negotiation)
+
+```sh
+./hasciicam -d /dev/video0 --pixel-size 641x359 -m text -o hasciicam-size.txt
+```
+
+Checks:
+
+- logs show requested size and nearest supported/negotiated capture size
+- output file is non-empty and updates
 
 ## macOS (AVFoundation)
 
