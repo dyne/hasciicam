@@ -1,6 +1,10 @@
 #ifndef HASCIICAM_CAPTURE_SIZE_H
 #define HASCIICAM_CAPTURE_SIZE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct capture_size_candidate {
     int width;
     int height;
@@ -13,5 +17,9 @@ int capture_size_is_better(int target_w,
                            int current_h,
                            int next_w,
                            int next_h);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
