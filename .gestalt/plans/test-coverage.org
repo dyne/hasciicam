@@ -72,7 +72,7 @@
 :Done when: CLI help regressions fail in CI.
 :END:
 
-** WIP [#A] Add stdout output test
+** DONE [#A] Add stdout output test
 :PROPERTIES:
 :Why: stdout is the simplest live-style output and exercises the real CLI render path without a window.
 :Change: Run hasciicam -d synthetic:// --frames 2 -O stdout. Capture output to a file and assert it contains non-whitespace ASCII.
@@ -80,7 +80,7 @@
 :Done when: The CLI can render visible ASCII through stdout in an automated test.
 :END:
 
-** TODO [#A] Add text file output test
+** WIP [#A] Add text file output test
 :PROPERTIES:
 :Why: Text output is a supported non-visual mode and should not regress while changing output adapters.
 :Change: Run hasciicam -d synthetic:// --frames 2 -m text -o <test-output>.txt. Assert file exists, is non-empty, and contains non-whitespace ASCII.
@@ -164,5 +164,6 @@
 :Tests: Local ctest; CI validates on push/PR.
 :Done when: CI covers help, stdout, text, HTML, conversion, core link, and synthetic pipeline smoke.
 :END:
+
 
 
