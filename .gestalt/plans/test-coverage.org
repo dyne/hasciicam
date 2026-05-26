@@ -64,7 +64,7 @@
 :Notes: Prefer small CMake/CTest wrappers. Use PowerShell/cmd only where Windows shell semantics are unavoidable.
 :END:
 
-** WIP [#A] Add help and AA help tests
+** DONE [#A] Add help and AA help tests
 :PROPERTIES:
 :Why: CLI option parsing is compatibility-sensitive and cheap to verify.
 :Change: Add CTest tests for hasciicam -h and hasciicam -H. Check for expected strings such as "Usage: hasciicam" and "aalib options".
@@ -72,7 +72,7 @@
 :Done when: CLI help regressions fail in CI.
 :END:
 
-** TODO [#A] Add stdout output test
+** WIP [#A] Add stdout output test
 :PROPERTIES:
 :Why: stdout is the simplest live-style output and exercises the real CLI render path without a window.
 :Change: Run hasciicam -d synthetic:// --frames 2 -O stdout. Capture output to a file and assert it contains non-whitespace ASCII.
@@ -164,4 +164,5 @@
 :Tests: Local ctest; CI validates on push/PR.
 :Done when: CI covers help, stdout, text, HTML, conversion, core link, and synthetic pipeline smoke.
 :END:
+
 
