@@ -231,6 +231,14 @@ if(HASCIICAM_ENABLE_TESTS)
   add_executable(test_capture_synthetic tests/test_capture_synthetic.c src/capture/capture_backend.c src/capture/capture_external.c src/capture/capture_synthetic.c)
   target_include_directories(test_capture_synthetic PRIVATE src/capture)
   add_test(NAME capture_synthetic COMMAND test_capture_synthetic)
+
+  if(HASCIICAM_BUILD_CLI)
+    add_test(NAME cli_help COMMAND hasciicam -h)
+    set_tests_properties(cli_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: hasciicam")
+
+    add_test(NAME cli_aahelp COMMAND hasciicam -H)
+    set_tests_properties(cli_aahelp PROPERTIES PASS_REGULAR_EXPRESSION "aalib options")
+  endif()
 endif()
 
 if(APPLE)
