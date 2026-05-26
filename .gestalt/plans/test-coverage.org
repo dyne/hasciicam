@@ -96,14 +96,14 @@
 :Done when: Empty HTML pages fail deterministically in CI.
 :END:
 
-* WIP [#B] Add Opt-In Visual And Camera Tests
+* DONE [#B] Add Opt-In Visual And Camera Tests
 :PROPERTIES:
 :Effort: 1-2 days
 :Goal: Exercise SDL windows and real camera paths without making CI flaky.
 :Notes: These tests should be off by default and enabled only on maintainer machines.
 :END:
 
-** WIP [#B] Add an opt-in SDL visual smoke test
+** DONE [#B] Add an opt-in SDL visual smoke test
 :PROPERTIES:
 :Why: SDL can fail in ways stdout/text/HTML cannot catch, but CI often lacks a display.
 :Change: Add HASCIICAM_ENABLE_VISUAL_TESTS=OFF by default. When ON, add a CTest that runs hasciicam -d synthetic:// --frames 2 -O SDL and verifies the process exits cleanly.
@@ -111,7 +111,7 @@
 :Done when: Maintainers can validate SDL launch/render/quit with one opt-in test.
 :END:
 
-** TODO [#B] Add opt-in camera smoke tests
+** DONE [#B] Add opt-in camera smoke tests
 :PROPERTIES:
 :Why: Real capture backends need manual/hardware validation, but should still have repeatable commands.
 :Change: Add HASCIICAM_ENABLE_CAMERA_TESTS=OFF and a HASCIICAM_TEST_CAMERA_DEVICE cache variable. When enabled, run a bounded real-camera test with --frames 2, preferably to text or stdout.
@@ -119,14 +119,14 @@
 :Done when: Camera tests are available locally but never run accidentally in CI.
 :END:
 
-* TODO [#B] Add Small Reusable Test Helpers
+* DONE [#B] Add Small Reusable Test Helpers
 :PROPERTIES:
 :Effort: 1 day
 :Goal: Avoid duplicating fragile file/string checks across CTest wrappers.
 :Notes: Keep helpers plain C or CMake script. Do not add a test framework.
 :END:
 
-** TODO [#B] Add a file content assertion helper
+** DONE [#B] Add a file content assertion helper
 :PROPERTIES:
 :Why: HTML/text/stdout tests need repeated checks for file existence, non-empty content, and required substrings.
 :Change: Add a small C helper or CMake script under tests/ that accepts a file path and required substrings/non-whitespace checks.
@@ -134,7 +134,7 @@
 :Done when: CLI smoke tests use one shared assertion helper.
 :END:
 
-** TODO [#C] Add labels and output directories
+** DONE [#C] Add labels and output directories
 :PROPERTIES:
 :Why: Test output files should not clutter the source tree and labels make partial test runs easier.
 :Change: Put generated files under the CTest build directory. Add CTest labels: unit, core, cli, visual, camera.
@@ -142,14 +142,14 @@
 :Done when: Test artifacts stay under the build tree and labeled subsets work.
 :END:
 
-* TODO [#C] Update Documentation And CI
+* DONE [#C] Update Documentation And CI
 :PROPERTIES:
 :Effort: 0.5-1 day
 :Goal: Make the test workflow discoverable and keep CI deterministic.
 :Notes: CI should run deterministic tests only.
 :END:
 
-** TODO [#A] Update AGENTS.md and docs/smoke-tests.md
+** DONE [#A] Update AGENTS.md and docs/smoke-tests.md
 :PROPERTIES:
 :Why: Human maintainers and agents need the same test commands and opt-in rules.
 :Change: Document synthetic://, --frames, deterministic CLI tests, visual tests, and camera tests. Include Windows vcvarsall guidance for running tests locally.
@@ -157,13 +157,16 @@
 :Done when: A future agent can add a test without rediscovering the strategy.
 :END:
 
-** TODO [#B] Update CI to include deterministic CLI tests
+** DONE [#B] Update CI to include deterministic CLI tests
 :PROPERTIES:
 :Why: CI should catch empty HTML/text/stdout regressions after synthetic CLI support lands.
 :Change: Keep SDL and camera disabled in CI. Ensure CI runs ctest with deterministic unit/core/cli tests on Windows, Linux, and macOS.
 :Tests: Local ctest; CI validates on push/PR.
 :Done when: CI covers help, stdout, text, HTML, conversion, core link, and synthetic pipeline smoke.
 :END:
+
+
+
 
 
 

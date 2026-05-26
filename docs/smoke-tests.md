@@ -2,6 +2,20 @@
 
 This file collects short manual checks for supported host paths.
 
+## Deterministic CLI (no camera required)
+
+Build and run full deterministic CLI suite:
+
+```powershell
+cmd /c "C:\PROGRA~1\MICROS~3\18\COMMUN~1\VC\Auxiliary\Build\vcvarsall.bat x64 && cmake -S . -B build-sdl-rel -DHASCIICAM_ENABLE_TESTS=ON && ctest --output-on-failure --test-dir build-sdl-rel -L cli"
+```
+
+Run one bounded stdout smoke manually:
+
+```powershell
+.\build-sdl-rel\hasciicam.exe -d synthetic:// --frames 2 -O stdout
+```
+
 ## Windows (camera + SDL)
 
 Build in MSVC environment:
@@ -79,3 +93,17 @@ Checks:
 - `hasciicam.html` updates from temporary publish path
 - refresh tag is present
 - content is non-empty
+
+## Opt-in visual and camera CTest
+
+Enable visual SDL smoke (`visual_sdl`):
+
+```powershell
+cmd /c "C:\PROGRA~1\MICROS~3\18\COMMUN~1\VC\Auxiliary\Build\vcvarsall.bat x64 && cmake -S . -B build-sdl-rel -DHASCIICAM_ENABLE_TESTS=ON -DHASCIICAM_ENABLE_VISUAL_TESTS=ON && ctest --output-on-failure --test-dir build-sdl-rel -R visual_sdl"
+```
+
+Enable camera smoke (`camera_text`) with explicit selector:
+
+```powershell
+cmd /c "C:\PROGRA~1\MICROS~3\18\COMMUN~1\VC\Auxiliary\Build\vcvarsall.bat x64 && cmake -S . -B build-sdl-rel -DHASCIICAM_ENABLE_TESTS=ON -DHASCIICAM_ENABLE_CAMERA_TESTS=ON -DHASCIICAM_TEST_CAMERA_DEVICE=<device> && ctest --output-on-failure --test-dir build-sdl-rel -R camera"
+```

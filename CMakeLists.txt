@@ -8,6 +8,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 option(ENABLE_ASAN "Enable AddressSanitizer for debugging" OFF)
 option(HASCIICAM_BUILD_CLI "Build hasciicam CLI executable" ON)
 option(HASCIICAM_ENABLE_TESTS "Enable hasciicam unit tests" ON)
+option(HASCIICAM_ENABLE_VISUAL_TESTS "Enable opt-in visual smoke tests" OFF)
+option(HASCIICAM_ENABLE_CAMERA_TESTS "Enable opt-in real camera smoke tests" OFF)
+set(HASCIICAM_TEST_CAMERA_DEVICE "" CACHE STRING "Camera device selector for opt-in camera smoke tests")
 option(HASCIICAM_ENABLE_SDL "Enable SDL output driver" ON)
 option(HASCIICAM_ENABLE_X11 "Enable X11 output driver" ON)
 option(HASCIICAM_ENABLE_CURSES "Enable curses output driver" ON)
@@ -195,6 +198,9 @@ endif()
 message(STATUS "hasciicam options:")
 message(STATUS "  HASCIICAM_BUILD_CLI=${HASCIICAM_BUILD_CLI}")
 message(STATUS "  HASCIICAM_ENABLE_TESTS=${HASCIICAM_ENABLE_TESTS}")
+message(STATUS "  HASCIICAM_ENABLE_VISUAL_TESTS=${HASCIICAM_ENABLE_VISUAL_TESTS}")
+message(STATUS "  HASCIICAM_ENABLE_CAMERA_TESTS=${HASCIICAM_ENABLE_CAMERA_TESTS}")
+message(STATUS "  HASCIICAM_TEST_CAMERA_DEVICE=${HASCIICAM_TEST_CAMERA_DEVICE}")
 message(STATUS "  HASCIICAM_ENABLE_SDL=${HASCIICAM_ENABLE_SDL} (found=${HASCIICAM_WITH_SDL})")
 message(STATUS "  HASCIICAM_ENABLE_X11=${HASCIICAM_ENABLE_X11} (found=${HASCIICAM_WITH_X11})")
 message(STATUS "  HASCIICAM_ENABLE_CURSES=${HASCIICAM_ENABLE_CURSES} (found=${HASCIICAM_WITH_CURSES})")
@@ -217,27 +223,33 @@ if(HASCIICAM_ENABLE_TESTS)
   )
   target_include_directories(test_frame_convert PRIVATE src/capture)
   add_test(NAME frame_convert COMMAND test_frame_convert)
+  set_tests_properties(frame_convert PROPERTIES LABELS "unit;core")
 
   add_executable(test_core_link tests/test_core_link.c)
   target_include_directories(test_core_link PRIVATE include)
   target_link_libraries(test_core_link PRIVATE hasciicam_core)
   add_test(NAME core_link COMMAND test_core_link)
+  set_tests_properties(core_link PROPERTIES LABELS "unit;core")
 
   add_executable(test_pipeline_smoke tests/test_pipeline_smoke.c)
   target_include_directories(test_pipeline_smoke PRIVATE include)
   target_link_libraries(test_pipeline_smoke PRIVATE hasciicam_core)
   add_test(NAME pipeline_smoke COMMAND test_pipeline_smoke)
+  set_tests_properties(pipeline_smoke PROPERTIES LABELS "unit;core")
 
   add_executable(test_capture_synthetic tests/test_capture_synthetic.c src/capture/capture_backend.c src/capture/capture_external.c src/capture/capture_synthetic.c)
   target_include_directories(test_capture_synthetic PRIVATE src/capture)
   add_test(NAME capture_synthetic COMMAND test_capture_synthetic)
+  set_tests_properties(capture_synthetic PROPERTIES LABELS "unit;core")
 
   if(HASCIICAM_BUILD_CLI)
     add_test(NAME cli_help COMMAND hasciicam -h)
     set_tests_properties(cli_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: hasciicam")
+    set_tests_properties(cli_help PROPERTIES LABELS "cli")
 
     add_test(NAME cli_aahelp COMMAND hasciicam -H)
     set_tests_properties(cli_aahelp PROPERTIES PASS_REGULAR_EXPRESSION "aalib options")
+    set_tests_properties(cli_aahelp PROPERTIES LABELS "cli")
 
     add_test(
       NAME cli_stdout
@@ -247,6 +259,7 @@ if(HASCIICAM_ENABLE_TESTS)
         -DHASCIICAM_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-stdout-smoke.txt
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake
     )
+    set_tests_properties(cli_stdout PROPERTIES LABELS "cli")
 
     add_test(
       NAME cli_text
@@ -256,6 +269,7 @@ if(HASCIICAM_ENABLE_TESTS)
         -DHASCIICAM_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-text-smoke.txt
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake
     )
+    set_tests_properties(cli_text PROPERTIES LABELS "cli")
 
     add_test(
       NAME cli_html
@@ -265,6 +279,36 @@ if(HASCIICAM_ENABLE_TESTS)
         -DHASCIICAM_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-html-smoke.html
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake
     )
+    set_tests_properties(cli_html PROPERTIES LABELS "cli")
+
+    if(HASCIICAM_ENABLE_VISUAL_TESTS)
+      add_test(
+        NAME visual_sdl
+        COMMAND ${CMAKE_COMMAND}
+          -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+          -DHASCIICAM_MODE=sdl
+          -DHASCIICAM_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/visual-sdl.log
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake
+      )
+      set_tests_properties(visual_sdl PROPERTIES LABELS "visual")
+    endif()
+
+    if(HASCIICAM_ENABLE_CAMERA_TESTS)
+      if(HASCIICAM_TEST_CAMERA_DEVICE STREQUAL "")
+        message(WARNING "HASCIICAM_ENABLE_CAMERA_TESTS is ON but HASCIICAM_TEST_CAMERA_DEVICE is empty; camera tests are not added.")
+      else()
+        add_test(
+          NAME camera_text
+          COMMAND ${CMAKE_COMMAND}
+            -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+            -DHASCIICAM_MODE=camera_text
+            -DHASCIICAM_DEVICE=${HASCIICAM_TEST_CAMERA_DEVICE}
+            -DHASCIICAM_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/camera-text-smoke.txt
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake
+        )
+        set_tests_properties(camera_text PROPERTIES LABELS "camera")
+      endif()
+    endif()
   endif()
 endif()
 

@@ -18,7 +18,7 @@ jobs:
         uses: seanmiddleditch/gha-setup-ninja@v5
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DHASCIICAM_ENABLE_TESTS=ON -DHASCIICAM_ENABLE_SDL=OFF
+        run: cmake -S . -B build -G Ninja -DHASCIICAM_ENABLE_TESTS=ON -DHASCIICAM_ENABLE_SDL=OFF -DHASCIICAM_ENABLE_VISUAL_TESTS=OFF -DHASCIICAM_ENABLE_CAMERA_TESTS=OFF
 
       - name: Build
         run: cmake --build build

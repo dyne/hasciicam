@@ -356,27 +356,25 @@ Current tests:
 - `frame_convert`: deterministic conversion coverage.
 - `core_link`: public embedding API link/creation smoke.
 - `pipeline_smoke`: synthetic frame end-to-end render smoke via public API.
+- `capture_synthetic`: explicit `synthetic://` backend smoke test.
+- `cli_help` and `cli_aahelp`: CLI and AA-help output checks.
+- `cli_stdout`, `cli_text`, `cli_html`: deterministic CLI smoke tests using
+  `-d synthetic:// --frames 2`.
 
-Planned test tiers are documented in `docs/testing-strategy.md`:
+Opt-in test families:
 
-- Unit/core tests: plain C executables for conversion, public API, and
-  synthetic pipeline behavior.
-- Deterministic CLI smoke tests: run the real `hasciicam` executable with a
-  synthetic capture source and bounded frame count, then check stdout/text/HTML
-  contents.
-- Visual tests: opt-in CTest tests that open SDL with a synthetic source and
-  verify clean exit.
-- Camera tests: opt-in CTest tests that require a maintainer-provided real
-  camera selector.
+- `HASCIICAM_ENABLE_VISUAL_TESTS=ON`: enables `visual_sdl`.
+- `HASCIICAM_ENABLE_CAMERA_TESTS=ON` with `HASCIICAM_TEST_CAMERA_DEVICE=...`:
+  enables `camera_text`.
 
-When implementing the planned CLI tests, add:
+The synthetic backend is test-only behavior selected explicitly by device string
+`synthetic://`. It is never used as fallback after real backend failures.
 
-- `synthetic://` capture backend selected only by explicit device string.
-- `--frames N` bounded run option that stops after N rendered frames.
-- CTest checks for `-h`, `-H`, `-O stdout`, `-m text`, and `-m html`.
+CTest labels:
 
-Do not let synthetic capture become a fallback for failed real camera backends;
-it must be explicit so camera regressions stay visible.
+- `unit`, `core`, `cli`, `visual`, `camera`
+
+See `docs/testing-strategy.md` for detailed rationale and rollout guidance.
 
 For code changes:
 
