@@ -1,6 +1,12 @@
 #ifndef HASCIICAM_APP_CONFIG_H
 #define HASCIICAM_APP_CONFIG_H
 
+typedef enum hasciicam_size_intent {
+    HASCIICAM_SIZE_NONE = 0,
+    HASCIICAM_SIZE_PIXELS,
+    HASCIICAM_SIZE_CHARS
+} hasciicam_size_intent;
+
 typedef struct hasciicam_config {
     int quiet;
     int mode;
@@ -13,9 +19,9 @@ typedef struct hasciicam_config {
     int aa_gamma;
     int fontsize;
     int linespace;
-    int user_w;
-    int user_h;
-    int whchanged;
+    int size_w;
+    int size_h;
+    hasciicam_size_intent size_intent;
     int max_frames;
     int uid;
     int gid;
