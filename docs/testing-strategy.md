@@ -91,17 +91,16 @@ hasciicam -d <device-or-matcher> --frames 2 -m text -o <build-output>.txt
 
 Use stdout or text output first. SDL can be covered separately by visual tests.
 
-## Implementation Plan
+## Implemented Baseline
 
-1. Add explicit synthetic capture selected by `-d synthetic://`.
-2. Add `--frames N` to the CLI config and stop after rendered frames.
-3. Add CTest labels: `unit`, `core`, `cli`, `visual`, `camera`.
-4. Add shared file/content assertion helper under `tests/`.
-5. Add CLI help and AA-help tests.
-6. Add stdout, text, and HTML CLI tests using synthetic capture.
-7. Add opt-in SDL visual CTest.
-8. Add opt-in real camera CTest.
-9. Update CI to run deterministic unit/core/cli tests only.
+Already in repository:
+
+1. Synthetic capture backend selected explicitly by `-d synthetic://`.
+2. Bounded run option `--frames N` (stops after rendered frames).
+3. Shared CLI smoke script at `tests/cli_smoke.cmake`.
+4. CTest labels: `unit`, `core`, `cli`, `visual`, `camera`.
+5. CLI tests: `cli_help`, `cli_aahelp`, `cli_stdout`, `cli_text`, `cli_html`.
+6. Opt-in tests: `visual_sdl`, `camera_text`.
 
 Do not let synthetic capture become fallback behavior. It must be selected
 explicitly so real capture regressions remain visible.

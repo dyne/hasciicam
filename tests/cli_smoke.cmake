@@ -34,6 +34,23 @@ elseif(HASCIICAM_MODE STREQUAL "html")
     OUTPUT_VARIABLE _out
     ERROR_FILE "${_stderr_file}"
   )
+elseif(HASCIICAM_MODE STREQUAL "sdl")
+  execute_process(
+    COMMAND "${HASCIICAM_EXE}" -d synthetic:// --frames 2 -O SDL
+    RESULT_VARIABLE _rc
+    OUTPUT_FILE "${_stdout_file}"
+    ERROR_FILE "${_stderr_file}"
+  )
+elseif(HASCIICAM_MODE STREQUAL "camera_text")
+  if(NOT DEFINED HASCIICAM_DEVICE OR HASCIICAM_DEVICE STREQUAL "")
+    message(FATAL_ERROR "HASCIICAM_DEVICE is required for camera_text mode")
+  endif()
+  execute_process(
+    COMMAND "${HASCIICAM_EXE}" -d "${HASCIICAM_DEVICE}" --frames 2 -m text -o "${_stdout_file}"
+    RESULT_VARIABLE _rc
+    OUTPUT_VARIABLE _out
+    ERROR_FILE "${_stderr_file}"
+  )
 else()
   message(FATAL_ERROR "Unknown HASCIICAM_MODE: ${HASCIICAM_MODE}")
 endif()
@@ -42,10 +59,13 @@ if(NOT _rc EQUAL 0)
   message(FATAL_ERROR "hasciicam exited with ${_rc}")
 endif()
 
+if(HASCIICAM_MODE STREQUAL "sdl")
+  return()
+endif()
+
 if(NOT EXISTS "${_stdout_file}")
   message(FATAL_ERROR "expected output file not found: ${_stdout_file}")
 endif()
-
 file(READ "${_stdout_file}" _content)
 string(LENGTH "${_content}" _len)
 if(_len EQUAL 0)
