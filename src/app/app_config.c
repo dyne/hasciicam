@@ -1,7 +1,5 @@
 #include "app_config.h"
 
-#include <ctype.h>
-#include <errno.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +19,8 @@
 
 static const struct option long_options[] = {
     {"frames", required_argument, NULL, 1000},
+    {"pixel-size", required_argument, NULL, 1001},
+    {"char-size", required_argument, NULL, 1002},
     {"help", no_argument, NULL, 'h'},
     {"aahelp", no_argument, NULL, 'H'},
     {"version", no_argument, NULL, 'v'},
@@ -58,7 +58,9 @@ static const char *help_text =
     " -m --mode         mode: live|html|text      - default live\n"
     " -d --device       video grabbing device     - default /dev/video\n"
     " -i --input        input channel number      - default 1\n"
-    " -s --size         ascii image size WxH      - webcam's smallest default\n"
+    " -s --size         contextual size WxH       - html chars, else pixels\n"
+    "    --pixel-size   capture pixel size WxH    - preferred camera size\n"
+    "    --char-size    output char size WxH      - preferred ascii grid\n"
     " -o --aafile       dumped file               - default hasciicam.[txt|html]\n"
     " -O --aadriver     aalib driver: X11|curses|SDL|stdout - default auto\n"
     " -D --daemon       run in background         - default foregrond\n"
@@ -75,6 +77,30 @@ static const char *help_text =
     " -I --invert       invert colors             - default off\n"
     " -B --background   background color (hex)    - default 000000\n"
     " -F --foreground   foreground color (hex)    - default 00FF00\n";
+
+/* Parse WIDTHxHEIGHT where separator can be x or X. */
+static int parse_wxh(const char *text, int *out_w, int *out_h) {
+    char *end = NULL;
+    long w = 0;
+    long h = 0;
+    if (text == NULL || out_w == NULL || out_h == NULL || text[0] == '\0')
+        return 0;
+
+    w = strtol(text, &end, 10);
+    if (end == text || w <= 0)
+        return 0;
+    if (*end != 'x' && *end != 'X')
+        return 0;
+    h = strtol(end + 1, &end, 10);
+    if (h <= 0)
+        return 0;
+    if (*end != '\0')
+        return 0;
+
+    *out_w = (int)w;
+    *out_h = (int)h;
+    return 1;
+}
 
 void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     if (cfg == NULL)
@@ -119,6 +145,9 @@ void hasciicam_config_parse(hasciicam_config *cfg,
                             const char *package,
                             const char *version) {
     int res = 0;
+    int short_size_w = 0;
+    int short_size_h = 0;
+    int short_size_set = 0;
 
     if (cfg == NULL)
         return;
@@ -175,21 +204,27 @@ void hasciicam_config_parse(hasciicam_config *cfg,
                 exit(1);
             }
             break;
-        case 's': {
-            char *t = optarg;
-            char *tt;
-            while (isdigit(*t))
-                t++;
-            *t = 0;
-            cfg->user_w = atoi(optarg);
-            tt = ++t;
-            while (isdigit(*tt))
-                tt++;
-            *tt = 0;
-            cfg->user_h = atoi(t);
-            cfg->whchanged = 1;
+        case 's':
+            if (!parse_wxh(optarg, &short_size_w, &short_size_h)) {
+                fprintf(stderr, "!! invalid size '%s', expected WxH\n", optarg);
+                exit(1);
+            }
+            short_size_set = 1;
             break;
-        }
+        case 1001:
+            if (!parse_wxh(optarg, &cfg->size_w, &cfg->size_h)) {
+                fprintf(stderr, "!! invalid pixel size '%s', expected WxH\n", optarg);
+                exit(1);
+            }
+            cfg->size_intent = HASCIICAM_SIZE_PIXELS;
+            break;
+        case 1002:
+            if (!parse_wxh(optarg, &cfg->size_w, &cfg->size_h)) {
+                fprintf(stderr, "!! invalid char size '%s', expected WxH\n", optarg);
+                exit(1);
+            }
+            cfg->size_intent = HASCIICAM_SIZE_CHARS;
+            break;
         case 'S':
             cfg->fontsize = atoi(optarg);
             switch (cfg->fontsize) {
@@ -250,4 +285,18 @@ void hasciicam_config_parse(hasciicam_config *cfg,
             break;
         }
     } while (res > 0);
+
+    if (short_size_set) {
+        cfg->size_w = short_size_w;
+        cfg->size_h = short_size_h;
+        if (cfg->mode == HTML)
+            cfg->size_intent = HASCIICAM_SIZE_CHARS;
+        else
+            cfg->size_intent = HASCIICAM_SIZE_PIXELS;
+    }
+
+    if (cfg->mode == HTML && cfg->size_intent == HASCIICAM_SIZE_PIXELS) {
+        fprintf(stderr, "!! html mode does not accept pixel size; use --char-size WxH or -s WxH\n");
+        exit(1);
+    }
 }

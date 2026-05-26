@@ -46,6 +46,20 @@ Use specified capture device. Default is \fB/dev/video\fP.
 .IP "-i --input"
 Selects the \fBdevice\fP's input channel to be used for grabbing frames. Default is \fB1\fP.
 .B
+.IP "-s --size"
+Contextual size expression \fBWxH\fP.
+In \fBhtml\fP mode it is interpreted as output character size.
+In \fBlive\fP and \fBtext\fP mode it is interpreted as capture pixel size.
+.B
+.IP "--pixel-size"
+Capture pixel size expression \fBWxH\fP.
+If unsupported, the closest supported capture size is negotiated.
+Not allowed in \fBhtml\fP mode.
+.B
+.IP "--char-size"
+Output character size expression \fBWxH\fP.
+Hasciicam derives a capture pixel target from this value.
+.B
 .IP "-o --aafile"
 Defines the file where to save rendered ascii, overwrited every \fIrefresh\fP seconds. Default is \fBhasciicam.html\fP when in \fBhtml\fP mode, \fBhasciicam.txt\fP when in \fBtext\fP mode (useless when in \fBlive\fP mode).
 .B

@@ -51,6 +51,7 @@ set(HASCIICAM_AALIB_SOURCES
 
 set(HASCIICAM_APP_SOURCES
     src/app/app_config.c
+    src/app/app_size.c
     src/app/app_session.c
     src/public/hasciicam_api.c
 )
@@ -68,6 +69,7 @@ set(HASCIICAM_RENDER_SOURCES
 set(HASCIICAM_CAPTURE_SOURCES
     src/capture/capture_backend.c
     src/capture/capture_external.c
+    src/capture/capture_size.c
     src/capture/capture_synthetic.c
     src/capture/capture_dshow.cpp
     src/capture/capture_mf.c

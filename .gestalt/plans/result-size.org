@@ -1,0 +1,222 @@
+#+TITLE: Result Size
+#+SUBTITLE: Make capture size and rendered character size explicit across Linux and Windows
+#+DATE: 2026-05-26
+#+KEYWORDS: hasciicam size capture pixels characters v4l2 media-foundation directshow html
+
+* TODO [#A] Define Size Semantics And CLI Compatibility
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Remove ambiguity from user-facing size options while preserving the useful short option.
+:Notes: Challenge the first idea of just renaming -s: that would break old scripts and still would not solve backend negotiation. Keep -s, add explicit long options, and make diagnostics say what happened.
+:END:
+
+** TODO [#A] Document the size model before editing behavior
+:PROPERTIES:
+:Why: The current code calls -s an ASCII size but passes it as capture pixels. The implementation needs one source of truth before changing parser and backend behavior.
+:Change: Add a short design note in docs/architecture.md or AGENTS.md that defines two intents: pixel-size is the desired camera input size in pixels; char-size is the desired rendered result size in characters. State that HTML uses char-size because its visible output is a fixed text grid in a file.
+:Tests: Documentation-only; skip build.
+:Done when: A maintainer can tell from docs whether a WxH value means camera pixels or ASCII characters in live, text, and HTML mode.
+:END:
+
+** TODO [#A] Extend app config with explicit size intent
+:PROPERTIES:
+:Why: A pair of integers plus whchanged cannot represent whether the user asked for input pixels or output characters.
+:Change: In src/app/app_config.h, replace or supplement user_w/user_h/whchanged with a small enum such as HASCIICAM_SIZE_NONE, HASCIICAM_SIZE_PIXELS, HASCIICAM_SIZE_CHARS plus width and height. Keep names plain C. Add native doc-comments above parser helpers.
+:Tests: Build only after the parser L2 because this L2 can be combined with parser edits if no standalone tests exist.
+:Done when: The config object can represent no size, pixel size, and character size without relying on mode-specific guesses outside the parser.
+:END:
+
+** TODO [#A] Add --pixel-size and --char-size while keeping -s contextual
+:PROPERTIES:
+:Why: Users need unambiguous options, but -s should remain useful and should match the mode most users care about.
+:Change: In src/app/app_config.c, add long options --pixel-size WxH and --char-size WxH. Keep -s as pixel-size in live and text mode, and as char-size in HTML mode. If mode is parsed after -s, defer contextual resolution until after all arguments are scanned rather than depending on option order. Reject invalid WxH values with a clear error and non-zero exit.
+:Tests: Add or extend CLI tests to cover hasciicam -h output, --pixel-size parsing through synthetic://, --char-size parsing through synthetic://, -m html -s WxH selecting char-size, and invalid sizes failing.
+:Done when: Help text shows all three accepted forms and stderr makes the selected size intent clear.
+:END:
+
+** TODO [#B] Update user-facing docs and man page
+:PROPERTIES:
+:Why: This is a user-visible CLI behavior change, and AGENTS.md requires README/man page updates for user-facing behavior.
+:Change: Update README.md and doc/hasciicam.1 with examples: live/text pixel-size, live/text char-size, and HTML char-size. Mention that unsupported camera sizes are rounded to the nearest supported input size and the final rendered character grid may be adjusted to match the negotiated camera size.
+:Tests: Documentation-only; skip build.
+:Done when: The docs no longer describe -s as only "ascii image size" or only "webcam default".
+:END:
+
+* TODO [#A] Add Shared Size Planning
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Calculate requested capture pixels and resulting character geometry in one small, testable place.
+:Notes: Prefer a small app-level module over spreading formulas through hasciicam.c and every backend. Do not add dependencies.
+:END:
+
+** TODO [#A] Introduce render metric helpers
+:PROPERTIES:
+:Why: Pixel-to-character conversion needs explicit metrics, and future fonts should not require hunting through main().
+:Change: Add a small module under src/app, for example app_size.h/app_size.c. Define a hasciicam_render_metrics struct with capture_pixels_per_char_x, capture_pixels_per_char_y, display_pixels_per_char_x, and display_pixels_per_char_y. For current behavior, derive capture_pixels_per_char_x=4 and capture_pixels_per_char_y=8 from the existing xstep/ystep/render sizing path. For HTML, map current font-size/linespace to display metrics in one function and document that future fonts should update this function.
+:Tests: Add a plain C unit test for default metrics and each current HTML font-size line-space case.
+:Done when: No new size formula is hard-coded in hasciicam.c.
+:END:
+
+** TODO [#A] Convert user intent into target capture pixels
+:PROPERTIES:
+:Why: Backends can only negotiate camera pixels; char-size must be converted before opening the camera.
+:Change: Add a helper that takes mode, size intent, requested WxH, and render metrics, then returns target capture width/height plus the preferred output character width/height. For pixel-size, target capture size is the user size and preferred chars are target pixels divided by capture_pixels_per_char. For char-size, target capture size is requested chars multiplied by capture_pixels_per_char.
+:Tests: Unit-test pixel-size 640x480 -> chars 160x60 with current metrics, char-size 80x25 -> capture 320x200, and no-size preserving current default behavior.
+:Done when: The conversion result is deterministic without touching any camera backend.
+:END:
+
+** TODO [#A] Apply negotiated capture size back to character geometry
+:PROPERTIES:
+:Why: Cameras may round to another supported input size; the rendered grid should match what is actually captured rather than what was requested.
+:Change: After hasciicam_session_start() and describe(), compute final ascii width/height from the negotiated capture_info width/height and metrics. Preserve current defaults when no size was requested. For HTML char-size, keep the requested character grid only if the negotiated capture size can support it exactly; otherwise report the adjusted grid clearly.
+:Tests: Add unit tests using synthetic:// or the size helper to verify adjusted geometry when requested capture and negotiated capture differ.
+:Done when: Runtime logs show requested size, negotiated capture size, and final ASCII character size.
+:END:
+
+** TODO [#B] Keep the public embedding API stable
+:PROPERTIES:
+:Why: include/hasciicam/hasciicam.h already exposes explicit camera and ASCII dimensions; this user story is about CLI confusion, not host API churn.
+:Change: Do not change hasciicam_start_external(...). If shared helpers are useful to the public path, use them internally only. Document any non-change in docs/architecture.md.
+:Tests: Run core_link and pipeline_smoke after code changes touching shared render/session code.
+:Done when: Existing host samples and public API tests build without signature changes.
+:END:
+
+* TODO [#A] Negotiate Closest Supported Capture Size On Linux
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Make V4L2 choose the closest supported capture size instead of blindly asking for possibly unsupported dimensions.
+:Notes: Prefer V4L2's own enumeration and TRY_FMT/S_FMT behavior. Keep fallback simple for devices that do not enumerate frame sizes.
+:END:
+
+** TODO [#A] Enumerate V4L2 YUYV frame sizes and choose nearest
+:PROPERTIES:
+:Why: VIDIOC_S_FMT may silently adjust or fail; users need predictable closest-size behavior.
+:Change: In src/capture/capture_v4l2.c, add a static helper that uses VIDIOC_ENUM_FRAMESIZES for V4L2_PIX_FMT_YUYV. Handle DISCRETE by scoring each size against target area and aspect ratio. Handle STEPWISE/CONTINUOUS by clamping to min/max and stepping to the nearest legal width/height. Use well-known absolute-difference scoring, not a custom complex algorithm.
+:Tests: If direct ioctl tests are awkward, keep helper math in pure functions and unit-test discrete and stepwise selection separately.
+:Done when: A target unsupported size selects the nearest enumerated V4L2 size before VIDIOC_S_FMT.
+:END:
+
+** TODO [#A] Fall back through TRY_FMT and S_FMT safely
+:PROPERTIES:
+:Why: Some V4L2 devices do not enumerate sizes reliably, and the kernel may still adjust the selected format.
+:Change: If frame-size enumeration fails, set requested target into v4l2_format and call VIDIOC_TRY_FMT when available, then VIDIOC_S_FMT. Always store and report the final format returned by VIDIOC_S_FMT. Do not fail solely because the final size differs from the target.
+:Tests: Build on Linux. Run synthetic CLI tests. If a Linux camera is available, run camera_text with a deliberately odd --pixel-size and confirm it reports the adjusted size.
+:Done when: Linux no longer rejects a reasonable unsupported requested size only because it was not exact.
+:END:
+
+** TODO [#B] Improve Linux diagnostics
+:PROPERTIES:
+:Why: The original complaint includes not knowing what size was requested or accepted.
+:Change: Print concise messages when not quiet: requested pixel target, selected V4L2 candidate, final capture size and pixel format. Keep wording consistent with Windows diagnostics.
+:Tests: Add a CLI smoke assertion if synthetic or helper logs make this deterministic; otherwise verify manually with a camera.
+:Done when: stderr explains size negotiation without requiring debug builds.
+:END:
+
+* TODO [#A] Negotiate Closest Supported Capture Size On Windows
+:PROPERTIES:
+:Effort: 1-2 days
+:Goal: Make Media Foundation and DirectShow honor requested size intent by choosing the closest supported capture format.
+:Notes: Media Foundation is primary on Windows; DirectShow is fallback and should not ignore requested size.
+:END:
+
+** TODO [#A] Choose nearest Media Foundation native media type
+:PROPERTIES:
+:Why: The current Media Foundation adapter rejects all non-exact requested sizes, which causes avoidable camera open failures.
+:Change: In src/capture/capture_mf.c, change enumeration so requested dimensions are scored rather than exact-matched. Keep existing pixel format ranking as the first compatibility filter, then choose the nearest size among supported uncompressed types, using format rank as a tie-breaker. If no size is requested, preserve current best-format behavior.
+:Tests: Add pure helper tests for size scoring if possible. Build on Windows. Run hasciicam.exe -d synthetic:// --frames 2 and, with a camera, run --pixel-size using an odd unsupported size.
+:Done when: Media Foundation opens the closest supported format and reports the negotiated size.
+:END:
+
+** TODO [#A] Add DirectShow IAMStreamConfig size selection
+:PROPERTIES:
+:Why: DirectShow currently builds a graph and accepts whatever format connects, so requested size has no effect when Media Foundation falls back.
+:Change: In src/capture/capture_dshow.cpp, query IAMStreamConfig on the capture pin before RenderStream. Enumerate stream caps, keep supported uncompressed formats already handled by subtype_to_format, score dimensions against the target, and call SetFormat with the best AM_MEDIA_TYPE before rendering. Preserve current behavior when no size is requested or IAMStreamConfig is unavailable.
+:Tests: Build on Windows. Run the DirectShow path if Media Foundation can be disabled with CMake or temporarily unavailable. Add no dependency or framework.
+:Done when: DirectShow either selects the nearest supported size or clearly reports that size selection was unavailable and continues with the connected format.
+:END:
+
+** TODO [#B] Share scoring logic without over-abstracting COM/V4L2
+:PROPERTIES:
+:Why: Linux, Media Foundation, and DirectShow need the same "closest size" policy, but backend APIs are too different for a large abstraction layer.
+:Change: Put tiny pure helpers such as capture_size_score() and capture_choose_discrete_size() in src/capture/capture_size.h/.c. Keep API limited to width/height scoring and candidate comparison. Do not wrap backend enumeration APIs.
+:Tests: Add a C unit test for tie-breaking, area differences, aspect-ratio differences, and exact matches.
+:Done when: Backends share the policy but still keep their native enumeration code local.
+:END:
+
+* TODO [#A] Wire CLI, Capture, Render, And Output Together
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Make the full CLI path produce predictable capture and result sizes in live, text, and HTML modes.
+:Notes: This is where hasciicam.c should get smaller, not larger: parse intent, plan size, open capture, derive final render geometry.
+:END:
+
+** TODO [#A] Replace raw -s handling in main
+:PROPERTIES:
+:Why: main currently copies user_w/user_h directly into capture_request, which is the root of the ambiguity.
+:Change: In src/hasciicam.c, compute render metrics after config parsing, build a size plan, put only target capture pixels into capture_request, then after describe() compute final aw/ah from negotiated capture_info. Remove unused geometry variables if they become dead. Keep xstep/ystep behavior equivalent unless the helper replaces them cleanly.
+:Tests: Run touched unit tests plus cli_stdout, cli_text, and cli_html.
+:Done when: -s no longer means "ASCII" in help but "contextual size", and main no longer guesses size semantics itself.
+:END:
+
+** TODO [#A] Force HTML output to character size
+:PROPERTIES:
+:Why: HTML output is a text document; users need to control the number of characters, not camera pixels.
+:Change: Ensure -m html -s WxH resolves to char-size. Decide and implement one explicit rule for --pixel-size with HTML: reject it with a clear message telling the user to use --char-size, because accepting it would reintroduce ambiguity. Keep --char-size valid in every mode.
+:Tests: Add CLI smoke tests for -m html -s 80x25 and -m html --pixel-size 640x480 failing with the expected message.
+:Done when: HTML mode cannot accidentally interpret -s as camera pixels.
+:END:
+
+** TODO [#B] Preserve AA-lib option ordering
+:PROPERTIES:
+:Why: AGENTS.md notes that AA-lib parses its own options before HasciiCam options; changing that can break existing usage.
+:Change: Keep aa_parseoptions() before hasciicam_config_parse(). Avoid adding size options that conflict with AA-lib short options. Verify --aahelp still works.
+:Tests: Run cli_aahelp and hasciicam -H manually if needed.
+:Done when: AA-lib options still parse before HasciiCam-specific size planning runs.
+:END:
+
+** TODO [#B] Make logs concise and actionable
+:PROPERTIES:
+:Why: The user should know exactly whether they asked for pixels or characters and what the camera accepted.
+:Change: Print one quiet-respecting block: size intent, requested chars/pixels, target capture pixels, negotiated capture pixels, final ASCII chars. Avoid verbose per-candidate logs unless debugging is later added.
+:Tests: CLI smoke tests should keep passing; optionally assert key phrases in stderr for deterministic synthetic runs.
+:Done when: A failed or adjusted camera size is understandable from normal stderr output.
+:END:
+
+* TODO [#A] Add Focused Tests And Manual Smoke Coverage
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Prove size semantics without needing real cameras in CI, and define real-camera checks for Linux and Windows.
+:Notes: Use CTest and plain C. Put generated artifacts under the build tree.
+:END:
+
+** TODO [#A] Add pure size planner and chooser tests
+:PROPERTIES:
+:Why: Most of the new behavior can be tested without platform cameras.
+:Change: Add C tests for app size planning and capture size scoring. Cover no-size, pixel-size, char-size, HTML -s resolution, exact match, nearest larger, nearest smaller, and aspect-ratio tie cases.
+:Tests: Add CTest labels unit;core and run ctest -R "size|capture_size" --output-on-failure.
+:Done when: The core size policy is deterministic in CI.
+:END:
+
+** TODO [#A] Extend deterministic CLI smoke tests
+:PROPERTIES:
+:Why: Users experience this through the executable, not helper functions.
+:Change: Extend tests/cli_smoke.cmake or add a companion script to run synthetic:// with --pixel-size, --char-size, and -m html -s. Check output exists and stderr contains expected final ASCII size where deterministic.
+:Tests: Run cli_stdout, cli_text, cli_html, and the new size-specific CLI tests.
+:Done when: CLI regressions in option semantics fail under CTest.
+:END:
+
+** TODO [#B] Add opt-in real camera smoke notes
+:PROPERTIES:
+:Why: Closest-size negotiation for V4L2, Media Foundation, and DirectShow needs real platform APIs, but CI should not require a camera.
+:Change: Update docs/smoke-tests.md with Linux and Windows commands for unsupported odd sizes, including expected log patterns. Include Media Foundation default path and DirectShow fallback path, probably by configuring HASCIICAM_ENABLE_CAPTURE_MF=OFF for the fallback check.
+:Tests: Documentation-only unless a camera is available. If available, run the documented smoke tests and capture notes.
+:Done when: A reviewer on Linux or Windows can verify real camera negotiation with copyable commands.
+:END:
+
+** TODO [#C] Update AGENTS.md if architecture guidance changes
+:PROPERTIES:
+:Why: The task may add size-planning and capture-size helper modules that future agents should know exist.
+:Change: If app_size or capture_size modules are added, update AGENTS.md with their responsibilities and remind future work to keep font metrics centralized.
+:Tests: Documentation-only; skip build.
+:Done when: Future work on fonts or capture sizes has a clear place to start.
+:END:

@@ -10,19 +10,23 @@ Main entrypoint: `src/hasciicam.c`
 Runtime stages:
 
 1. Parse AA-lib options and HasciiCam CLI options.
-2. Open capture backend through `capture_open_default()`.
-3. Start backend, read frames, and release frames.
-4. Convert source frames to grayscale (`frame_convert.c`).
-5. Write grayscale into AA-lib image memory.
-6. Render ASCII with AA-lib (`aa_fastrender`).
-7. Flush to live/file output through AA-lib driver selection.
-8. Stop/close capture and release all buffers.
+2. Resolve size intent (`pixels` vs `chars`) in `src/app/app_size.c`.
+3. Open capture backend through `capture_open_default()`.
+4. Negotiate closest supported capture size when exact input size is unavailable.
+5. Derive final ASCII geometry from negotiated capture dimensions.
+6. Start backend, read frames, and release frames.
+7. Convert source frames to grayscale (`frame_convert.c`).
+8. Write grayscale into AA-lib image memory.
+9. Render ASCII with AA-lib (`aa_fastrender`).
+10. Flush to live/file output through AA-lib driver selection.
+11. Stop/close capture and release all buffers.
 
 ## Modules
 
 Application shell:
 
 - `src/hasciicam.c`: CLI, lifecycle, render loop orchestration.
+- `src/app/app_size.c`: size intent planning and capture/ascii geometry helpers.
 
 Capture ports and adapters:
 

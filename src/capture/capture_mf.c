@@ -1,4 +1,5 @@
 #include "capture_mf.h"
+#include "capture_size.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -150,6 +151,7 @@ static int mf_open(capture_device **out, const capture_request *req) {
     HRESULT hr;
     UINT32 i;
     int best_rank = 1000;
+    int best_size_score = 0x7fffffff;
     int found = 0;
 
     hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
@@ -227,13 +229,24 @@ static int mf_open(capture_device **out, const capture_request *req) {
             continue;
         }
 
-        if (req->requested_width > 0 && req->requested_height > 0 &&
-            ((int)w != req->requested_width || (int)h != req->requested_height)) {
-            IMFMediaType_Release(candidate);
+        if (req->requested_width > 0 && req->requested_height > 0) {
+            int score = capture_size_score(req->requested_width, req->requested_height, (int)w, (int)h);
+            if (!found ||
+                score < best_size_score ||
+                (score == best_size_score && rank < best_rank)) {
+                if (chosen != NULL)
+                    IMFMediaType_Release(chosen);
+                chosen = candidate;
+                best_rank = rank;
+                best_size_score = score;
+                found = 1;
+            } else {
+                IMFMediaType_Release(candidate);
+            }
             continue;
         }
 
-        if (rank < best_rank) {
+        if (!found || rank < best_rank) {
             if (chosen != NULL)
                 IMFMediaType_Release(chosen);
             chosen = candidate;

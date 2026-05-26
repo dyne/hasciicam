@@ -225,6 +225,22 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME frame_convert COMMAND test_frame_convert)
   set_tests_properties(frame_convert PROPERTIES LABELS "unit;core")
 
+  add_executable(test_app_size
+    tests/test_app_size.c
+    src/app/app_size.c
+  )
+  target_include_directories(test_app_size PRIVATE src/app)
+  add_test(NAME app_size COMMAND test_app_size)
+  set_tests_properties(app_size PROPERTIES LABELS "unit;core")
+
+  add_executable(test_capture_size
+    tests/test_capture_size.c
+    src/capture/capture_size.c
+  )
+  target_include_directories(test_capture_size PRIVATE src/capture)
+  add_test(NAME capture_size COMMAND test_capture_size)
+  set_tests_properties(capture_size PROPERTIES LABELS "unit;core")
+
   add_executable(test_core_link tests/test_core_link.c)
   target_include_directories(test_core_link PRIVATE include)
   target_link_libraries(test_core_link PRIVATE hasciicam_core)
@@ -280,6 +296,42 @@ if(HASCIICAM_ENABLE_TESTS)
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake
     )
     set_tests_properties(cli_html PROPERTIES LABELS "cli")
+
+    add_test(
+      NAME cli_size_pixel
+      COMMAND ${CMAKE_COMMAND}
+        -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+        -DHASCIICAM_CASE=pixel
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_size_semantics.cmake
+    )
+    set_tests_properties(cli_size_pixel PROPERTIES LABELS "cli")
+
+    add_test(
+      NAME cli_size_chars
+      COMMAND ${CMAKE_COMMAND}
+        -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+        -DHASCIICAM_CASE=chars
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_size_semantics.cmake
+    )
+    set_tests_properties(cli_size_chars PROPERTIES LABELS "cli")
+
+    add_test(
+      NAME cli_size_html_short_s
+      COMMAND ${CMAKE_COMMAND}
+        -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+        -DHASCIICAM_CASE=html_short_s
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_size_semantics.cmake
+    )
+    set_tests_properties(cli_size_html_short_s PROPERTIES LABELS "cli")
+
+    add_test(
+      NAME cli_size_html_pixel_reject
+      COMMAND ${CMAKE_COMMAND}
+        -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+        -DHASCIICAM_CASE=html_pixel_reject
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_size_semantics.cmake
+    )
+    set_tests_properties(cli_size_html_pixel_reject PROPERTIES LABELS "cli")
 
     if(HASCIICAM_ENABLE_VISUAL_TESTS)
       add_test(
