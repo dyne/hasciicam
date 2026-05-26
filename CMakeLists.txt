@@ -247,6 +247,15 @@ if(HASCIICAM_ENABLE_TESTS)
         -DHASCIICAM_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-stdout-smoke.txt
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake
     )
+
+    add_test(
+      NAME cli_text
+      COMMAND ${CMAKE_COMMAND}
+        -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+        -DHASCIICAM_MODE=text
+        -DHASCIICAM_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-text-smoke.txt
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake
+    )
   endif()
 endif()
 
