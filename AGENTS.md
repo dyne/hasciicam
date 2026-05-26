@@ -357,7 +357,7 @@ Current tests:
 - `core_link`: public embedding API link/creation smoke.
 - `pipeline_smoke`: synthetic frame end-to-end render smoke via public API.
 
-Planned test tiers are documented in `.gestalt/plans/test-coverage.org`:
+Planned test tiers are documented in `docs/testing-strategy.md`:
 
 - Unit/core tests: plain C executables for conversion, public API, and
   synthetic pipeline behavior.
