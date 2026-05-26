@@ -3,14 +3,14 @@
 #+DATE: 2026-05-26
 #+KEYWORDS: hasciicam tests ctest cli html sdl synthetic camera
 
-* TODO [#A] Define The Test Strategy And Boundaries
+* DONE [#A] Define The Test Strategy And Boundaries
 :PROPERTIES:
 :Effort: 0.5 day
 :Goal: Keep tests simple, deterministic, and C-first without adding a framework.
 :Notes: Use CTest as the runner. Add plain C helpers only where direct core access is needed. Avoid new dependencies.
 :END:
 
-** TODO [#A] Document the test tiers in AGENTS.md
+** DONE [#A] Document the test tiers in AGENTS.md
 :PROPERTIES:
 :Why: Future agents need to know which tests are required in CI, which are opt-in, and which are manual camera checks.
 :Change: Update AGENTS.md with four tiers: unit/core C tests, deterministic CLI smoke tests, opt-in visual SDL tests, and opt-in real camera tests. State that no external test framework should be added until plain C + CTest becomes painful.
@@ -18,7 +18,7 @@
 :Done when: A future agent can decide where a new test belongs before editing code.
 :END:
 
-** TODO [#A] Keep CTest as the single runner
+** DONE [#A] Keep CTest as the single runner
 :PROPERTIES:
 :Why: The project already uses CMake and CTest, so adding another runner would complicate cross-platform maintenance.
 :Change: Make all automated tests visible through CTest. Use CMake labels such as unit, cli, visual, camera if useful.
@@ -26,14 +26,14 @@
 :Done when: ctest lists all non-manual tests and no separate test command is required.
 :END:
 
-* TODO [#A] Add A Deterministic Synthetic CLI Source
+* WIP [#A] Add A Deterministic Synthetic CLI Source
 :PROPERTIES:
 :Effort: 1-2 days
 :Goal: Let the real CLI run for a bounded number of frames without camera hardware.
 :Notes: This is the key enabler for HTML/text/stdout/SDL smoke tests.
 :END:
 
-** TODO [#A] Add a synthetic capture backend
+** DONE [#A] Add a synthetic capture backend
 :PROPERTIES:
 :Why: CLI output tests should not depend on camera permissions, hardware, or backend availability.
 :Change: Add a capture backend selected by device "synthetic://" or a similarly explicit selector. It should generate deterministic grayscale frames with motion across frames. Keep it in src/capture and behind capture_ops like every other backend.
@@ -41,7 +41,7 @@
 :Done when: The CLI can run without a physical camera by passing -d synthetic://.
 :END:
 
-** TODO [#A] Add a bounded frame-count option
+** WIP [#A] Add a bounded frame-count option
 :PROPERTIES:
 :Why: CLI smoke tests need hasciicam to exit on its own after rendering a known number of frames.
 :Change: Add a small option such as --frames N to hasciicam_config. Keep it documented as a test/smoke option. In the main loop, request session stop after N rendered frames, not N capture reads.

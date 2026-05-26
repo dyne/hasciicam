@@ -227,6 +227,10 @@ if(HASCIICAM_ENABLE_TESTS)
   target_include_directories(test_pipeline_smoke PRIVATE include)
   target_link_libraries(test_pipeline_smoke PRIVATE hasciicam_core)
   add_test(NAME pipeline_smoke COMMAND test_pipeline_smoke)
+
+  add_executable(test_capture_synthetic tests/test_capture_synthetic.c src/capture/capture_backend.c src/capture/capture_external.c src/capture/capture_synthetic.c)
+  target_include_directories(test_capture_synthetic PRIVATE src/capture)
+  add_test(NAME capture_synthetic COMMAND test_capture_synthetic)
 endif()
 
 if(APPLE)
