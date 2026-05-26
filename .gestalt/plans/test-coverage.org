@@ -80,7 +80,7 @@
 :Done when: The CLI can render visible ASCII through stdout in an automated test.
 :END:
 
-** WIP [#A] Add text file output test
+** DONE [#A] Add text file output test
 :PROPERTIES:
 :Why: Text output is a supported non-visual mode and should not regress while changing output adapters.
 :Change: Run hasciicam -d synthetic:// --frames 2 -m text -o <test-output>.txt. Assert file exists, is non-empty, and contains non-whitespace ASCII.
@@ -88,7 +88,7 @@
 :Done when: Text output is covered by deterministic CI.
 :END:
 
-** TODO [#A] Add HTML file output test
+** WIP [#A] Add HTML file output test
 :PROPERTIES:
 :Why: HTML mode has had regressions and is part of original HasciiCam behavior.
 :Change: Run hasciicam -d synthetic:// --frames 2 -m html -o <test-output>.html. Assert file exists, contains the refresh meta tag, contains <PRE>, and contains non-whitespace ASCII inside the generated page.
@@ -164,6 +164,7 @@
 :Tests: Local ctest; CI validates on push/PR.
 :Done when: CI covers help, stdout, text, HTML, conversion, core link, and synthetic pipeline smoke.
 :END:
+
 
 
 
