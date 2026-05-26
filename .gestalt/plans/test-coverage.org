@@ -57,7 +57,7 @@
 :Done when: Synthetic behavior is explicit and cannot mask production capture regressions.
 :END:
 
-* WIP [#A] Add Deterministic CLI Smoke Tests
+* DONE [#A] Add Deterministic CLI Smoke Tests
 :PROPERTIES:
 :Effort: 1-2 days
 :Goal: Verify the executable behavior users rely on: help, stdout, text, HTML, and clean exit.
@@ -88,7 +88,7 @@
 :Done when: Text output is covered by deterministic CI.
 :END:
 
-** WIP [#A] Add HTML file output test
+** DONE [#A] Add HTML file output test
 :PROPERTIES:
 :Why: HTML mode has had regressions and is part of original HasciiCam behavior.
 :Change: Run hasciicam -d synthetic:// --frames 2 -m html -o <test-output>.html. Assert file exists, contains the refresh meta tag, contains <PRE>, and contains non-whitespace ASCII inside the generated page.
@@ -96,14 +96,14 @@
 :Done when: Empty HTML pages fail deterministically in CI.
 :END:
 
-* TODO [#B] Add Opt-In Visual And Camera Tests
+* WIP [#B] Add Opt-In Visual And Camera Tests
 :PROPERTIES:
 :Effort: 1-2 days
 :Goal: Exercise SDL windows and real camera paths without making CI flaky.
 :Notes: These tests should be off by default and enabled only on maintainer machines.
 :END:
 
-** TODO [#B] Add an opt-in SDL visual smoke test
+** WIP [#B] Add an opt-in SDL visual smoke test
 :PROPERTIES:
 :Why: SDL can fail in ways stdout/text/HTML cannot catch, but CI often lacks a display.
 :Change: Add HASCIICAM_ENABLE_VISUAL_TESTS=OFF by default. When ON, add a CTest that runs hasciicam -d synthetic:// --frames 2 -O SDL and verifies the process exits cleanly.
@@ -164,6 +164,7 @@
 :Tests: Local ctest; CI validates on push/PR.
 :Done when: CI covers help, stdout, text, HTML, conversion, core link, and synthetic pipeline smoke.
 :END:
+
 
 
 
