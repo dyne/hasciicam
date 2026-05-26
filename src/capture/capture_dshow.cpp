@@ -1,4 +1,5 @@
 #include "capture_dshow.h"
+#include "capture_size.h"
 
 #if defined(_WIN32)
 
@@ -65,6 +66,10 @@ static void release_media_type(AM_MEDIA_TYPE *mt) {
     }
 }
 
+static int abs_height(int h) {
+    return h > 0 ? h : -h;
+}
+
 static int subtype_to_format(const GUID &subtype, capture_pixel_format *fmt) {
     if (IsEqualGUID(subtype, MEDIASUBTYPE_YUY2)) {
         *fmt = CAPTURE_PIXFMT_YUY2;
@@ -79,6 +84,93 @@ static int subtype_to_format(const GUID &subtype, capture_pixel_format *fmt) {
         return 1;
     }
     return 0;
+}
+
+static HRESULT configure_capture_size(struct capture_device *dev, const capture_request *req) {
+    IAMStreamConfig *stream_config = NULL;
+    int best_index = -1;
+    int best_w = 0;
+    int best_h = 0;
+    HRESULT hr;
+    int count = 0;
+    int cap_size = 0;
+    int i;
+
+    if (dev == NULL || req == NULL || req->requested_width <= 0 || req->requested_height <= 0)
+        return S_OK;
+
+    hr = dev->builder->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
+                                     dev->source_filter, IID_IAMStreamConfig,
+                                     (void **)&stream_config);
+    if (FAILED(hr) || stream_config == NULL)
+        return S_OK;
+
+    hr = stream_config->GetNumberOfCapabilities(&count, &cap_size);
+    if (FAILED(hr) || count <= 0 || cap_size <= 0) {
+        stream_config->Release();
+        return S_OK;
+    }
+
+    for (i = 0; i < count; i++) {
+        AM_MEDIA_TYPE *mt = NULL;
+        std::vector<unsigned char> caps((size_t)cap_size);
+        VIDEO_STREAM_CONFIG_CAPS *vsc = (VIDEO_STREAM_CONFIG_CAPS *)caps.data();
+        capture_pixel_format fmt;
+        int w = 0;
+        int h = 0;
+
+        hr = stream_config->GetStreamCaps(i, &mt, caps.data());
+        if (FAILED(hr) || mt == NULL)
+            continue;
+        if (mt->formattype != FORMAT_VideoInfo || mt->cbFormat < sizeof(VIDEOINFOHEADER) || mt->pbFormat == NULL) {
+            release_media_type(mt);
+            CoTaskMemFree(mt);
+            continue;
+        }
+        if (!subtype_to_format(mt->subtype, &fmt)) {
+            release_media_type(mt);
+            CoTaskMemFree(mt);
+            continue;
+        }
+
+        w = vsc->InputSize.cx;
+        h = abs_height(vsc->InputSize.cy);
+        if (w <= 0 || h <= 0) {
+            VIDEOINFOHEADER *vih = (VIDEOINFOHEADER *)mt->pbFormat;
+            w = vih->bmiHeader.biWidth;
+            h = abs_height(vih->bmiHeader.biHeight);
+        }
+        if (w <= 0 || h <= 0) {
+            release_media_type(mt);
+            CoTaskMemFree(mt);
+            continue;
+        }
+
+        if (best_index < 0 ||
+            capture_size_is_better(req->requested_width, req->requested_height,
+                                   best_w, best_h, w, h)) {
+            best_index = i;
+            best_w = w;
+            best_h = h;
+        }
+
+        release_media_type(mt);
+        CoTaskMemFree(mt);
+    }
+
+    if (best_index >= 0) {
+        AM_MEDIA_TYPE *best_mt = NULL;
+        std::vector<unsigned char> caps((size_t)cap_size);
+        hr = stream_config->GetStreamCaps(best_index, &best_mt, caps.data());
+        if (SUCCEEDED(hr) && best_mt != NULL) {
+            stream_config->SetFormat(best_mt);
+            release_media_type(best_mt);
+            CoTaskMemFree(best_mt);
+        }
+    }
+
+    stream_config->Release();
+    return S_OK;
 }
 
 static int try_match_device(IMoniker *moniker, const capture_request *req) {
@@ -109,7 +201,7 @@ static int try_match_device(IMoniker *moniker, const capture_request *req) {
     return match;
 }
 
-static HRESULT build_graph(struct capture_device *dev, IMoniker *chosen) {
+static HRESULT build_graph(struct capture_device *dev, IMoniker *chosen, const capture_request *req) {
     HRESULT hr;
     AM_MEDIA_TYPE mt;
     VIDEOINFOHEADER *vih;
@@ -128,6 +220,9 @@ static HRESULT build_graph(struct capture_device *dev, IMoniker *chosen) {
     hr = chosen->BindToObject(NULL, NULL, IID_IBaseFilter, (void **)&dev->source_filter);
     if (FAILED(hr)) return hr;
     hr = dev->graph->AddFilter(dev->source_filter, L"Video Capture");
+    if (FAILED(hr)) return hr;
+
+    hr = configure_capture_size(dev, req);
     if (FAILED(hr)) return hr;
 
     hr = CoCreateInstance(CLSID_SampleGrabber, NULL, CLSCTX_INPROC_SERVER,
@@ -212,7 +307,7 @@ static int dshow_open(capture_device **out, const capture_request *req) {
 
     while (enum_moniker->Next(1, &moniker, NULL) == S_OK) {
         if (try_match_device(moniker, req)) {
-            hr = build_graph(dev, moniker);
+            hr = build_graph(dev, moniker, req);
             moniker->Release();
             moniker = NULL;
             if (SUCCEEDED(hr)) {
