@@ -21,6 +21,11 @@ cmake .. -G Ninja
 ninja
 ```
 
+Windows note (common failure): before `cmake`/`ninja`, load the MSVC environment
+with a Visual Studio `vcvars*.bat` script (usually `vcvarsall.bat`), or use a
+Visual Studio Developer Command Prompt/PowerShell. Without that environment,
+configure/build often fails because compilers or `INCLUDE`/`LIB` are not set.
+
 On Windows with MSVC and Ninja, run the command from a Visual Studio Developer
 Command Prompt/PowerShell, or initialize the environment first:
 

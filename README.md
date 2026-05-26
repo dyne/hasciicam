@@ -94,6 +94,19 @@ To see the manual:
 man hasciicam
 ```
 
+Size selection:
+
+- `--pixel-size WxH`: request camera capture size in pixels.
+- `--char-size WxH`: request output ASCII size in characters.
+- `-s WxH` / `--size WxH`: contextual shortcut:
+  - HTML mode: character size.
+  - Live/Text mode: pixel size.
+
+In HTML mode, `--pixel-size` is rejected; use `--char-size` or `-s`.
+When a camera does not support the exact requested pixel size, HasciiCam
+negotiates the closest available capture size and reports the final capture
+and ASCII dimensions at startup.
+
 # BUILD FROM SOURCE
 
 If you want to compile hasciicam from its source code, you will need

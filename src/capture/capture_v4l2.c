@@ -1,4 +1,5 @@
 #include "capture_v4l2.h"
+#include "capture_size.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +33,77 @@ struct capture_device {
 };
 
 static void v4l2_stop(capture_device *dev);
+
+static int clamp_to_step(int value, int min_v, int max_v, int step_v) {
+    int delta;
+    int down;
+    int up;
+    if (value < min_v)
+        return min_v;
+    if (value > max_v)
+        return max_v;
+    if (step_v <= 1)
+        return value;
+
+    delta = value - min_v;
+    down = min_v + (delta / step_v) * step_v;
+    up = down + step_v;
+    if (up > max_v)
+        up = max_v;
+    if ((value - down) <= (up - value))
+        return down;
+    return up;
+}
+
+static int choose_nearest_v4l2_size(int fd, int target_w, int target_h, int *out_w, int *out_h) {
+    struct v4l2_frmsizeenum framesize;
+    int best_w = 0;
+    int best_h = 0;
+    int have_best = 0;
+    int idx = 0;
+
+    if (fd < 0 || out_w == NULL || out_h == NULL || target_w <= 0 || target_h <= 0)
+        return 0;
+
+    memset(&framesize, 0, sizeof(framesize));
+    framesize.pixel_format = V4L2_PIX_FMT_YUYV;
+    for (idx = 0;; idx++) {
+        framesize.index = (unsigned int)idx;
+        if (ioctl(fd, VIDIOC_ENUM_FRAMESIZES, &framesize) == -1)
+            break;
+
+        if (framesize.type == V4L2_FRMSIZE_TYPE_DISCRETE) {
+            int cw = (int)framesize.discrete.width;
+            int ch = (int)framesize.discrete.height;
+            if (!have_best || capture_size_is_better(target_w, target_h, best_w, best_h, cw, ch)) {
+                best_w = cw;
+                best_h = ch;
+                have_best = 1;
+            }
+        } else if (framesize.type == V4L2_FRMSIZE_TYPE_STEPWISE ||
+                   framesize.type == V4L2_FRMSIZE_TYPE_CONTINUOUS) {
+            int cw = clamp_to_step(target_w,
+                                   (int)framesize.stepwise.min_width,
+                                   (int)framesize.stepwise.max_width,
+                                   (int)framesize.stepwise.step_width);
+            int ch = clamp_to_step(target_h,
+                                   (int)framesize.stepwise.min_height,
+                                   (int)framesize.stepwise.max_height,
+                                   (int)framesize.stepwise.step_height);
+            if (!have_best || capture_size_is_better(target_w, target_h, best_w, best_h, cw, ch)) {
+                best_w = cw;
+                best_h = ch;
+                have_best = 1;
+            }
+        }
+    }
+
+    if (!have_best)
+        return 0;
+    *out_w = best_w;
+    *out_h = best_h;
+    return 1;
+}
 
 static int v4l2_open(capture_device **out, const capture_request *req) {
     struct capture_device *dev;
@@ -107,10 +179,28 @@ static int v4l2_open(capture_device **out, const capture_request *req) {
 
     format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
     if (req->requested_width > 0 && req->requested_height > 0) {
-        format.fmt.pix.width = req->requested_width;
-        format.fmt.pix.height = req->requested_height;
-        fprintf(stderr, "user defined size: %u x %u\n",
-                req->requested_width, req->requested_height);
+        int selected_w = req->requested_width;
+        int selected_h = req->requested_height;
+        if (choose_nearest_v4l2_size(fd, req->requested_width, req->requested_height,
+                                     &selected_w, &selected_h)) {
+            format.fmt.pix.width = (unsigned int)selected_w;
+            format.fmt.pix.height = (unsigned int)selected_h;
+            fprintf(stderr, "requested capture size: %d x %d, nearest supported: %d x %d\n",
+                    req->requested_width, req->requested_height, selected_w, selected_h);
+        } else {
+            format.fmt.pix.width = req->requested_width;
+            format.fmt.pix.height = req->requested_height;
+            fprintf(stderr, "requested capture size: %d x %d\n",
+                    req->requested_width, req->requested_height);
+        }
+    }
+
+    {
+        struct v4l2_format try_format;
+        memset(&try_format, 0, sizeof(try_format));
+        try_format = format;
+        if (ioctl(fd, VIDIOC_TRY_FMT, &try_format) != -1)
+            format = try_format;
     }
 
     if (ioctl(fd, VIDIOC_S_FMT, &format) == -1) {

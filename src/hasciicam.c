@@ -45,6 +45,7 @@
 
 #include <aalib.h>
 #include "app/app_config.h"
+#include "app/app_size.h"
 #include "app/app_session.h"
 #include "capture/capture_backend.h"
 #include "output/output.h"
@@ -104,9 +105,8 @@ main (int argc, char **argv) {
   int refresh;
   int fontsize;
   int linespace;
-  int user_w;
-  int user_h;
-  int whchanged;
+  hasciicam_size_metrics size_metrics;
+  hasciicam_size_plan size_plan;
   int uid;
   int gid;
   int max_frames;
@@ -157,9 +157,6 @@ main (int argc, char **argv) {
   refresh = appcfg.refresh;
   fontsize = appcfg.fontsize;
   linespace = appcfg.linespace;
-  user_w = appcfg.user_w;
-  user_h = appcfg.user_h;
-  whchanged = appcfg.whchanged;
   uid = appcfg.uid;
   gid = appcfg.gid;
   max_frames = appcfg.max_frames;
@@ -174,12 +171,15 @@ main (int argc, char **argv) {
   aa_geo.bright = appcfg.aa_bright;
   aa_geo.contrast = appcfg.aa_contrast;
   aa_geo.gamma = appcfg.aa_gamma;
+  hasciicam_size_metrics_init(&size_metrics);
+  hasciicam_size_build_plan(&appcfg, &size_metrics, &size_plan);
+
   memset(&cap_req, 0, sizeof(cap_req));
   cap_req.device = device;
   cap_req.input_channel = inputch;
-  if (whchanged == 1) {
-    cap_req.requested_width = user_w;
-    cap_req.requested_height = user_h;
+  if (size_plan.requested_capture_width > 0 && size_plan.requested_capture_height > 0) {
+    cap_req.requested_width = size_plan.requested_capture_width;
+    cap_req.requested_height = size_plan.requested_capture_height;
   }
 
   if (!hasciicam_session_start(&session, &cap_req)) {
@@ -203,10 +203,20 @@ main (int argc, char **argv) {
 
   xbytestep = xstep + xstep;
   ybytestep = vbytesperline * (ystep - 1);
-  gw = vw / xstep;
-  gh = vh / ystep;
-  aw = gw / 2;
-  ah = gh / 2;
+  hasciicam_size_compute_ascii_from_capture(&size_metrics, vw, vh, &aw, &ah);
+  gw = aw * 2;
+  gh = ah * 2;
+
+  if (!quiet && appcfg.size_intent != HASCIICAM_SIZE_NONE) {
+    const char *intent = (appcfg.size_intent == HASCIICAM_SIZE_PIXELS) ? "pixels" : "chars";
+    fprintf(stderr, "Size request: %s %dx%d\n", intent, appcfg.size_w, appcfg.size_h);
+    if (cap_req.requested_width > 0 && cap_req.requested_height > 0) {
+      fprintf(stderr, "Capture target: %dx%d\n",
+              cap_req.requested_width, cap_req.requested_height);
+    }
+    fprintf(stderr, "Capture negotiated: %dx%d\n", vw, vh);
+    fprintf(stderr, "Ascii result: %dx%d\n", aw, ah);
+  }
 
   fprintf(stderr, "Grey buffer is %i bytes\n", gw * gh);
 
