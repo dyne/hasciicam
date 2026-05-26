@@ -20,6 +20,7 @@
 #define TEXT 2
 
 static const struct option long_options[] = {
+    {"frames", required_argument, NULL, 1000},
     {"help", no_argument, NULL, 'h'},
     {"aahelp", no_argument, NULL, 'H'},
     {"version", no_argument, NULL, 'v'},
@@ -61,6 +62,7 @@ static const char *help_text =
     " -o --aafile       dumped file               - default hasciicam.[txt|html]\n"
     " -O --aadriver     aalib driver: X11|curses|SDL|stdout - default auto\n"
     " -D --daemon       run in background         - default foregrond\n"
+    "    --frames N     stop after N rendered frames (test/smoke)\n"
     " -U --uid          setuid (int)              - default current\n"
     " -G --gid          setgid (int)              - default current\n"
     "rendering options:\n"
@@ -107,6 +109,7 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     cfg->linespace = 5;
     cfg->uid = -1;
     cfg->gid = -1;
+    cfg->max_frames = 0;
 }
 
 void hasciicam_config_parse(hasciicam_config *cfg,
@@ -123,6 +126,11 @@ void hasciicam_config_parse(hasciicam_config *cfg,
     do {
         res = getopt_long(argc, argv, short_options, long_options, NULL);
         switch (res) {
+        case 1000:
+            cfg->max_frames = atoi(optarg);
+            if (cfg->max_frames < 0)
+                cfg->max_frames = 0;
+            break;
         case 'h':
             fprintf(stderr, "%s", help_text);
             exit(0);

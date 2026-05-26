@@ -109,6 +109,8 @@ main (int argc, char **argv) {
   int whchanged;
   int uid;
   int gid;
+  int max_frames;
+  int rendered_frames = 0;
   char *device;
   char *aafile;
   char *background;
@@ -160,6 +162,7 @@ main (int argc, char **argv) {
   whchanged = appcfg.whchanged;
   uid = appcfg.uid;
   gid = appcfg.gid;
+  max_frames = appcfg.max_frames;
   device = appcfg.device;
   aafile = appcfg.aafile;
   background = appcfg.background;
@@ -333,6 +336,12 @@ main (int argc, char **argv) {
       hasciicam_output_poll(&output);
     } else if (mode == HTML && frame_rendered) {
       hasciicam_output_file_publish_html(aatmpfile, aafile);
+    }
+    if (frame_rendered) {
+      rendered_frames++;
+      if (max_frames > 0 && rendered_frames >= max_frames) {
+        hasciicam_session_request_stop(&session);
+      }
     }
 
   }
