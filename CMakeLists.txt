@@ -238,6 +238,15 @@ if(HASCIICAM_ENABLE_TESTS)
 
     add_test(NAME cli_aahelp COMMAND hasciicam -H)
     set_tests_properties(cli_aahelp PROPERTIES PASS_REGULAR_EXPRESSION "aalib options")
+
+    add_test(
+      NAME cli_stdout
+      COMMAND ${CMAKE_COMMAND}
+        -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+        -DHASCIICAM_MODE=stdout
+        -DHASCIICAM_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-stdout-smoke.txt
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake
+    )
   endif()
 endif()
 
