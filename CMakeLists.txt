@@ -82,6 +82,7 @@ endif()
 # Create aalib static library
 add_library(aalib STATIC ${HASCIICAM_AALIB_SOURCES})
 target_include_directories(aalib PUBLIC src/aalib)
+target_compile_definitions(aalib PRIVATE HASCIICAM_APP_TITLE="hasciicam ${PROJECT_VERSION}")
 if(WIN32)
     target_include_directories(aalib PUBLIC src/compat)
     target_compile_definitions(aalib PRIVATE _CRT_SECURE_NO_WARNINGS)
