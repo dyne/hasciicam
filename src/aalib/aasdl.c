@@ -172,8 +172,8 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
         return 0;
     }
     
-    d->width = p->width ? p->width : 80;
-    d->height = p->height ? p->height : 25;
+    d->width = p->width ? p->width : (p->recwidth ? p->recwidth : 80);
+    d->height = p->height ? p->height : (p->recheight ? p->recheight : 25);
     
     if (p->maxwidth && d->width > p->maxwidth)
         d->width = p->maxwidth;
