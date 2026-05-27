@@ -69,8 +69,8 @@ static void SDL_render_char(struct sdldriverdata *d, unsigned char ch, int x, in
     // fprintf(stderr, "SDL_render_char: ch=%d, x=%d, y=%d\n", ch, x, y);
 
     SDL_Rect dst = {
-        x * d->char_width,
-        y * d->char_height,
+        d->x_offset_px + (x * d->char_width),
+        d->y_offset_px + (y * d->char_height),
         d->char_width,
         d->char_height
     };
@@ -283,6 +283,9 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     d->inverted = 0;
     d->cvisible = 0;
     d->fullscreen = 0;
+    d->x_offset_px = 0;
+    d->y_offset_px = 0;
+    d->force_clear = 1;
     d->Xpos = 0;
     d->Ypos = 0;
     
@@ -353,6 +356,7 @@ static void SDL_getsize(aa_context *c, int *width, int *height)
     if (new_width != d->width || new_height != d->height) {
         d->width = new_width;
         d->height = new_height;
+        d->force_clear = 1;
 
         if (d->previoust) {
             free(d->previoust);
@@ -425,6 +429,14 @@ static void SDL_flush(aa_context *c)
 {
     struct sdldriverdata *d = c->driverdata;
     int pos;
+    int draw_w_chars;
+    int draw_h_chars;
+    int win_width;
+    int win_height;
+    int content_px_w;
+    int content_px_h;
+    int new_x_offset;
+    int new_y_offset;
 
     SDL_process_events(d);
 
@@ -432,6 +444,29 @@ static void SDL_flush(aa_context *c)
     int scrheight = aa_scrheight(c);
     int bufsize = scrwidth * scrheight;
     
+    draw_w_chars = scrwidth < d->width ? scrwidth : d->width;
+    draw_h_chars = scrheight < d->height ? scrheight : d->height;
+
+    SDL_GetWindowSize(d->window, &win_width, &win_height);
+    content_px_w = draw_w_chars * d->char_width;
+    content_px_h = draw_h_chars * d->char_height;
+    new_x_offset = (win_width - content_px_w) / 2;
+    new_y_offset = (win_height - content_px_h) / 2;
+    if (new_x_offset < 0)
+        new_x_offset = 0;
+    if (new_y_offset < 0)
+        new_y_offset = 0;
+
+    if (new_x_offset != d->x_offset_px || new_y_offset != d->y_offset_px) {
+        d->x_offset_px = new_x_offset;
+        d->y_offset_px = new_y_offset;
+        d->force_clear = 1;
+        if (d->previoust && d->previousa) {
+            memset(d->previoust, 0xFF, bufsize);
+            memset(d->previousa, 0xFF, bufsize);
+        }
+    }
+
     /* Allocate change-tracking buffers based on actual screen size */
     if (!d->previoust) {
         d->previoust = malloc(bufsize);
@@ -442,10 +477,17 @@ static void SDL_flush(aa_context *c)
         }
         memset(d->previoust, 0xFF, bufsize);
         memset(d->previousa, 0xFF, bufsize);
+        d->force_clear = 1;
     }
 
-    for (int y = 0; y < scrheight && y < d->height; y++) {
-        for (int x = 0; x < scrwidth && x < d->width; x++) {
+    if (d->force_clear) {
+        SDL_SetRenderDrawColor(d->renderer, 0, 0, 0, 255);
+        SDL_RenderClear(d->renderer);
+        d->force_clear = 0;
+    }
+
+    for (int y = 0; y < draw_h_chars; y++) {
+        for (int x = 0; x < draw_w_chars; x++) {
             pos = x + y * scrwidth;
             
             unsigned char ch = c->textbuffer[pos];
