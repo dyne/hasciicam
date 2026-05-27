@@ -48,14 +48,12 @@ static void SDL_render_char(struct sdldriverdata *d, unsigned char ch, int x, in
         d->char_height
     };
 
-    /* Draw background */
-    if (bg_color != d->black_color) {
-        SDL_SetRenderDrawColor(d->renderer,
-            (bg_color >> 16) & 0xFF,
-            (bg_color >> 8) & 0xFF,
-            bg_color & 0xFF, 255);
-        SDL_RenderFillRect(d->renderer, &dst);
-    }
+    /* Always clear the cell background for dirty updates. */
+    SDL_SetRenderDrawColor(d->renderer,
+        (bg_color >> 16) & 0xFF,
+        (bg_color >> 8) & 0xFF,
+        bg_color & 0xFF, 255);
+    SDL_RenderFillRect(d->renderer, &dst);
 
     if (d->font_texture) {
         SDL_Rect src = {
