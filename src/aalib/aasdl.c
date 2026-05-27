@@ -57,7 +57,22 @@ static void SDL_render_char(struct sdldriverdata *d, unsigned char ch, int x, in
         SDL_RenderFillRect(d->renderer, &dst);
     }
 
-    /* Draw character using font bitmap directly - pixel by pixel */
+    if (d->font_texture) {
+        SDL_Rect src = {
+            (ch % 16) * d->char_width,
+            (ch / 16) * d->char_height,
+            d->char_width,
+            d->char_height
+        };
+        SDL_SetTextureColorMod(d->font_texture,
+            (fg_color >> 16) & 0xFF,
+            (fg_color >> 8) & 0xFF,
+            fg_color & 0xFF);
+        SDL_RenderCopy(d->renderer, d->font_texture, &src, &dst);
+        return;
+    }
+
+    /* Fallback path: draw character using font bitmap directly - pixel by pixel */
     if (d->font && d->font->data && ch < 256) {
         const unsigned char *font_data = d->font->data;
         int font_height = d->font->height < d->char_height ? d->font->height : d->char_height;
@@ -232,8 +247,7 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
         return 0;
     }
     
-    /* Font texture not needed - we render directly */
-    d->font_texture = NULL;
+    SDL_create_font_texture(d);
     
     d->black_color = 0x000000;
     d->dim_color = 0x686868;
@@ -242,7 +256,7 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     d->special_color = 0x0000FF;
     
     d->inverted = 0;
-    d->cvisible = 1;
+    d->cvisible = 0;
     d->Xpos = 0;
     d->Ypos = 0;
     
@@ -400,13 +414,10 @@ static void SDL_flush(aa_context *c)
             fprintf(stderr, "SDL_flush: Failed to allocate buffers\n");
             return;
         }
-        memset(d->previoust, ' ', bufsize);
-        memset(d->previousa, 0, bufsize);
+        memset(d->previoust, 0xFF, bufsize);
+        memset(d->previousa, 0xFF, bufsize);
     }
-    
-    SDL_SetRenderDrawColor(d->renderer, 0, 0, 0, 255);
-    SDL_RenderClear(d->renderer);
-    
+
     for (int y = 0; y < scrheight && y < d->height; y++) {
         for (int x = 0; x < scrwidth && x < d->width; x++) {
             pos = x + y * scrwidth;
@@ -438,10 +449,11 @@ static void SDL_flush(aa_context *c)
                 }
             }
             
-            SDL_render_char(d, ch, x, y, fg_color, bg_color);
-            
-            d->previoust[pos] = ch;
-            d->previousa[pos] = attr;
+            if (ch != d->previoust[pos] || attr != d->previousa[pos]) {
+                SDL_render_char(d, ch, x, y, fg_color, bg_color);
+                d->previoust[pos] = ch;
+                d->previousa[pos] = attr;
+            }
         }
     }
     
