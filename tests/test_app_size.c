@@ -23,13 +23,13 @@ static int test_pixel_size_plan(void) {
     hasciicam_size_metrics_init(&m);
     cfg.mode = LIVE;
     cfg.size_intent = HASCIICAM_SIZE_PIXELS;
-    cfg.size_w = 640;
-    cfg.size_h = 480;
+    cfg.size_w = 1920;
+    cfg.size_h = 1200;
     hasciicam_size_build_plan(&cfg, &m, &plan);
-    return plan.requested_capture_width == 640 &&
-           plan.requested_capture_height == 480 &&
-           plan.preferred_ascii_width == 160 &&
-           plan.preferred_ascii_height == 60;
+    return plan.requested_capture_width == 960 &&
+           plan.requested_capture_height == 600 &&
+           plan.preferred_ascii_width == 240 &&
+           plan.preferred_ascii_height == 75;
 }
 
 static int test_char_size_plan(void) {
