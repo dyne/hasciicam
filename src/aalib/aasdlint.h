@@ -22,6 +22,7 @@ struct sdldriverdata {
     int current_attr;
     int inverted;
     int cvisible;
+    int fullscreen;
     int Xpos;
     int Ypos;
     
