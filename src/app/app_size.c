@@ -10,10 +10,22 @@ void hasciicam_size_metrics_init(hasciicam_size_metrics *metrics) {
      */
     metrics->capture_pixels_per_char_x = 4;
     metrics->capture_pixels_per_char_y = 8;
+    /*
+     * Current SDL presentation path uses 8x16 pixel character cells.
+     * When additional live fonts are introduced, update this mapping.
+     */
+    metrics->display_pixels_per_char_x = 8;
+    metrics->display_pixels_per_char_y = 16;
 }
 
 static int positive_or_zero(int value) {
     return value > 0 ? value : 0;
+}
+
+static int div_round_nearest(int num, int den) {
+    if (den <= 0)
+        return 0;
+    return (num + (den / 2)) / den;
 }
 
 void hasciicam_size_build_plan(const hasciicam_config *cfg,
@@ -31,12 +43,23 @@ void hasciicam_size_build_plan(const hasciicam_config *cfg,
         return;
 
     if (cfg->size_intent == HASCIICAM_SIZE_PIXELS) {
-        plan->requested_capture_width = cfg->size_w;
-        plan->requested_capture_height = cfg->size_h;
-        plan->preferred_ascii_width =
-            positive_or_zero(cfg->size_w / metrics->capture_pixels_per_char_x);
-        plan->preferred_ascii_height =
-            positive_or_zero(cfg->size_h / metrics->capture_pixels_per_char_y);
+        /*
+         * Pixel intent targets final output pixel size.
+         * Convert to an ascii grid using display cell metrics, then derive
+         * required capture target from capture-per-char metrics.
+         */
+        plan->preferred_ascii_width = positive_or_zero(
+            div_round_nearest(cfg->size_w, metrics->display_pixels_per_char_x));
+        plan->preferred_ascii_height = positive_or_zero(
+            div_round_nearest(cfg->size_h, metrics->display_pixels_per_char_y));
+        if (plan->preferred_ascii_width < 1)
+            plan->preferred_ascii_width = 1;
+        if (plan->preferred_ascii_height < 1)
+            plan->preferred_ascii_height = 1;
+        plan->requested_capture_width =
+            plan->preferred_ascii_width * metrics->capture_pixels_per_char_x;
+        plan->requested_capture_height =
+            plan->preferred_ascii_height * metrics->capture_pixels_per_char_y;
     } else if (cfg->size_intent == HASCIICAM_SIZE_CHARS) {
         plan->preferred_ascii_width = cfg->size_w;
         plan->preferred_ascii_height = cfg->size_h;
