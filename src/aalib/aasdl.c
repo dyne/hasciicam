@@ -12,6 +12,10 @@
 __AA_CONST struct aa_driver SDL_d;
 extern int quiet;
 
+#ifndef HASCIICAM_APP_TITLE
+#define HASCIICAM_APP_TITLE "hasciicam"
+#endif
+
 static void SDL_flush(aa_context *c);
 static void SDL_process_events(void);
 
@@ -206,7 +210,7 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     int win_width = d->width * d->char_width;
     int win_height = d->height * d->char_height;
     
-    d->window = SDL_CreateWindow("AA-lib SDL",
+    d->window = SDL_CreateWindow(HASCIICAM_APP_TITLE,
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
         win_width, win_height,
         SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
