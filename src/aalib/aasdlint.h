@@ -12,6 +12,9 @@ struct sdldriverdata {
     int height;
     int char_width;
     int char_height;
+    int x_offset_px;
+    int y_offset_px;
+    int force_clear;
     
     int black_color;
     int dim_color;
