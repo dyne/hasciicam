@@ -214,6 +214,11 @@ main (int argc, char **argv) {
       fprintf(stderr, "Capture target: %dx%d\n",
               cap_req.requested_width, cap_req.requested_height);
     }
+    if (appcfg.size_intent == HASCIICAM_SIZE_PIXELS) {
+      fprintf(stderr, "Window pixel target: %dx%d\n", appcfg.size_w, appcfg.size_h);
+      fprintf(stderr, "Ascii grid target: %dx%d\n",
+              size_plan.preferred_ascii_width, size_plan.preferred_ascii_height);
+    }
     fprintf(stderr, "Capture negotiated: %dx%d\n", vw, vh);
     fprintf(stderr, "Ascii result: %dx%d\n", aw, ah);
   }

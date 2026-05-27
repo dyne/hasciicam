@@ -6,6 +6,8 @@
 typedef struct hasciicam_size_metrics {
     int capture_pixels_per_char_x;
     int capture_pixels_per_char_y;
+    int display_pixels_per_char_x;
+    int display_pixels_per_char_y;
 } hasciicam_size_metrics;
 
 typedef struct hasciicam_size_plan {
