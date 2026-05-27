@@ -17,9 +17,21 @@ extern int quiet;
 #endif
 
 static void SDL_flush(aa_context *c);
-static void SDL_process_events(void);
+static void SDL_process_events(struct sdldriverdata *d);
+static void SDL_set_fullscreen(struct sdldriverdata *d, int enable);
 
-static void SDL_process_events(void)
+static void SDL_set_fullscreen(struct sdldriverdata *d, int enable)
+{
+    Uint32 mode;
+    if (d == NULL || d->window == NULL)
+        return;
+    mode = enable ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
+    if (SDL_SetWindowFullscreen(d->window, mode) == 0) {
+        d->fullscreen = enable ? 1 : 0;
+    }
+}
+
+static void SDL_process_events(struct sdldriverdata *d)
 {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -31,6 +43,17 @@ static void SDL_process_events(void)
             event.window.event == SDL_WINDOWEVENT_CLOSE) {
             raise(SIGINT);
             return;
+        }
+        if (event.type == SDL_KEYDOWN && d != NULL) {
+            SDL_Keycode sym = event.key.keysym.sym;
+            if (sym == SDLK_f) {
+                SDL_set_fullscreen(d, d->fullscreen ? 0 : 1);
+                continue;
+            }
+            if (sym == SDLK_ESCAPE && d->fullscreen) {
+                SDL_set_fullscreen(d, 0);
+                continue;
+            }
         }
     }
 }
@@ -259,6 +282,7 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     
     d->inverted = 0;
     d->cvisible = 0;
+    d->fullscreen = 0;
     d->Xpos = 0;
     d->Ypos = 0;
     
@@ -402,7 +426,7 @@ static void SDL_flush(aa_context *c)
     struct sdldriverdata *d = c->driverdata;
     int pos;
 
-    SDL_process_events();
+    SDL_process_events(d);
 
     int scrwidth = aa_scrwidth(c);
     int scrheight = aa_scrheight(c);
