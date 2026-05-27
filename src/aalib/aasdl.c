@@ -10,6 +10,7 @@
 #include "aasdlint.h"
 
 __AA_CONST struct aa_driver SDL_d;
+extern int quiet;
 
 static void SDL_flush(aa_context *c);
 static void SDL_process_events(void);
@@ -213,6 +214,14 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     /* Update dest params to match actual size */
     dest->width = d->width;
     dest->height = d->height;
+
+    if (!quiet) {
+        fprintf(stderr,
+                "SDL window size: %dx%d px (cell %dx%d px, grid %dx%d chars)\n",
+                actual_width, actual_height,
+                d->char_width, d->char_height,
+                d->width, d->height);
+    }
     
     d->renderer = SDL_CreateRenderer(d->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!d->renderer) {
