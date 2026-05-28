@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.12)
 project(hasciicam VERSION 2.0 LANGUAGES C CXX)
 
+if(APPLE)
+  enable_language(OBJCXX)
+endif()
+
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -14,7 +18,11 @@ set(HASCIICAM_TEST_CAMERA_DEVICE "" CACHE STRING "Camera device selector for opt
 option(HASCIICAM_ENABLE_SDL "Enable SDL output driver" ON)
 option(HASCIICAM_ENABLE_X11 "Enable X11 output driver" ON)
 option(HASCIICAM_ENABLE_CURSES "Enable curses output driver" ON)
-option(HASCIICAM_ENABLE_CAPTURE_V4L2 "Enable V4L2 capture backend" ON)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  option(HASCIICAM_ENABLE_CAPTURE_V4L2 "Enable V4L2 capture backend" ON)
+else()
+  option(HASCIICAM_ENABLE_CAPTURE_V4L2 "Enable V4L2 capture backend" OFF)
+endif()
 if(WIN32)
   option(HASCIICAM_ENABLE_CAPTURE_MF "Enable Media Foundation capture backend" ON)
   option(HASCIICAM_ENABLE_CAPTURE_DSHOW "Enable DirectShow capture backend fallback" ON)

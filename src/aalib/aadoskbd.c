@@ -4,7 +4,6 @@
 #include <go32.h>
 #include <dpmi.h>
 #include <sys/nearptr.h>
-#include <malloc.h>
 #include <stdlib.h>
 #include <dos.h>
 #include <dpmi.h>

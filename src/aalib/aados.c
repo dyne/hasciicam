@@ -5,7 +5,7 @@
 #include <go32.h>
 #include <dpmi.h>
 #include <sys/nearptr.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include "aalib.h"
 #include "aaint.h"
 int __use_nearptr_hack;
