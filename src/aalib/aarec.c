@@ -1,5 +1,5 @@
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include "aalib.h"
 #include "aaint.h"
 aa_linkedlist *aa_kbdrecommended = NULL, *aa_mouserecommended = NULL,
