@@ -5,8 +5,11 @@
 #import <AVFoundation/AVFoundation.h>
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
+#import <dispatch/dispatch.h>
 #import <Foundation/Foundation.h>
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <vector>
 #include <mutex>
