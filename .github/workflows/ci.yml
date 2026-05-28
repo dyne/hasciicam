@@ -2,15 +2,37 @@ name: ci
 
 on:
   push:
+    branches:
+      - master
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   build-and-test:
+    name: ${{ matrix.name }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            package: linux
+            exe_suffix: ""
+            allow_failure: false
+          - name: macOS
+            os: macos-latest
+            package: mac
+            exe_suffix: ""
+            allow_failure: true
+          - name: Windows
+            os: windows-latest
+            package: win
+            exe_suffix: ".exe"
+            allow_failure: false
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.allow_failure }}
     steps:
       - uses: actions/checkout@v4
 
@@ -18,10 +40,78 @@ jobs:
         uses: seanmiddleditch/gha-setup-ninja@v5
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DHASCIICAM_ENABLE_TESTS=ON -DHASCIICAM_ENABLE_SDL=OFF -DHASCIICAM_ENABLE_VISUAL_TESTS=OFF -DHASCIICAM_ENABLE_CAMERA_TESTS=OFF
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DHASCIICAM_ENABLE_TESTS=ON
+          -DHASCIICAM_ENABLE_SDL=OFF
+          -DHASCIICAM_ENABLE_X11=OFF
+          -DHASCIICAM_ENABLE_CURSES=OFF
+          -DHASCIICAM_ENABLE_VISUAL_TESTS=OFF
+          -DHASCIICAM_ENABLE_CAMERA_TESTS=OFF
 
       - name: Build
         run: cmake --build build
 
       - name: Test
         run: ctest --output-on-failure --test-dir build
+
+      - name: Package release zip
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="dist/hasciicam-${{ matrix.package }}"
+          mkdir -p "${package_dir}/bin" "${package_dir}/share/man/man1"
+          cp "build/hasciicam${{ matrix.exe_suffix }}" "${package_dir}/bin/"
+          cp doc/hasciicam.1 "${package_dir}/share/man/man1/"
+          cp README.md "${package_dir}/"
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            find build -maxdepth 1 -name '*.dll' -exec cp '{}' "${package_dir}/bin/" ';'
+          fi
+          cmake -E tar cf "hasciicam-${{ matrix.package }}.zip" --format=zip "${package_dir}"
+
+      - name: Upload release zip
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: hasciicam-${{ matrix.package }}
+          path: hasciicam-${{ matrix.package }}.zip
+          if-no-files-found: error
+
+  release:
+    name: Release
+    needs: build-and-test
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.build-and-test.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release zips
+        uses: actions/download-artifact@v4
+        with:
+          pattern: hasciicam-*
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          artifacts=(release-artifacts/*.zip)
+          if [ ${#artifacts[@]} -eq 0 ]; then
+            echo "No release artifacts were produced."
+            exit 1
+          fi
+          version="$(sed -n 's/^project(hasciicam VERSION \([^ )]*\).*/\1/p' CMakeLists.txt | head -n 1)"
+          short_sha="${GITHUB_SHA:0:7}"
+          tag="v${version}-${short_sha}"
+          gh release create "${tag}" "${artifacts[@]}" \
+            --target "${GITHUB_SHA}" \
+            --title "HasciiCam ${version} (${short_sha})" \
+            --notes "Automated release for ${GITHUB_SHA}."
