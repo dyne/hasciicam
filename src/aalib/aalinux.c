@@ -1,7 +1,7 @@
 // #include "config.h"
 #ifdef LINUX_DRIVER
 #include <sys/stat.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <linux/kd.h>
 #ifdef GPM_MOUSEDRIVER
@@ -11,7 +11,6 @@
 #include <fcntl.h>
 #include <setjmp.h>
 #include <signal.h>
-#include <stdlib.h>
 #include <stdio.h>
 #include "aalib.h"
 #include "aaint.h"

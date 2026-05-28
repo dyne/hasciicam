@@ -1,6 +1,6 @@
 #include <string.h>
 #include <ctype.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include "aalib.h"
 #include "aaint.h"
 static void aa_editdisplay(struct aa_edit *e)
