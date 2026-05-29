@@ -373,9 +373,7 @@ main (int argc, char **argv) {
 //    aa_render (ascii_context, ascii_rndparms, 0, 0,
 //	       vid_geo.w,vid_geo.h);
 
-    if (mode == LIVE) {
-      hasciicam_output_poll(&output);
-    } else if (mode == HTML && frame_rendered) {
+    if (mode == HTML && frame_rendered) {
       hasciicam_output_file_publish_html(aatmpfile, aafile);
     }
     if (frame_rendered) {
