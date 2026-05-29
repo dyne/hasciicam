@@ -136,6 +136,8 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     cfg->uid = -1;
     cfg->gid = -1;
     cfg->max_frames = 0;
+    cfg->explicit_size = 0;
+    cfg->explicit_aadriver = 0;
 }
 
 void hasciicam_config_parse(hasciicam_config *cfg,
@@ -210,6 +212,7 @@ void hasciicam_config_parse(hasciicam_config *cfg,
                 exit(1);
             }
             short_size_set = 1;
+            cfg->explicit_size = 1;
             break;
         case 1001:
             if (!parse_wxh(optarg, &cfg->size_w, &cfg->size_h)) {
@@ -217,6 +220,7 @@ void hasciicam_config_parse(hasciicam_config *cfg,
                 exit(1);
             }
             cfg->size_intent = HASCIICAM_SIZE_PIXELS;
+            cfg->explicit_size = 1;
             break;
         case 1002:
             if (!parse_wxh(optarg, &cfg->size_w, &cfg->size_h)) {
@@ -224,6 +228,7 @@ void hasciicam_config_parse(hasciicam_config *cfg,
                 exit(1);
             }
             cfg->size_intent = HASCIICAM_SIZE_CHARS;
+            cfg->explicit_size = 1;
             break;
         case 'S':
             cfg->fontsize = atoi(optarg);
@@ -251,6 +256,7 @@ void hasciicam_config_parse(hasciicam_config *cfg,
         case 'O':
             strncpy(cfg->aadriver, optarg, sizeof(cfg->aadriver) - 1);
             cfg->aadriver[sizeof(cfg->aadriver) - 1] = '\0';
+            cfg->explicit_aadriver = 1;
             break;
         case 'D':
             cfg->daemon_mode = 1;

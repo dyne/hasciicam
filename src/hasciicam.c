@@ -48,6 +48,7 @@
 #include "app/app_size.h"
 #include "app/app_session.h"
 #include "capture/capture_backend.h"
+#include "display/display_size.h"
 #include "output/output.h"
 #include "output/output_file.h"
 #include "render/render_session.h"
@@ -111,6 +112,9 @@ main (int argc, char **argv) {
   int gid;
   int max_frames;
   int rendered_frames = 0;
+  int detected_screen_w = 0;
+  int detected_screen_h = 0;
+  int auto_live_size_applied = 0;
   char *device;
   char *aafile;
   char *background;
@@ -174,6 +178,21 @@ main (int argc, char **argv) {
   hasciicam_size_metrics_init(&size_metrics);
   hasciicam_size_build_plan(&appcfg, &size_metrics, &size_plan);
 
+  if (mode == LIVE && !appcfg.explicit_size && !appcfg.explicit_aadriver) {
+    if (!appcfg.explicit_aadriver && appcfg.aadriver[0] == '\0') {
+      strncpy(appcfg.aadriver, "SDL", sizeof(appcfg.aadriver) - 1);
+      appcfg.aadriver[sizeof(appcfg.aadriver) - 1] = '\0';
+      aadriver = appcfg.aadriver;
+    }
+    if (hasciicam_display_size_detect_primary(&detected_screen_w, &detected_screen_h)) {
+      hasciicam_size_build_default_live_plan(&size_metrics,
+                                             detected_screen_w,
+                                             detected_screen_h,
+                                             &size_plan);
+      auto_live_size_applied = 1;
+    }
+  }
+
   memset(&cap_req, 0, sizeof(cap_req));
   cap_req.device = device;
   cap_req.input_channel = inputch;
@@ -219,6 +238,13 @@ main (int argc, char **argv) {
       fprintf(stderr, "Ascii grid target: %dx%d\n",
               size_plan.preferred_ascii_width, size_plan.preferred_ascii_height);
     }
+    fprintf(stderr, "Capture negotiated: %dx%d\n", vw, vh);
+    fprintf(stderr, "Ascii result: %dx%d\n", aw, ah);
+  } else if (!quiet && auto_live_size_applied) {
+    fprintf(stderr, "Auto live sizing from primary display: %dx%d\n",
+            detected_screen_w, detected_screen_h);
+    fprintf(stderr, "Capture target: %dx%d\n",
+            size_plan.requested_capture_width, size_plan.requested_capture_height);
     fprintf(stderr, "Capture negotiated: %dx%d\n", vw, vh);
     fprintf(stderr, "Ascii result: %dx%d\n", aw, ah);
   }

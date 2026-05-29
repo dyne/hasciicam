@@ -21,6 +21,10 @@ void hasciicam_size_metrics_init(hasciicam_size_metrics *metrics);
 void hasciicam_size_build_plan(const hasciicam_config *cfg,
                                const hasciicam_size_metrics *metrics,
                                hasciicam_size_plan *plan);
+void hasciicam_size_build_default_live_plan(const hasciicam_size_metrics *metrics,
+                                            int screen_width,
+                                            int screen_height,
+                                            hasciicam_size_plan *plan);
 void hasciicam_size_compute_ascii_from_capture(const hasciicam_size_metrics *metrics,
                                                int capture_width,
                                                int capture_height,

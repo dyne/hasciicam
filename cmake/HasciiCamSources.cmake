@@ -53,6 +53,7 @@ set(HASCIICAM_APP_SOURCES
     src/app/app_config.c
     src/app/app_size.c
     src/app/app_session.c
+    src/display/display_size.c
     src/public/hasciicam_api.c
 )
 

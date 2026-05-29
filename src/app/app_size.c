@@ -28,6 +28,10 @@ static int div_round_nearest(int num, int den) {
     return (num + (den / 2)) / den;
 }
 
+static int clamp_min(int value, int minimum) {
+    return value < minimum ? minimum : value;
+}
+
 void hasciicam_size_build_plan(const hasciicam_config *cfg,
                                const hasciicam_size_metrics *metrics,
                                hasciicam_size_plan *plan) {
@@ -66,6 +70,52 @@ void hasciicam_size_build_plan(const hasciicam_config *cfg,
         plan->requested_capture_width = cfg->size_w * metrics->capture_pixels_per_char_x;
         plan->requested_capture_height = cfg->size_h * metrics->capture_pixels_per_char_y;
     }
+}
+
+void hasciicam_size_build_default_live_plan(const hasciicam_size_metrics *metrics,
+                                            int screen_width,
+                                            int screen_height,
+                                            hasciicam_size_plan *plan) {
+    int target_pixels_w;
+    int target_pixels_h;
+    int ascii_w;
+    int ascii_h;
+
+    if (metrics == 0 || plan == 0)
+        return;
+
+    plan->requested_capture_width = 0;
+    plan->requested_capture_height = 0;
+    plan->preferred_ascii_width = 0;
+    plan->preferred_ascii_height = 0;
+
+    if (screen_width <= 0 || screen_height <= 0)
+        return;
+
+    target_pixels_w = (screen_width * 9) / 10;
+    target_pixels_h = (screen_height * 9) / 10;
+
+    if (screen_width >= 640)
+        target_pixels_w = clamp_min(target_pixels_w, 640);
+    if (screen_height >= 480)
+        target_pixels_h = clamp_min(target_pixels_h, 480);
+
+    if (target_pixels_w > screen_width)
+        target_pixels_w = screen_width;
+    if (target_pixels_h > screen_height)
+        target_pixels_h = screen_height;
+
+    ascii_w = target_pixels_w / metrics->display_pixels_per_char_x;
+    ascii_h = target_pixels_h / metrics->display_pixels_per_char_y;
+    if (ascii_w < 1)
+        ascii_w = 1;
+    if (ascii_h < 1)
+        ascii_h = 1;
+
+    plan->preferred_ascii_width = ascii_w;
+    plan->preferred_ascii_height = ascii_h;
+    plan->requested_capture_width = ascii_w * metrics->capture_pixels_per_char_x;
+    plan->requested_capture_height = ascii_h * metrics->capture_pixels_per_char_y;
 }
 
 void hasciicam_size_compute_ascii_from_capture(const hasciicam_size_metrics *metrics,
