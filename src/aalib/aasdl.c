@@ -232,6 +232,16 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     
     int win_width = d->width * d->char_width;
     int win_height = d->height * d->char_height;
+    SDL_Rect usable_bounds;
+
+    /* Keep initial window inside primary usable display bounds. */
+    if (SDL_GetDisplayUsableBounds(0, &usable_bounds) == 0 &&
+        usable_bounds.w > 0 && usable_bounds.h > 0) {
+        if (win_width > usable_bounds.w)
+            win_width = usable_bounds.w;
+        if (win_height > usable_bounds.h)
+            win_height = usable_bounds.h;
+    }
     
     d->window = SDL_CreateWindow(HASCIICAM_APP_TITLE,
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
