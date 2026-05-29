@@ -63,6 +63,110 @@ static void SDL_log_renderer_info(SDL_Renderer *renderer, Uint32 requested_flags
     }
 }
 
+static void SDL_destroy_stream_texture(struct sdldriverdata *d)
+{
+    if (d == NULL)
+        return;
+    if (d->stream_texture != NULL) {
+        SDL_DestroyTexture(d->stream_texture);
+        d->stream_texture = NULL;
+    }
+    if (d->stream_pixels != NULL) {
+        free(d->stream_pixels);
+        d->stream_pixels = NULL;
+    }
+    d->stream_width = 0;
+    d->stream_height = 0;
+}
+
+static int SDL_ensure_stream_texture(struct sdldriverdata *d, int width, int height)
+{
+    size_t pixel_count;
+
+    if (d == NULL || d->renderer == NULL || width <= 0 || height <= 0)
+        return 0;
+    if (d->stream_texture != NULL &&
+        d->stream_pixels != NULL &&
+        d->stream_width == width &&
+        d->stream_height == height) {
+        return 1;
+    }
+
+    SDL_destroy_stream_texture(d);
+
+    d->stream_texture = SDL_CreateTexture(d->renderer,
+                                          SDL_PIXELFORMAT_ARGB8888,
+                                          SDL_TEXTUREACCESS_STREAMING,
+                                          width,
+                                          height);
+    if (d->stream_texture == NULL) {
+        fprintf(stderr, "SDL_CreateTexture(streaming) failed: %s\n", SDL_GetError());
+        return 0;
+    }
+
+    pixel_count = (size_t)width * (size_t)height;
+    d->stream_pixels = calloc(pixel_count, sizeof(*d->stream_pixels));
+    if (d->stream_pixels == NULL) {
+        fprintf(stderr, "SDL_flush: Failed to allocate streaming pixels\n");
+        SDL_destroy_stream_texture(d);
+        return 0;
+    }
+
+    d->stream_width = width;
+    d->stream_height = height;
+    d->force_clear = 1;
+    return 1;
+}
+
+static Uint32 SDL_map_rgb(struct sdldriverdata *d, int color)
+{
+    return SDL_MapRGB(d->stream_format,
+                      (color >> 16) & 0xFF,
+                      (color >> 8) & 0xFF,
+                      color & 0xFF);
+}
+
+static void SDL_stream_draw_char(struct sdldriverdata *d,
+                                 unsigned char ch,
+                                 int cell_x,
+                                 int cell_y,
+                                 int fg_color,
+                                 int bg_color)
+{
+    int px;
+    int py;
+    int left;
+    int top;
+    int font_height;
+    Uint32 fg;
+    Uint32 bg;
+
+    if (d == NULL || d->stream_pixels == NULL || d->font == NULL || d->font->data == NULL)
+        return;
+
+    left = cell_x * d->char_width;
+    top = cell_y * d->char_height;
+    fg = SDL_map_rgb(d, fg_color);
+    bg = SDL_map_rgb(d, bg_color);
+
+    for (py = 0; py < d->char_height; py++) {
+        Uint32 *row = d->stream_pixels + ((top + py) * d->stream_width) + left;
+        for (px = 0; px < d->char_width; px++)
+            row[px] = bg;
+    }
+
+    font_height = d->font->height < d->char_height ? d->font->height : d->char_height;
+    for (py = 0; py < font_height; py++) {
+        int index = ch * d->font->height + py;
+        unsigned char byte = d->font->data[index];
+        Uint32 *row = d->stream_pixels + ((top + py) * d->stream_width) + left;
+        for (px = 0; px < 8 && px < d->char_width; px++) {
+            if (byte & (0x80 >> px))
+                row[px] = fg;
+        }
+    }
+}
+
 static void SDL_set_fullscreen(struct sdldriverdata *d, int enable)
 {
     Uint32 mode;
@@ -303,6 +407,10 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     SDL_GetWindowSize(d->window, &actual_width, &actual_height);
     d->width = actual_width / d->char_width;
     d->height = actual_height / d->char_height;
+    if (d->width < 1)
+        d->width = 1;
+    if (d->height < 1)
+        d->height = 1;
     
     /* Update dest params to match actual size */
     dest->width = d->width;
@@ -326,6 +434,16 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
         return 0;
     }
     SDL_log_renderer_info(d->renderer, renderer_flags);
+
+    d->stream_format = SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888);
+    if (d->stream_format == NULL) {
+        fprintf(stderr, "SDL_AllocFormat failed: %s\n", SDL_GetError());
+        SDL_DestroyRenderer(d->renderer);
+        SDL_DestroyWindow(d->window);
+        free(d);
+        SDL_Quit();
+        return 0;
+    }
     
     SDL_create_font_texture(d);
     
@@ -375,6 +493,11 @@ static void SDL_uninit(aa_context *c)
     if (d->font_texture) {
         SDL_DestroyTexture(d->font_texture);
         d->font_texture = NULL;
+    }
+    SDL_destroy_stream_texture(d);
+    if (d->stream_format) {
+        SDL_FreeFormat(d->stream_format);
+        d->stream_format = NULL;
     }
     if (d->renderer) {
         SDL_DestroyRenderer(d->renderer);
@@ -434,7 +557,7 @@ static void SDL_setattr(aa_context *c, int attr)
 static void SDL_print(aa_context *c, __AA_CONST char *text)
 {
     struct sdldriverdata *d = c->driverdata;
-    int len = strlen(text);
+    int len = (int)strlen(text);
     
     for (int i = 0; i < len; i++) {
         if (d->Xpos >= d->width) {
@@ -443,32 +566,6 @@ static void SDL_print(aa_context *c, __AA_CONST char *text)
             if (d->Ypos >= d->height)
                 d->Ypos = 0;
         }
-        
-        int fg_color, bg_color;
-        
-        if (d->inverted) {
-            bg_color = d->bold_color;
-            switch (d->current_attr) {
-                case AA_DIM:      fg_color = d->dim_color; break;
-                case AA_BOLD:     
-                case AA_BOLDFONT: fg_color = d->black_color; break;
-                case AA_REVERSE:  fg_color = d->bold_color; bg_color = d->black_color; break;
-                case AA_SPECIAL:  fg_color = d->special_color; break;
-                default:          fg_color = d->normal_color; break;
-            }
-        } else {
-            bg_color = d->black_color;
-            switch (d->current_attr) {
-                case AA_DIM:      fg_color = d->dim_color; break;
-                case AA_BOLD:     
-                case AA_BOLDFONT: fg_color = d->bold_color; break;
-                case AA_REVERSE:  fg_color = d->black_color; bg_color = d->normal_color; break;
-                case AA_SPECIAL:  fg_color = d->special_color; break;
-                default:          fg_color = d->normal_color; break;
-            }
-        }
-        
-        SDL_render_char(d, (unsigned char)text[i], d->Xpos, d->Ypos, fg_color, bg_color);
         d->Xpos++;
     }
 }
@@ -528,6 +625,10 @@ static void SDL_flush(aa_context *c)
         d->previousa = malloc(bufsize);
         if (!d->previoust || !d->previousa) {
             fprintf(stderr, "SDL_flush: Failed to allocate buffers\n");
+            free(d->previoust);
+            free(d->previousa);
+            d->previoust = NULL;
+            d->previousa = NULL;
             return;
         }
         memset(d->previoust, 0xFF, bufsize);
@@ -535,10 +636,12 @@ static void SDL_flush(aa_context *c)
         d->force_clear = 1;
     }
 
+    if (!SDL_ensure_stream_texture(d, content_px_w, content_px_h))
+        return;
+
     if (d->force_clear) {
-        SDL_SetRenderDrawColor(d->renderer, 0, 0, 0, 255);
-        SDL_RenderClear(d->renderer);
-        d->force_clear = 0;
+        memset(d->previoust, 0xFF, bufsize);
+        memset(d->previousa, 0xFF, bufsize);
     }
 
     for (int y = 0; y < draw_h_chars; y++) {
@@ -573,25 +676,44 @@ static void SDL_flush(aa_context *c)
             }
             
             if (ch != d->previoust[pos] || attr != d->previousa[pos]) {
-                SDL_render_char(d, ch, x, y, fg_color, bg_color);
+                SDL_stream_draw_char(d, ch, x, y, fg_color, bg_color);
                 d->previoust[pos] = ch;
                 d->previousa[pos] = attr;
             }
         }
     }
-    
+
+    if (SDL_UpdateTexture(d->stream_texture,
+                          NULL,
+                          d->stream_pixels,
+                          d->stream_width * (int)sizeof(*d->stream_pixels)) != 0) {
+        fprintf(stderr, "SDL_UpdateTexture failed: %s\n", SDL_GetError());
+        return;
+    }
+
+    SDL_SetRenderDrawColor(d->renderer, 0, 0, 0, 255);
+    SDL_RenderClear(d->renderer);
+    {
+        SDL_Rect dst = {
+            d->x_offset_px,
+            d->y_offset_px,
+            content_px_w,
+            content_px_h
+        };
+        SDL_RenderCopy(d->renderer, d->stream_texture, NULL, &dst);
+    }
     if (d->cvisible) {
         SDL_SetRenderDrawColor(d->renderer, 255, 255, 255, 255);
         SDL_Rect cursor_rect = {
-            d->Xpos * d->char_width,
-            (d->Ypos + 1) * d->char_height - 2,
+            d->x_offset_px + (d->Xpos * d->char_width),
+            d->y_offset_px + ((d->Ypos + 1) * d->char_height) - 2,
             d->char_width,
             2
         };
         SDL_RenderFillRect(d->renderer, &cursor_rect);
     }
-    
     SDL_RenderPresent(d->renderer);
+    d->force_clear = 0;
 }
 
 static void SDL_cursor(aa_context *c, int mode)
@@ -606,7 +728,7 @@ __AA_CONST struct aa_driver SDL_d = {
     SDL_uninit,
     SDL_getsize,
     SDL_setattr,
-    SDL_print,
+    NULL,
     SDL_gotoxy,
     SDL_flush,
     SDL_cursor
