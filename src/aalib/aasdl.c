@@ -47,6 +47,15 @@ static Uint32 SDL_renderer_flags_from_env(void)
     return flags;
 }
 
+static int SDL_fullscreen_from_env(void)
+{
+    const char *fullscreen = getenv("HASCIICAM_SDL_FULLSCREEN");
+    return SDL_env_is(fullscreen, "1") ||
+           SDL_env_is(fullscreen, "on") ||
+           SDL_env_is(fullscreen, "true") ||
+           SDL_env_is(fullscreen, "yes");
+}
+
 static void SDL_log_renderer_info(SDL_Renderer *renderer, Uint32 requested_flags)
 {
     SDL_RendererInfo info;
@@ -401,6 +410,9 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
         SDL_Quit();
         return 0;
     }
+
+    if (SDL_fullscreen_from_env())
+        SDL_set_fullscreen(d, 1);
     
     /* Get actual window size (may differ due to DPI scaling/WM constraints) */
     int actual_width, actual_height;

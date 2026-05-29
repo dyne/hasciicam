@@ -99,6 +99,8 @@ static void apply_sdl_runtime_options(const hasciicam_config *cfg) {
     set_process_env("HASCIICAM_SDL_VSYNC", "on");
   else if (cfg->sdl_vsync == -1)
     set_process_env("HASCIICAM_SDL_VSYNC", "auto");
+  if (cfg->sdl_fullscreen)
+    set_process_env("HASCIICAM_SDL_FULLSCREEN", "1");
 }
 
 /* greyscale image is sampled from Y luminance component */

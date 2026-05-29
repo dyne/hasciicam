@@ -23,6 +23,7 @@ static const struct option long_options[] = {
     {"char-size", required_argument, NULL, 1002},
     {"sdl-renderer", required_argument, NULL, 1003},
     {"sdl-vsync", required_argument, NULL, 1004},
+    {"fullscreen", no_argument, NULL, 1005},
     {"help", no_argument, NULL, 'h'},
     {"aahelp", no_argument, NULL, 'H'},
     {"version", no_argument, NULL, 'v'},
@@ -67,6 +68,7 @@ static const char *help_text =
     " -O --aadriver     aalib driver: X11|curses|SDL|stdout - default auto\n"
     "    --sdl-renderer accelerated|software|auto - SDL renderer choice\n"
     "    --sdl-vsync    on|off|auto               - SDL presentation sync\n"
+    "    --fullscreen   start SDL live output fullscreen\n"
     " -D --daemon       run in background         - default foregrond\n"
     "    --frames N     stop after N rendered frames (test/smoke)\n"
     " -U --uid          setuid (int)              - default current\n"
@@ -177,6 +179,7 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     cfg->explicit_size = 0;
     cfg->explicit_aadriver = 0;
     cfg->sdl_vsync = -2;
+    cfg->sdl_fullscreen = 0;
 }
 
 void hasciicam_config_parse(hasciicam_config *cfg,
@@ -280,6 +283,9 @@ void hasciicam_config_parse(hasciicam_config *cfg,
                 fprintf(stderr, "!! invalid SDL vsync '%s', expected on, off, or auto\n", optarg);
                 exit(1);
             }
+            break;
+        case 1005:
+            cfg->sdl_fullscreen = 1;
             break;
         case 'S':
             cfg->fontsize = atoi(optarg);
