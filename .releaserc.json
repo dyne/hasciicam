@@ -1,0 +1,29 @@
+{
+  "branches": [
+    "master"
+  ],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "release-artifacts/hasciicam-linux.zip",
+            "label": "HasciiCam Linux"
+          },
+          {
+            "path": "release-artifacts/hasciicam-mac.zip",
+            "label": "HasciiCam macOS"
+          },
+          {
+            "path": "release-artifacts/hasciicam-win.zip",
+            "label": "HasciiCam Windows"
+          }
+        ]
+      }
+    ]
+  ]
+}
