@@ -60,6 +60,16 @@ Not allowed in \fBhtml\fP mode.
 Output character size expression \fBWxH\fP.
 Hasciicam derives a capture pixel target from this value.
 .B
+.IP "--sdl-renderer"
+Selects the SDL renderer backend for live SDL output:
+\fBaccelerated\fP, \fBsoftware\fP, or \fBauto\fP.
+Default is \fBaccelerated\fP.
+.B
+.IP "--sdl-vsync"
+Controls SDL presentation sync for live SDL output:
+\fBon\fP, \fBoff\fP, or \fBauto\fP.
+Default is \fBon\fP.
+.B
 .IP "-o --aafile"
 Defines the file where to save rendered ascii, overwrited every \fIrefresh\fP seconds. Default is \fBhasciicam.html\fP when in \fBhtml\fP mode, \fBhasciicam.txt\fP when in \fBtext\fP mode (useless when in \fBlive\fP mode).
 .B

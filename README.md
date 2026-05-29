@@ -107,6 +107,14 @@ When a camera does not support the exact requested pixel size, HasciiCam
 negotiates the closest available capture size and reports the final capture
 and ASCII dimensions at startup.
 
+SDL live output tuning:
+
+- `--sdl-renderer accelerated|software|auto`: choose the SDL renderer backend.
+- `--sdl-vsync on|off|auto`: control SDL presentation sync.
+
+These switches are useful when profiling Xorg/Mesa driver overhead. The default
+keeps the historical accelerated renderer with vsync.
+
 # BUILD FROM SOURCE
 
 If you want to compile hasciicam from its source code, you will need
