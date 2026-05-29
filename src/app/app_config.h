@@ -24,6 +24,7 @@ typedef struct hasciicam_config {
     hasciicam_size_intent size_intent;
     int explicit_size;
     int explicit_aadriver;
+    int sdl_vsync;
     int max_frames;
     int uid;
     int gid;
@@ -33,6 +34,7 @@ typedef struct hasciicam_config {
     char foreground[64];
     char fontface[256];
     char aadriver[64];
+    char sdl_renderer[32];
 } hasciicam_config;
 
 void hasciicam_config_init_defaults(hasciicam_config *cfg);

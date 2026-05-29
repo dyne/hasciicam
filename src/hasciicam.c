@@ -78,6 +78,29 @@ char aatmpfile[256];
 void quitproc (int Sig);
 volatile sig_atomic_t userbreak;
 
+static void set_process_env(const char *name, const char *value) {
+  if (name == NULL || value == NULL)
+    return;
+#if defined(_WIN32)
+  _putenv_s(name, value);
+#else
+  setenv(name, value, 1);
+#endif
+}
+
+static void apply_sdl_runtime_options(const hasciicam_config *cfg) {
+  if (cfg == NULL)
+    return;
+  if (cfg->sdl_renderer[0] != '\0')
+    set_process_env("HASCIICAM_SDL_RENDERER", cfg->sdl_renderer);
+  if (cfg->sdl_vsync == 0)
+    set_process_env("HASCIICAM_SDL_VSYNC", "off");
+  else if (cfg->sdl_vsync == 1)
+    set_process_env("HASCIICAM_SDL_VSYNC", "on");
+  else if (cfg->sdl_vsync == -1)
+    set_process_env("HASCIICAM_SDL_VSYNC", "auto");
+}
+
 /* greyscale image is sampled from Y luminance component */
 int YtoRGB[256];
 int xstep=2, ystep=4;
@@ -154,6 +177,7 @@ main (int argc, char **argv) {
 
   /* set hasciicam options */
   hasciicam_config_parse(&appcfg, argc, argv, aa_help, PACKAGE, VERSION);
+  apply_sdl_runtime_options(&appcfg);
   quiet = appcfg.quiet;
   mode = appcfg.mode;
   inputch = appcfg.input_channel;

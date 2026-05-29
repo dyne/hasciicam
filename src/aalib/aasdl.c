@@ -20,6 +20,49 @@ static void SDL_flush(aa_context *c);
 static void SDL_process_events(struct sdldriverdata *d);
 static void SDL_set_fullscreen(struct sdldriverdata *d, int enable);
 
+static int SDL_env_is(const char *value, const char *expected)
+{
+    return value != NULL && expected != NULL && SDL_strcasecmp(value, expected) == 0;
+}
+
+static Uint32 SDL_renderer_flags_from_env(void)
+{
+    const char *renderer = getenv("HASCIICAM_SDL_RENDERER");
+    const char *vsync = getenv("HASCIICAM_SDL_VSYNC");
+    Uint32 flags = SDL_RENDERER_ACCELERATED;
+
+    if (SDL_env_is(renderer, "software")) {
+        flags = SDL_RENDERER_SOFTWARE;
+    } else if (SDL_env_is(renderer, "auto")) {
+        flags = 0;
+    } else if (SDL_env_is(renderer, "accelerated")) {
+        flags = SDL_RENDERER_ACCELERATED;
+    }
+
+    if (vsync == NULL || SDL_env_is(vsync, "on") || SDL_env_is(vsync, "1") ||
+        SDL_env_is(vsync, "true") || SDL_env_is(vsync, "yes")) {
+        flags |= SDL_RENDERER_PRESENTVSYNC;
+    }
+
+    return flags;
+}
+
+static void SDL_log_renderer_info(SDL_Renderer *renderer, Uint32 requested_flags)
+{
+    SDL_RendererInfo info;
+    if (renderer == NULL || quiet)
+        return;
+    if (SDL_GetRendererInfo(renderer, &info) == 0) {
+        fprintf(stderr,
+                "SDL renderer: %s (requested:%s%s%s)\n",
+                info.name ? info.name : "unknown",
+                (requested_flags & SDL_RENDERER_SOFTWARE) ? " software" :
+                    ((requested_flags & SDL_RENDERER_ACCELERATED) ? " accelerated" : " auto"),
+                (requested_flags & SDL_RENDERER_PRESENTVSYNC) ? " vsync" : " no-vsync",
+                (info.flags & SDL_RENDERER_TARGETTEXTURE) ? " target-texture" : "");
+    }
+}
+
 static void SDL_set_fullscreen(struct sdldriverdata *d, int enable)
 {
     Uint32 mode;
@@ -273,7 +316,8 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
                 d->width, d->height);
     }
     
-    d->renderer = SDL_CreateRenderer(d->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    Uint32 renderer_flags = SDL_renderer_flags_from_env();
+    d->renderer = SDL_CreateRenderer(d->window, -1, renderer_flags);
     if (!d->renderer) {
         fprintf(stderr, "SDL renderer creation failed: %s\n", SDL_GetError());
         SDL_DestroyWindow(d->window);
@@ -281,6 +325,7 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
         SDL_Quit();
         return 0;
     }
+    SDL_log_renderer_info(d->renderer, renderer_flags);
     
     SDL_create_font_texture(d);
     

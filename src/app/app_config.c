@@ -21,6 +21,8 @@ static const struct option long_options[] = {
     {"frames", required_argument, NULL, 1000},
     {"pixel-size", required_argument, NULL, 1001},
     {"char-size", required_argument, NULL, 1002},
+    {"sdl-renderer", required_argument, NULL, 1003},
+    {"sdl-vsync", required_argument, NULL, 1004},
     {"help", no_argument, NULL, 'h'},
     {"aahelp", no_argument, NULL, 'H'},
     {"version", no_argument, NULL, 'v'},
@@ -63,6 +65,8 @@ static const char *help_text =
     "    --char-size    output char size WxH      - preferred ascii grid\n"
     " -o --aafile       dumped file               - default hasciicam.[txt|html]\n"
     " -O --aadriver     aalib driver: X11|curses|SDL|stdout - default auto\n"
+    "    --sdl-renderer accelerated|software|auto - SDL renderer choice\n"
+    "    --sdl-vsync    on|off|auto               - SDL presentation sync\n"
     " -D --daemon       run in background         - default foregrond\n"
     "    --frames N     stop after N rendered frames (test/smoke)\n"
     " -U --uid          setuid (int)              - default current\n"
@@ -102,6 +106,39 @@ static int parse_wxh(const char *text, int *out_w, int *out_h) {
     return 1;
 }
 
+static int parse_sdl_vsync(const char *text, int *out_vsync) {
+    if (text == NULL || out_vsync == NULL)
+        return 0;
+    if (strcasecmp(text, "on") == 0 || strcmp(text, "1") == 0 ||
+        strcasecmp(text, "true") == 0 || strcasecmp(text, "yes") == 0) {
+        *out_vsync = 1;
+        return 1;
+    }
+    if (strcasecmp(text, "off") == 0 || strcmp(text, "0") == 0 ||
+        strcasecmp(text, "false") == 0 || strcasecmp(text, "no") == 0) {
+        *out_vsync = 0;
+        return 1;
+    }
+    if (strcasecmp(text, "auto") == 0) {
+        *out_vsync = -1;
+        return 1;
+    }
+    return 0;
+}
+
+static int parse_sdl_renderer(const char *text, char *out_renderer, size_t out_size) {
+    if (text == NULL || out_renderer == NULL || out_size == 0)
+        return 0;
+    if (strcasecmp(text, "accelerated") == 0 ||
+        strcasecmp(text, "software") == 0 ||
+        strcasecmp(text, "auto") == 0) {
+        strncpy(out_renderer, text, out_size - 1);
+        out_renderer[out_size - 1] = '\0';
+        return 1;
+    }
+    return 0;
+}
+
 void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     if (cfg == NULL)
         return;
@@ -123,6 +160,7 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     strcpy(cfg->foreground, "00FF00");
     strcpy(cfg->fontface, "courier");
     strcpy(cfg->aadriver, "");
+    strcpy(cfg->sdl_renderer, "");
     strcpy(cfg->aafile, "");
 
     cfg->mode = LIVE;
@@ -138,6 +176,7 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     cfg->max_frames = 0;
     cfg->explicit_size = 0;
     cfg->explicit_aadriver = 0;
+    cfg->sdl_vsync = -2;
 }
 
 void hasciicam_config_parse(hasciicam_config *cfg,
@@ -229,6 +268,18 @@ void hasciicam_config_parse(hasciicam_config *cfg,
             }
             cfg->size_intent = HASCIICAM_SIZE_CHARS;
             cfg->explicit_size = 1;
+            break;
+        case 1003:
+            if (!parse_sdl_renderer(optarg, cfg->sdl_renderer, sizeof(cfg->sdl_renderer))) {
+                fprintf(stderr, "!! invalid SDL renderer '%s', expected accelerated, software, or auto\n", optarg);
+                exit(1);
+            }
+            break;
+        case 1004:
+            if (!parse_sdl_vsync(optarg, &cfg->sdl_vsync)) {
+                fprintf(stderr, "!! invalid SDL vsync '%s', expected on, off, or auto\n", optarg);
+                exit(1);
+            }
             break;
         case 'S':
             cfg->fontsize = atoi(optarg);
