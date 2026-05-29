@@ -22,4 +22,17 @@ int capture_frame_to_gray_scaled(const capture_frame *frame,
                                  int dst_w,
                                  int dst_h);
 
+/*
+ * Convert and optionally mirror while sampling source pixels.
+ *
+ * mirror_x flips left/right and mirror_y flips top/bottom. The mirroring is
+ * applied in the source-coordinate mapping, so no extra output pass is needed.
+ */
+int capture_frame_to_gray_scaled_mirrored(const capture_frame *frame,
+                                          unsigned char *dst,
+                                          int dst_w,
+                                          int dst_h,
+                                          int mirror_x,
+                                          int mirror_y);
+
 #endif

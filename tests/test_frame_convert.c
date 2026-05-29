@@ -72,6 +72,42 @@ static int test_nv21_reads_y_plane(void) {
     return dst[0] == 11 && dst[1] == 12 && dst[2] == 13 && dst[3] == 14;
 }
 
+static int test_gray8_mirror_x(void) {
+    unsigned char src[6] = {1, 2, 3, 4, 5, 6};
+    unsigned char dst[6] = {0, 0, 0, 0, 0, 0};
+    capture_frame frame;
+    memset(&frame, 0, sizeof(frame));
+    frame.data = src;
+    frame.data_size = sizeof(src);
+    frame.width = 3;
+    frame.height = 2;
+    frame.stride_bytes = 3;
+    frame.pixel_format = CAPTURE_PIXFMT_GRAY8;
+
+    if (!capture_frame_to_gray_scaled_mirrored(&frame, dst, 3, 2, 1, 0))
+        return 0;
+    return dst[0] == 3 && dst[1] == 2 && dst[2] == 1 &&
+           dst[3] == 6 && dst[4] == 5 && dst[5] == 4;
+}
+
+static int test_gray8_mirror_y(void) {
+    unsigned char src[6] = {1, 2, 3, 4, 5, 6};
+    unsigned char dst[6] = {0, 0, 0, 0, 0, 0};
+    capture_frame frame;
+    memset(&frame, 0, sizeof(frame));
+    frame.data = src;
+    frame.data_size = sizeof(src);
+    frame.width = 3;
+    frame.height = 2;
+    frame.stride_bytes = 3;
+    frame.pixel_format = CAPTURE_PIXFMT_GRAY8;
+
+    if (!capture_frame_to_gray_scaled_mirrored(&frame, dst, 3, 2, 0, 1))
+        return 0;
+    return dst[0] == 4 && dst[1] == 5 && dst[2] == 6 &&
+           dst[3] == 1 && dst[4] == 2 && dst[5] == 3;
+}
+
 static int test_bgra_luma_for_red_pixel(void) {
     /* B, G, R, A */
     unsigned char src[4] = {0, 0, 255, 255};
@@ -109,6 +145,8 @@ int main(void) {
     if (!test_yuyv_reads_luma_bytes()) return 1;
     if (!test_nv12_reads_y_plane()) return 1;
     if (!test_nv21_reads_y_plane()) return 1;
+    if (!test_gray8_mirror_x()) return 1;
+    if (!test_gray8_mirror_y()) return 1;
     if (!test_bgra_luma_for_red_pixel()) return 1;
     if (!test_invalid_format_fails()) return 1;
     printf("frame_convert tests passed\n");

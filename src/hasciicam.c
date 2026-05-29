@@ -232,6 +232,7 @@ main (int argc, char **argv) {
             capture_last_error());
     exit(-1);
   }
+  hasciicam_session_set_mirror(&session, appcfg.mirror_x, appcfg.mirror_y);
   cap_info = hasciicam_session_capture_info(&session);
   if (cap_info == NULL) {
     fprintf(stderr, "!! cannot query capture backend\n");

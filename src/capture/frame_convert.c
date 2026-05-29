@@ -15,6 +15,15 @@ int capture_frame_to_gray_scaled(const capture_frame *frame,
                                  unsigned char *dst,
                                  int dst_w,
                                  int dst_h) {
+    return capture_frame_to_gray_scaled_mirrored(frame, dst, dst_w, dst_h, 0, 0);
+}
+
+int capture_frame_to_gray_scaled_mirrored(const capture_frame *frame,
+                                         unsigned char *dst,
+                                         int dst_w,
+                                         int dst_h,
+                                         int mirror_x,
+                                         int mirror_y) {
     int y;
     int x;
     int src_w;
@@ -30,8 +39,12 @@ int capture_frame_to_gray_scaled(const capture_frame *frame,
 
     for (y = 0; y < dst_h; y++) {
         int src_y = (y * src_h) / dst_h;
+        if (mirror_y)
+            src_y = src_h - 1 - src_y;
         for (x = 0; x < dst_w; x++) {
             int src_x = (x * src_w) / dst_w;
+            if (mirror_x)
+                src_x = src_w - 1 - src_x;
             unsigned char gray = 0;
 
             switch (frame->pixel_format) {

@@ -27,6 +27,13 @@ int hasciicam_session_start(hasciicam_session *session, const capture_request *r
     return 1;
 }
 
+void hasciicam_session_set_mirror(hasciicam_session *session, int mirror_x, int mirror_y) {
+    if (session == NULL)
+        return;
+    session->mirror_x = mirror_x ? 1 : 0;
+    session->mirror_y = mirror_y ? 1 : 0;
+}
+
 int hasciicam_session_step(hasciicam_session *session,
                            int output_width,
                            int output_height,
@@ -59,7 +66,12 @@ int hasciicam_session_step(hasciicam_session *session,
     if (!session->capture_ops->read(session->capture_dev, &frame))
         return 0;
 
-    if (!capture_frame_to_gray_scaled(&frame, session->gray_buffer, output_width, output_height)) {
+    if (!capture_frame_to_gray_scaled_mirrored(&frame,
+                                               session->gray_buffer,
+                                               output_width,
+                                               output_height,
+                                               session->mirror_x,
+                                               session->mirror_y)) {
         session->capture_ops->release(session->capture_dev, &frame);
         return 0;
     }

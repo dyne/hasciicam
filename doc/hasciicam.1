@@ -74,6 +74,12 @@ Default is \fBon\fP.
 Starts live SDL output in desktop fullscreen mode.
 Press \fBf\fP to toggle fullscreen while running, or \fBEscape\fP to leave fullscreen.
 .B
+.IP "--mirror"
+Flips the camera image while sampling source pixels.
+Accepted values are \fBx\fP, \fB-x\fP, \fBy\fP, and \fB-y\fP.
+Horizontal mirror \fBx\fP is enabled by default so live preview behaves like a mirror.
+Use \fB--mirror -x\fP to disable horizontal mirroring, and \fB--mirror y\fP to add vertical mirroring.
+.B
 .IP "-o --aafile"
 Defines the file where to save rendered ascii, overwrited every \fIrefresh\fP seconds. Default is \fBhasciicam.html\fP when in \fBhtml\fP mode, \fBhasciicam.txt\fP when in \fBtext\fP mode (useless when in \fBlive\fP mode).
 .B

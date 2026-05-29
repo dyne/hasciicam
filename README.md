@@ -112,6 +112,8 @@ SDL live output tuning:
 - `--sdl-renderer accelerated|software|auto`: choose the SDL renderer backend.
 - `--sdl-vsync on|off|auto`: control SDL presentation sync.
 - `--fullscreen`: start SDL live output in desktop fullscreen mode.
+- `--mirror x|-x|y|-y`: flip camera image while sampling. Horizontal mirror
+  (`x`) is enabled by default; use `--mirror -x` to disable it.
 
 These switches are useful when profiling Xorg/Mesa driver overhead. The default
 keeps the historical accelerated renderer with vsync.

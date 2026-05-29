@@ -24,6 +24,7 @@ static const struct option long_options[] = {
     {"sdl-renderer", required_argument, NULL, 1003},
     {"sdl-vsync", required_argument, NULL, 1004},
     {"fullscreen", no_argument, NULL, 1005},
+    {"mirror", required_argument, NULL, 1006},
     {"help", no_argument, NULL, 'h'},
     {"aahelp", no_argument, NULL, 'H'},
     {"version", no_argument, NULL, 'v'},
@@ -69,6 +70,7 @@ static const char *help_text =
     "    --sdl-renderer accelerated|software|auto - SDL renderer choice\n"
     "    --sdl-vsync    on|off|auto               - SDL presentation sync\n"
     "    --fullscreen   start SDL live output fullscreen\n"
+    "    --mirror       x|-x|y|-y                 - flip image, default x\n"
     " -D --daemon       run in background         - default foregrond\n"
     "    --frames N     stop after N rendered frames (test/smoke)\n"
     " -U --uid          setuid (int)              - default current\n"
@@ -141,6 +143,28 @@ static int parse_sdl_renderer(const char *text, char *out_renderer, size_t out_s
     return 0;
 }
 
+static int parse_mirror_axis(const char *text, int *mirror_x, int *mirror_y) {
+    if (text == NULL || mirror_x == NULL || mirror_y == NULL)
+        return 0;
+    if (strcmp(text, "x") == 0) {
+        *mirror_x = 1;
+        return 1;
+    }
+    if (strcmp(text, "-x") == 0) {
+        *mirror_x = 0;
+        return 1;
+    }
+    if (strcmp(text, "y") == 0) {
+        *mirror_y = 1;
+        return 1;
+    }
+    if (strcmp(text, "-y") == 0) {
+        *mirror_y = 0;
+        return 1;
+    }
+    return 0;
+}
+
 void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     if (cfg == NULL)
         return;
@@ -180,6 +204,8 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     cfg->explicit_aadriver = 0;
     cfg->sdl_vsync = -2;
     cfg->sdl_fullscreen = 0;
+    cfg->mirror_x = 1;
+    cfg->mirror_y = 0;
 }
 
 void hasciicam_config_parse(hasciicam_config *cfg,
@@ -286,6 +312,12 @@ void hasciicam_config_parse(hasciicam_config *cfg,
             break;
         case 1005:
             cfg->sdl_fullscreen = 1;
+            break;
+        case 1006:
+            if (!parse_mirror_axis(optarg, &cfg->mirror_x, &cfg->mirror_y)) {
+                fprintf(stderr, "!! invalid mirror axis '%s', expected x, -x, y, or -y\n", optarg);
+                exit(1);
+            }
             break;
         case 'S':
             cfg->fontsize = atoi(optarg);

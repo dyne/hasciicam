@@ -9,10 +9,13 @@ typedef struct hasciicam_session {
     capture_info capture_info;
     unsigned char *gray_buffer;
     int gray_size;
+    int mirror_x;
+    int mirror_y;
     int stop_requested;
 } hasciicam_session;
 
 int hasciicam_session_start(hasciicam_session *session, const capture_request *req);
+void hasciicam_session_set_mirror(hasciicam_session *session, int mirror_x, int mirror_y);
 int hasciicam_session_step(hasciicam_session *session,
                            int output_width,
                            int output_height,

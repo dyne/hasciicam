@@ -26,6 +26,8 @@ typedef struct hasciicam_config {
     int explicit_aadriver;
     int sdl_vsync;
     int sdl_fullscreen;
+    int mirror_x;
+    int mirror_y;
     int max_frames;
     int uid;
     int gid;
