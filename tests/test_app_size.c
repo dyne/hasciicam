@@ -59,11 +59,37 @@ static int test_compute_ascii_from_capture(void) {
     return aw == 320 && ah == 90;
 }
 
+static int test_default_live_size_plan_hd(void) {
+    hasciicam_size_metrics m;
+    hasciicam_size_plan plan;
+    hasciicam_size_metrics_init(&m);
+    memset(&plan, 0, sizeof(plan));
+    hasciicam_size_build_default_live_plan(&m, 1920, 1080, &plan);
+    return plan.preferred_ascii_width == 216 &&
+           plan.preferred_ascii_height == 60 &&
+           plan.requested_capture_width == 864 &&
+           plan.requested_capture_height == 480;
+}
+
+static int test_default_live_size_plan_small_display(void) {
+    hasciicam_size_metrics m;
+    hasciicam_size_plan plan;
+    hasciicam_size_metrics_init(&m);
+    memset(&plan, 0, sizeof(plan));
+    hasciicam_size_build_default_live_plan(&m, 800, 600, &plan);
+    return plan.preferred_ascii_width == 90 &&
+           plan.preferred_ascii_height == 33 &&
+           plan.requested_capture_width == 360 &&
+           plan.requested_capture_height == 264;
+}
+
 int main(void) {
     if (!test_metrics_defaults()) return 1;
     if (!test_pixel_size_plan()) return 1;
     if (!test_char_size_plan()) return 1;
     if (!test_compute_ascii_from_capture()) return 1;
+    if (!test_default_live_size_plan_hd()) return 1;
+    if (!test_default_live_size_plan_small_display()) return 1;
     printf("app_size tests passed\n");
     return 0;
 }
