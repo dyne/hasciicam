@@ -202,6 +202,12 @@ static void SDL_process_events(struct sdldriverdata *d)
         }
         if (event.type == SDL_KEYDOWN && d != NULL) {
             SDL_Keycode sym = event.key.keysym.sym;
+            SDL_Keymod mod = event.key.keysym.mod;
+            if (sym == SDLK_q ||
+                ((mod & KMOD_CTRL) && (sym == SDLK_q || sym == SDLK_c))) {
+                raise(SIGINT);
+                return;
+            }
             if (sym == SDLK_f) {
                 SDL_set_fullscreen(d, d->fullscreen ? 0 : 1);
                 continue;
