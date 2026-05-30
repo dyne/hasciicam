@@ -2,7 +2,7 @@
 
 Hasciicam makes it possible to have live ASCII video on the web.
 
-![Jaromil in the Hascii spliff screenshot](img/jaro_hasciicam.jpg)
+![Jaromil in the Hascii spliff screenshot](/img/jaro_hasciicam.jpg)
 
 Hasciicam captures video from a TV card and renders it into ASCII. It can format
 the output as an HTML page with a refresh tag, as a live ASCII window, or as a
@@ -16,7 +16,7 @@ Java, or other client-side requirements.
 
 Swiss artist installation using Hasciicam and printers, 2015:
 
-![Swiss artist installation using Hasciicam and printers](img/swiss_installation_printers.jpg)
+![Swiss artist installation using Hasciicam and printers](/img/swiss_installation_printers.jpg)
 
 ## Installation
 
