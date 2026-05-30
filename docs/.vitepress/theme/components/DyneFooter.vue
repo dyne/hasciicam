@@ -4,8 +4,8 @@
       <div class="dyne-footer__content">
         <div class="dyne-footer__top">
           <a class="dyne-footer__logo" href="https://dyne.org" aria-label="Dyne.org">
-            <img class="dyne-footer__mark" src="/dyne-mark.svg" alt="" />
-            <img class="dyne-footer__logotype" src="/dyne-logotype.svg" alt="Dyne.org" />
+            <img class="dyne-footer__mark" :src="withBase('/dyne-mark.svg')" alt="" />
+            <img class="dyne-footer__logotype" :src="withBase('/dyne-logotype.svg')" alt="Dyne.org" />
           </a>
 
           <div class="dyne-footer__right">
@@ -40,6 +40,7 @@
 </template>
 
 <script setup lang="ts">
+import { withBase } from 'vitepress'
 import SocialIcon from './SocialIcon.vue'
 import { socialLinks } from './social-icons'
 

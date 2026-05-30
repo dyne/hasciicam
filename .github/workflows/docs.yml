@@ -45,6 +45,8 @@ jobs:
 
       - name: Build VitePress site
         run: npm run build
+        env:
+          BASE_PATH: /hasciicam/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
