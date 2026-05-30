@@ -222,7 +222,7 @@ message(STATUS "  HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION=${HASCIICAM_ENABLE_CAPTU
 if(HASCIICAM_BUILD_CLI)
   install(TARGETS hasciicam DESTINATION bin)
 endif()
-install(FILES doc/hasciicam.1 DESTINATION share/man/man1 OPTIONAL)
+install(FILES docs/hasciicam.1 DESTINATION share/man/man1 OPTIONAL)
 
 if(HASCIICAM_ENABLE_TESTS)
   enable_testing()

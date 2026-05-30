@@ -56,16 +56,35 @@ jobs:
       - name: Test
         run: ctest --output-on-failure --test-dir build
 
+      - name: Setup Node for website package
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Build website for release zip
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix docs
+          npm run build --prefix docs
+        env:
+          BASE_PATH: /hasciicam/
+
       - name: Package release zip
         if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         shell: bash
         run: |
           set -euo pipefail
           package_dir="dist/hasciicam-${{ matrix.package }}"
-          mkdir -p "${package_dir}/bin" "${package_dir}/share/man/man1"
+          mkdir -p "${package_dir}/bin" "${package_dir}/share/man/man1" "${package_dir}/share/hasciicam"
           cp "build/hasciicam${{ matrix.exe_suffix }}" "${package_dir}/bin/"
-          cp doc/hasciicam.1 "${package_dir}/share/man/man1/"
+          cp docs/hasciicam.1 "${package_dir}/share/man/man1/"
           cp README.md "${package_dir}/"
+          cp -R docs/.vitepress/dist "${package_dir}/share/hasciicam/website"
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             find build -maxdepth 1 -name '*.dll' -exec cp '{}' "${package_dir}/bin/" ';'
           fi
