@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: 'Hasciicam',
-  description: 'Live ASCII video for the web',
+  description: 'Live ASCII video',
   base: process.env.BASE_PATH ?? '/',
   appearance: true,
   themeConfig: {
@@ -12,7 +12,7 @@ export default defineConfig({
       { text: 'About Dyne.org', link: 'https://dyne.org' }
     ],
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/jaromil/hasciicam/' }
+      { icon: 'github', link: 'https://github.com/dyne/hasciicam/' }
     ],
 
     sidebar: [
@@ -21,8 +21,7 @@ export default defineConfig({
         items: [
           { text: 'Home', link: '/' },
           { text: 'Usage guide', link: '/usage-guide' },
-          { text: 'Manual page', link: '/manpage.html' },
-          { text: 'Source code', link: 'https://github.com/jaromil/hasciicam/' }
+          { text: 'Source code', link: 'https://github.com/dyne/hasciicam/' }
         ]
       }
     ]
