@@ -80,6 +80,10 @@ Accepted values are \fBx\fP, \fB-x\fP, \fBy\fP, and \fB-y\fP.
 Horizontal mirror \fBx\fP is enabled by default so live preview behaves like a mirror.
 Use \fB--mirror -x\fP to disable horizontal mirroring, and \fB--mirror y\fP to add vertical mirroring.
 .B
+.IP "--config"
+Loads startup configuration from the given TOML file.
+If omitted, HasciiCam checks for \fBhasciicam.toml\fP in the current working directory and loads it when present.
+.B
 .IP "-o --aafile"
 Defines the file where to save rendered ascii, overwrited every \fIrefresh\fP seconds. Default is \fBhasciicam.html\fP when in \fBhtml\fP mode, \fBhasciicam.asc\fP when in \fBtext\fP mode (useless when in \fBlive\fP mode).
 .B
@@ -133,8 +137,8 @@ puts your ascii into your local .plan (fingercam)
 generates an hascii video with font size +1 and uploads the frames in ftp passive mode on the dyne.org server, with user jaromil password sasuchen, inside the korova directory
 .SH ENVIRONMENT
 HasciiCam also accepts launch configuration from lowercase environment
-variables that match canonical config keys. Command-line options have higher
-precedence than environment variables.
+variables that match canonical config keys. Startup TOML is loaded before
+environment variables, and command-line options have highest precedence.
 .IP
 Examples:
 .br
@@ -156,8 +160,9 @@ Canonical keys:
 .br
 \fBbackground foreground uid gid frames sdl_renderer sdl_vsync fullscreen mirror\fP
 .SH CONFIG FILES
-Internal APIs can load/save TOML config files using the vendored
-\fBcktan/tomlc17\fP parser. Current CLI startup does not auto-load TOML.
+HasciiCam loads \fBhasciicam.toml\fP from the current working directory at
+startup when it exists. Use \fB--config path/to/file.toml\fP to load a specific
+TOML file instead.
 .IP
 Example TOML:
 .nf

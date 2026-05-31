@@ -112,7 +112,7 @@ The current path in `src/hasciicam.c` is:
 
 1. Install `SIGINT` handling through `quitproc()`.
 2. Initialize AA-lib defaults and let AA-lib parse AA options with `aa_parseoptions()`.
-3. Parse HasciiCam CLI options in `config_init()`.
+3. Load startup config, then parse HasciiCam env/CLI options in `config_init()`.
 4. Build a `capture_request` and open capture through `capture_open_default()`:
    - Windows order: Media Foundation, then DirectShow fallback.
    - Non-Windows order: V4L2.
@@ -153,6 +153,8 @@ Core options:
 - `-o`, `--aafile`: HTML/text output file.
 - `-O`, `--aadriver`: preferred live AA-lib driver, such as `SDL`, `X11`,
   `curses`, or `stdout`.
+- `--config`: load a startup TOML config file instead of auto-discovering
+  `hasciicam.toml` in the current working directory.
 - `-D`, `--daemon`: run in the background on Unix-like systems.
 - `-U`, `--uid` and `-G`, `--gid`: drop privileges.
 
@@ -173,11 +175,13 @@ changing CLI parsing, preserve that ordering.
 
 ## Launch Configuration
 
-HasciiCam launch config supports three sources:
+HasciiCam launch config supports four sources:
 
 1. Defaults from `hasciicam_config_init_defaults()`
-2. Lowercase environment variables with canonical config-key names
-3. Command-line options (highest precedence)
+2. Startup TOML: explicit `--config path` or `hasciicam.toml` in the current
+   working directory when present
+3. Lowercase environment variables with canonical config-key names
+4. Command-line options (highest precedence)
 
 Canonical config keys:
 
@@ -363,8 +367,8 @@ Internal config file APIs are declared in `src/app/app_config.h`:
 - `hasciicam_config_save_toml(...)`
 
 TOML parsing uses vendored `cktan/tomlc17` source in `src/app/tomlc17/`.
-Current startup does not auto-load a TOML file and does not implement CLI
-`--config` discovery.
+Startup auto-loads `hasciicam.toml` from the current working directory when
+present. `--config path` loads a specific TOML file instead.
 
 ## Portability Notes
 
