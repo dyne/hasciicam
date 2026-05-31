@@ -66,6 +66,9 @@ int hasciicam_gui_overlay_process_event(const SDL_Event *event) {
 void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
     float fg[3];
     float bg[3];
+    bool invert;
+    bool mirror_x;
+    bool mirror_y;
 
     if (!g_initialized || state == NULL)
         return;
@@ -78,12 +81,18 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
     ImGui::SliderInt("Brightness", &state->aa_bright, 0, 255);
     ImGui::SliderInt("Contrast", &state->aa_contrast, 0, 127);
     ImGui::SliderFloat("Gamma", &state->aa_gamma, 0.5f, 4.0f, "%.2f");
-    ImGui::Checkbox("Invert", &state->invert);
+    invert = state->invert != 0;
+    if (ImGui::Checkbox("Invert", &invert))
+        state->invert = invert ? 1 : 0;
 
     ImGui::Separator();
     ImGui::Text("Capture");
-    ImGui::Checkbox("Mirror X", &state->mirror_x);
-    ImGui::Checkbox("Mirror Y", &state->mirror_y);
+    mirror_x = state->mirror_x != 0;
+    mirror_y = state->mirror_y != 0;
+    if (ImGui::Checkbox("Mirror X", &mirror_x))
+        state->mirror_x = mirror_x ? 1 : 0;
+    if (ImGui::Checkbox("Mirror Y", &mirror_y))
+        state->mirror_y = mirror_y ? 1 : 0;
     ImGui::Text("Size: %dx%d", state->capture_width, state->capture_height);
     ImGui::Text("Stride: %d bytes", state->capture_stride_bytes);
     ImGui::Text("Pixel format: %d", (int)state->capture_pixel_format);
