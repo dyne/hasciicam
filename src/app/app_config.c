@@ -50,6 +50,7 @@ static const struct option long_options[] = {
     {"sdl-vsync", required_argument, NULL, 1004},
     {"fullscreen", no_argument, NULL, 1005},
     {"mirror", required_argument, NULL, 1006},
+    {"config", required_argument, NULL, 1007},
     {"help", no_argument, NULL, 'h'},
     {"aahelp", no_argument, NULL, 'H'},
     {"version", no_argument, NULL, 'v'},
@@ -96,6 +97,7 @@ static const char *help_text =
     "    --sdl-vsync    on|off|auto               - SDL presentation sync\n"
     "    --fullscreen   start SDL live output fullscreen\n"
     "    --mirror       x|-x|y|-y                 - flip image, default x\n"
+    "    --config       load startup TOML config  - default ./hasciicam.toml\n"
     " -D --daemon       run in background         - default foregrond\n"
     "    --frames N     stop after N rendered frames (test/smoke)\n"
     " -U --uid          setuid (int)              - default current\n"
@@ -872,6 +874,54 @@ int hasciicam_config_load_toml(hasciicam_config *cfg,
     return ok;
 }
 
+static int file_exists(const char *path) {
+    FILE *fp = NULL;
+    if (path == NULL || path[0] == '\0')
+        return 0;
+    fp = fopen(path, "rb");
+    if (fp == NULL)
+        return 0;
+    fclose(fp);
+    return 1;
+}
+
+static const char *find_explicit_config_path(int argc, char *argv[]) {
+    int i = 1;
+    for (i = 1; i < argc; ++i) {
+        const char *arg = argv[i];
+        if (arg == NULL)
+            continue;
+        if (strcmp(arg, "--config") == 0) {
+            if (i + 1 >= argc)
+                return "";
+            return argv[i + 1];
+        }
+        if (strncmp(arg, "--config=", 9) == 0)
+            return arg + 9;
+    }
+    return NULL;
+}
+
+static void load_startup_config(hasciicam_config *cfg, int argc, char *argv[]) {
+    char err[200];
+    const char *path = find_explicit_config_path(argc, argv);
+    int explicit_path = path != NULL;
+
+    if (!explicit_path)
+        path = "hasciicam.toml";
+
+    if (path[0] == '\0') {
+        fprintf(stderr, "!! --config requires a path\n");
+        exit(1);
+    }
+    if (!explicit_path && !file_exists(path))
+        return;
+    if (!hasciicam_config_load_toml(cfg, path, err, sizeof(err))) {
+        fprintf(stderr, "!! cannot load config %s: %s\n", path, err);
+        exit(1);
+    }
+}
+
 int hasciicam_config_save_toml(const hasciicam_config *cfg,
                                const char *path,
                                char *err,
@@ -924,6 +974,8 @@ void hasciicam_config_parse(hasciicam_config *cfg,
 
     if (cfg == NULL)
         return;
+
+    load_startup_config(cfg, argc, argv);
 
     if (!hasciicam_config_load_env(cfg, env_err, sizeof(env_err))) {
         fprintf(stderr, "!! %s\n", env_err);
@@ -1009,6 +1061,8 @@ void hasciicam_config_parse(hasciicam_config *cfg,
                 fprintf(stderr, "!! %s\n", env_err);
                 exit(1);
             }
+            break;
+        case 1007:
             break;
         case 'S':
             if (!set_config_value(cfg, "font_size", optarg, env_err, sizeof(env_err))) {

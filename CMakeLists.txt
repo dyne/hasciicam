@@ -378,6 +378,15 @@ if(HASCIICAM_ENABLE_TESTS)
     set_tests_properties(cli_render_tuning PROPERTIES LABELS "cli")
 
     add_test(
+      NAME cli_config_startup
+      COMMAND ${CMAKE_COMMAND}
+        -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+        -DHASCIICAM_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_config_startup.cmake
+    )
+    set_tests_properties(cli_config_startup PROPERTIES LABELS "cli")
+
+    add_test(
       NAME cli_size_pixel
       COMMAND ${CMAKE_COMMAND}
         -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
