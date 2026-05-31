@@ -469,7 +469,8 @@ main (int argc, char **argv) {
       copy_size = (gray_size < dest_size) ? gray_size : dest_size;
       if (copy_size > 0) {
         memcpy(aa_image(render_session.context), gray_frame, copy_size);
-        hasciicam_output_write_ascii_frame(&output, ascii_width, ascii_height);
+        hasciicam_output_write_ascii_frame_tuned(&output, ascii_width, ascii_height,
+                                                render_session.render_params);
         frame_rendered = 1;
       }
     }

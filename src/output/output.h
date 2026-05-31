@@ -10,6 +10,10 @@ typedef struct hasciicam_output {
 
 int hasciicam_output_open_aalib(hasciicam_output *output, aa_context *context);
 void hasciicam_output_write_ascii_frame(hasciicam_output *output, int ascii_width, int ascii_height);
+void hasciicam_output_write_ascii_frame_tuned(hasciicam_output *output,
+                                              int ascii_width,
+                                              int ascii_height,
+                                              const aa_renderparams *render_params);
 void hasciicam_output_poll(hasciicam_output *output);
 void hasciicam_output_close(hasciicam_output *output);
 const char *hasciicam_output_name(const hasciicam_output *output);
