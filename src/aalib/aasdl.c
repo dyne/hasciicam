@@ -8,6 +8,10 @@
 #include "aalib.h"
 #include "aaint.h"
 #include "aasdlint.h"
+#include "../gui/gui_bridge.h"
+#if defined(HASCIICAM_ENABLE_GUI)
+#include "../gui/gui_overlay.h"
+#endif
 
 __AA_CONST struct aa_driver SDL_d;
 extern int quiet;
@@ -19,6 +23,9 @@ extern int quiet;
 static void SDL_flush(aa_context *c);
 static void SDL_process_events(struct sdldriverdata *d);
 static void SDL_set_fullscreen(struct sdldriverdata *d, int enable);
+static void SDL_apply_runtime_colors(struct sdldriverdata *d,
+                                     unsigned int foreground_rgb,
+                                     unsigned int background_rgb);
 
 static int SDL_env_is(const char *value, const char *expected)
 {
@@ -191,6 +198,9 @@ static void SDL_process_events(struct sdldriverdata *d)
 {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        if (d != NULL && d->gui_ready) {
+            hasciicam_gui_overlay_process_event(&event);
+        }
         if (event.type == SDL_QUIT) {
             raise(SIGINT);
             return;
@@ -200,9 +210,20 @@ static void SDL_process_events(struct sdldriverdata *d)
             raise(SIGINT);
             return;
         }
+        if (event.type == SDL_MOUSEBUTTONDOWN &&
+            event.button.button == SDL_BUTTON_RIGHT &&
+            d != NULL && d->gui_ready) {
+            if (!hasciicam_gui_overlay_wants_mouse()) {
+                d->gui_visible = d->gui_visible ? 0 : 1;
+            }
+            continue;
+        }
         if (event.type == SDL_KEYDOWN && d != NULL) {
             SDL_Keycode sym = event.key.keysym.sym;
             SDL_Keymod mod = event.key.keysym.mod;
+            if (d->gui_ready && d->gui_visible && hasciicam_gui_overlay_wants_keyboard()) {
+                continue;
+            }
             if (sym == SDLK_q ||
                 ((mod & KMOD_CTRL) && (sym == SDLK_q || sym == SDLK_c))) {
                 raise(SIGINT);
@@ -474,6 +495,9 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     d->inverted = 0;
     d->cvisible = 0;
     d->fullscreen = 0;
+    d->gui_ready = 0;
+    d->gui_visible = 0;
+    d->gui_state = NULL;
     d->x_offset_px = 0;
     d->y_offset_px = 0;
     d->force_clear = 1;
@@ -500,6 +524,11 @@ static void SDL_uninit(aa_context *c)
     if (!d)
         return;
     
+    if (d->gui_ready) {
+        hasciicam_gui_overlay_shutdown();
+        d->gui_ready = 0;
+    }
+
     if (d->previoust) {
         free(d->previoust);
         d->previoust = NULL;
@@ -730,6 +759,12 @@ static void SDL_flush(aa_context *c)
         };
         SDL_RenderFillRect(d->renderer, &cursor_rect);
     }
+
+    if (d->gui_ready && d->gui_visible && d->gui_state != NULL) {
+        hasciicam_gui_overlay_new_frame();
+        hasciicam_gui_overlay_draw(d->gui_state);
+        hasciicam_gui_overlay_render(d->renderer);
+    }
     SDL_RenderPresent(d->renderer);
     d->force_clear = 0;
 }
@@ -751,5 +786,72 @@ __AA_CONST struct aa_driver SDL_d = {
     SDL_flush,
     SDL_cursor
 };
+
+static unsigned int clamp_rgb24(unsigned int rgb) {
+    return rgb & 0x00FFFFFFu;
+}
+
+static int adjust_component(int value, float factor) {
+    int out = (int)(value * factor);
+    if (out < 0) out = 0;
+    if (out > 255) out = 255;
+    return out;
+}
+
+static void SDL_apply_runtime_colors(struct sdldriverdata *d,
+                                     unsigned int foreground_rgb,
+                                     unsigned int background_rgb) {
+    int fg_r;
+    int fg_g;
+    int fg_b;
+    if (d == NULL)
+        return;
+    foreground_rgb = clamp_rgb24(foreground_rgb);
+    background_rgb = clamp_rgb24(background_rgb);
+    d->normal_color = (int)foreground_rgb;
+    d->black_color = (int)background_rgb;
+    d->special_color = d->normal_color;
+
+    fg_r = (int)((foreground_rgb >> 16) & 0xFF);
+    fg_g = (int)((foreground_rgb >> 8) & 0xFF);
+    fg_b = (int)(foreground_rgb & 0xFF);
+
+    d->dim_color = (adjust_component(fg_r, 0.55f) << 16) |
+                   (adjust_component(fg_g, 0.55f) << 8) |
+                   adjust_component(fg_b, 0.55f);
+    d->bold_color = (adjust_component(fg_r, 1.2f) << 16) |
+                    (adjust_component(fg_g, 1.2f) << 8) |
+                    adjust_component(fg_b, 1.2f);
+    d->force_clear = 1;
+}
+
+int hasciicam_sdl_set_gui_state(aa_context *context, struct hasciicam_gui_state *state) {
+    struct sdldriverdata *d;
+    if (context == NULL || context->driverdata == NULL)
+        return 0;
+    if (context->driver != &SDL_d)
+        return 0;
+    d = (struct sdldriverdata *)context->driverdata;
+    d->gui_state = state;
+#if defined(HASCIICAM_ENABLE_GUI)
+    if (!d->gui_ready) {
+        d->gui_ready = hasciicam_gui_overlay_init(d->window, d->renderer) ? 1 : 0;
+    }
+#else
+    d->gui_ready = 0;
+#endif
+    return d->gui_ready;
+}
+
+int hasciicam_sdl_set_runtime_colors(aa_context *context, unsigned int foreground_rgb, unsigned int background_rgb) {
+    struct sdldriverdata *d;
+    if (context == NULL || context->driverdata == NULL)
+        return 0;
+    if (context->driver != &SDL_d)
+        return 0;
+    d = (struct sdldriverdata *)context->driverdata;
+    SDL_apply_runtime_colors(d, foreground_rgb, background_rgb);
+    return 1;
+}
 
 #endif
