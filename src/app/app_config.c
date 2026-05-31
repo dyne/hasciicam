@@ -1,6 +1,7 @@
 #include "app_config.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +39,7 @@ typedef struct config_key_desc {
     const char *key;
     config_value_kind kind;
     int persist;
+    int allow_env_toml;
 } config_key_desc;
 
 static const struct option long_options[] = {
@@ -110,35 +112,35 @@ static const char *help_text =
     " -F --foreground   foreground color (hex)    - default 00FF00\n";
 
 static const config_key_desc config_keys[] = {
-    {"show_help", CONFIG_VALUE_BOOL, 0},
-    {"show_aahelp", CONFIG_VALUE_BOOL, 0},
-    {"show_version", CONFIG_VALUE_BOOL, 0},
-    {"quiet", CONFIG_VALUE_BOOL, 1},
-    {"mode", CONFIG_VALUE_MODE, 1},
-    {"device", CONFIG_VALUE_STRING, 1},
-    {"input", CONFIG_VALUE_INT, 1},
-    {"size", CONFIG_VALUE_SIZE, 0},
-    {"pixel_size", CONFIG_VALUE_PIXEL_SIZE, 1},
-    {"char_size", CONFIG_VALUE_CHAR_SIZE, 1},
-    {"output_file", CONFIG_VALUE_STRING, 1},
-    {"aa_driver", CONFIG_VALUE_STRING, 1},
-    {"daemon", CONFIG_VALUE_BOOL, 1},
-    {"font_size", CONFIG_VALUE_INT, 1},
-    {"font_face", CONFIG_VALUE_STRING, 1},
-    {"refresh", CONFIG_VALUE_INT, 1},
-    {"aa_bright", CONFIG_VALUE_INT, 1},
-    {"aa_contrast", CONFIG_VALUE_INT, 1},
-    {"aa_gamma", CONFIG_VALUE_INT, 1},
-    {"invert", CONFIG_VALUE_BOOL, 1},
-    {"background", CONFIG_VALUE_STRING, 1},
-    {"foreground", CONFIG_VALUE_STRING, 1},
-    {"uid", CONFIG_VALUE_INT, 1},
-    {"gid", CONFIG_VALUE_INT, 1},
-    {"frames", CONFIG_VALUE_INT, 1},
-    {"sdl_renderer", CONFIG_VALUE_SDL_RENDERER, 1},
-    {"sdl_vsync", CONFIG_VALUE_SDL_VSYNC, 1},
-    {"fullscreen", CONFIG_VALUE_BOOL, 1},
-    {"mirror", CONFIG_VALUE_MIRROR, 1}
+    {"show_help", CONFIG_VALUE_BOOL, 0, 0},
+    {"show_aahelp", CONFIG_VALUE_BOOL, 0, 0},
+    {"show_version", CONFIG_VALUE_BOOL, 0, 0},
+    {"quiet", CONFIG_VALUE_BOOL, 1, 1},
+    {"mode", CONFIG_VALUE_MODE, 1, 1},
+    {"device", CONFIG_VALUE_STRING, 1, 1},
+    {"input", CONFIG_VALUE_INT, 1, 1},
+    {"size", CONFIG_VALUE_SIZE, 0, 0},
+    {"pixel_size", CONFIG_VALUE_PIXEL_SIZE, 1, 1},
+    {"char_size", CONFIG_VALUE_CHAR_SIZE, 1, 1},
+    {"output_file", CONFIG_VALUE_STRING, 1, 1},
+    {"aa_driver", CONFIG_VALUE_STRING, 1, 1},
+    {"daemon", CONFIG_VALUE_BOOL, 1, 1},
+    {"font_size", CONFIG_VALUE_INT, 1, 1},
+    {"font_face", CONFIG_VALUE_STRING, 1, 1},
+    {"refresh", CONFIG_VALUE_INT, 1, 1},
+    {"aa_bright", CONFIG_VALUE_INT, 1, 1},
+    {"aa_contrast", CONFIG_VALUE_INT, 1, 1},
+    {"aa_gamma", CONFIG_VALUE_INT, 1, 1},
+    {"invert", CONFIG_VALUE_BOOL, 1, 1},
+    {"background", CONFIG_VALUE_STRING, 1, 1},
+    {"foreground", CONFIG_VALUE_STRING, 1, 1},
+    {"uid", CONFIG_VALUE_INT, 1, 1},
+    {"gid", CONFIG_VALUE_INT, 1, 1},
+    {"frames", CONFIG_VALUE_INT, 1, 1},
+    {"sdl_renderer", CONFIG_VALUE_SDL_RENDERER, 1, 1},
+    {"sdl_vsync", CONFIG_VALUE_SDL_VSYNC, 1, 1},
+    {"fullscreen", CONFIG_VALUE_BOOL, 1, 1},
+    {"mirror", CONFIG_VALUE_MIRROR, 1, 1}
 };
 
 /* Parse WIDTHxHEIGHT where separator can be x or X. */
@@ -199,25 +201,37 @@ static int parse_sdl_renderer(const char *text, char *out_renderer, size_t out_s
 }
 
 static int parse_mirror_axis(const char *text, int *mirror_x, int *mirror_y) {
-    if (text == NULL || mirror_x == NULL || mirror_y == NULL)
+    char token_buf[64];
+    char *cursor = NULL;
+    char *token = NULL;
+    int seen = 0;
+
+    if (text == NULL || mirror_x == NULL || mirror_y == NULL || text[0] == '\0')
         return 0;
-    if (strcmp(text, "x") == 0) {
-        *mirror_x = 1;
-        return 1;
+    strncpy(token_buf, text, sizeof(token_buf) - 1);
+    token_buf[sizeof(token_buf) - 1] = '\0';
+
+    cursor = token_buf;
+    token = strtok(cursor, ", \t");
+    while (token != NULL) {
+        if (strcmp(token, "x") == 0) {
+            *mirror_x = 1;
+            seen = 1;
+        } else if (strcmp(token, "-x") == 0) {
+            *mirror_x = 0;
+            seen = 1;
+        } else if (strcmp(token, "y") == 0) {
+            *mirror_y = 1;
+            seen = 1;
+        } else if (strcmp(token, "-y") == 0) {
+            *mirror_y = 0;
+            seen = 1;
+        } else {
+            return 0;
+        }
+        token = strtok(NULL, ", \t");
     }
-    if (strcmp(text, "-x") == 0) {
-        *mirror_x = 0;
-        return 1;
-    }
-    if (strcmp(text, "y") == 0) {
-        *mirror_y = 1;
-        return 1;
-    }
-    if (strcmp(text, "-y") == 0) {
-        *mirror_y = 0;
-        return 1;
-    }
-    return 0;
+    return seen;
 }
 
 static void set_error(char *err, size_t err_size, const char *msg) {
@@ -263,8 +277,11 @@ static int parse_int_value(const char *value, int *out_value) {
     long parsed = 0;
     if (value == NULL || out_value == NULL || value[0] == '\0')
         return 0;
+    errno = 0;
     parsed = strtol(value, &end, 10);
     if (end == value || *end != '\0')
+        return 0;
+    if (errno == ERANGE || parsed > INT_MAX || parsed < INT_MIN)
         return 0;
     *out_value = (int)parsed;
     return 1;
@@ -517,7 +534,7 @@ static int set_config_value(hasciicam_config *cfg,
     }
     if (strcmp(key, "mirror") == 0) {
         if (!parse_mirror_axis(value, &cfg->mirror_x, &cfg->mirror_y)) {
-            set_error(err, err_size, "invalid value for mirror: expected x, -x, y, or -y");
+            set_error(err, err_size, "invalid value for mirror: expected x/-x/y/-y tokens");
             return 0;
         }
         return 1;
@@ -663,11 +680,15 @@ static int config_value_as_string(const hasciicam_config *cfg,
         return 1;
     }
     if (strcmp(key, "sdl_vsync") == 0) {
-        const char *vsync = "auto";
+        const char *vsync = NULL;
         if (cfg->sdl_vsync == 1)
             vsync = "on";
         else if (cfg->sdl_vsync == 0)
             vsync = "off";
+        else if (cfg->sdl_vsync == -1)
+            vsync = "auto";
+        else
+            return 0;
         snprintf(out, out_size, "%s", vsync);
         *out_is_quoted = 1;
         return 1;
@@ -678,14 +699,9 @@ static int config_value_as_string(const hasciicam_config *cfg,
         return 1;
     }
     if (strcmp(key, "mirror") == 0) {
-        const char *mirror = "x";
-        if (cfg->mirror_x == 0)
-            mirror = "-x";
-        else if (cfg->mirror_y == 1)
-            mirror = "y";
-        else if (cfg->mirror_y == 0 && cfg->mirror_x != 1)
-            mirror = "-y";
-        snprintf(out, out_size, "%s", mirror);
+        snprintf(out, out_size, "%s,%s",
+                 cfg->mirror_x ? "x" : "-x",
+                 cfg->mirror_y ? "y" : "-y");
         *out_is_quoted = 1;
         return 1;
     }
@@ -768,6 +784,8 @@ int hasciicam_config_load_env(hasciicam_config *cfg, char *err, size_t err_size)
         return 0;
     }
     for (i = 0; i < sizeof(config_keys) / sizeof(config_keys[0]); ++i) {
+        if (!config_keys[i].allow_env_toml)
+            continue;
         const char *value = getenv(config_keys[i].key);
         if (value == NULL || value[0] == '\0')
             continue;
@@ -810,10 +828,17 @@ int hasciicam_config_load_toml(hasciicam_config *cfg,
         size_t k = 0;
         for (k = 0; k < sizeof(config_keys) / sizeof(config_keys[0]); ++k) {
             if (strcmp(config_keys[k].key, key) == 0) {
+                if (!config_keys[k].allow_env_toml) {
+                    set_errorf(err, err_size, "key not allowed in env/toml: %s", key);
+                    ok = 0;
+                    break;
+                }
                 has_known_key = 1;
                 break;
             }
         }
+        if (!ok)
+            break;
         if (!has_known_key) {
             set_errorf(err, err_size, "unknown config key %s", key);
             ok = 0;
