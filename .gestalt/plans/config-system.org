@@ -167,7 +167,7 @@
 :Done when: No automatic config file lookup is added, and docs/comments state the intended order for future callers.
 :END:
 
-* WIP [#B] Update documentation and automated coverage
+* DONE [#B] Update documentation and automated coverage
 :PROPERTIES:
 :Effort: 1 day
 :Goal: Make the new config behavior discoverable and covered by deterministic CTest tests.
@@ -190,7 +190,7 @@
 :Done when: Existing CLI smoke tests still pass with the new config system.
 :END:
 
-** TODO [#B] Document environment variables and TOML examples
+** DONE [#B] Document environment variables and TOML examples
 :PROPERTIES:
 :Why: Users need to know the canonical lowercase key names, and maintainers need to know that TOML parsing is delegated to vendored `tomlc17` while HasciiCam intentionally accepts only flat config keys.
 :Change: Update `AGENTS.md` if useful for future LLM work, and update user-facing docs such as `doc/hasciicam.1` or a docs page if config behavior is exposed publicly. Show examples: `mode=html output_file=frame.html hasciicam`, `font_size=2 foreground=FFFFFF hasciicam -m html`, and a minimal TOML file with `mode = "text"`, `output_file = "hasciicam.asc"`, `device = "/dev/video0"`, `char_size = "80x25"`, `sdl_renderer = "software"`, and `sdl_vsync = "off"`. State that TOML load/save functions are internal unless a CLI `--config` option is added later. Document the vendored `tomlc17` source, license, and update path in the source tree rather than only in user docs.

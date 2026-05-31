@@ -83,6 +83,9 @@ Use \fB--mirror -x\fP to disable horizontal mirroring, and \fB--mirror y\fP to a
 .IP "-o --aafile"
 Defines the file where to save rendered ascii, overwrited every \fIrefresh\fP seconds. Default is \fBhasciicam.html\fP when in \fBhtml\fP mode, \fBhasciicam.txt\fP when in \fBtext\fP mode (useless when in \fBlive\fP mode).
 .B
+.IP "--frames"
+Stops after \fBN\fP rendered frames. Useful for deterministic smoke tests.
+.B
 .IP "-f --ftp"
 Ftp pushes the selected output file to an ftp account specified within an expression like \fB:user%pass@dyne.org:/home/user/www\fP. If the password is not specified (omit %pass) hasciicam asks for it on stdin (hidden while typing). If the directory is not specified it is assumed to be the first ftp directory where user logs in. Remote file is refreshed depending on \fBrefresh\fP rate and connection bandwidth, a \fIscolopendro\fP temporary file is created to keep clients on the other side refreshing smooth.
 .B
@@ -128,6 +131,43 @@ puts your ascii into your local .plan (fingercam)
 .B hasciicam -m html -S 2 -o index.html -f :jaromil%sasuchen@dyne.org:korova
 .br
 generates an hascii video with font size +1 and uploads the frames in ftp passive mode on the dyne.org server, with user jaromil password sasuchen, inside the korova directory
+.SH ENVIRONMENT
+HasciiCam also accepts launch configuration from lowercase environment
+variables that match canonical config keys. Command-line options have higher
+precedence than environment variables.
+.IP
+Examples:
+.br
+\fBmode=html\fP
+.br
+\fBoutput_file=frame.html\fP
+.br
+\fBfont_size=2\fP
+.br
+\fBsdl_renderer=software\fP
+.br
+\fBsdl_vsync=off\fP
+.IP
+Canonical keys:
+.br
+\fBquiet mode device input pixel_size char_size output_file aa_driver daemon\fP
+.br
+\fBfont_size font_face refresh aa_bright aa_contrast aa_gamma invert\fP
+.br
+\fBbackground foreground uid gid frames sdl_renderer sdl_vsync fullscreen mirror\fP
+.SH CONFIG FILES
+Internal APIs can load/save TOML config files using the vendored
+\fBcktan/tomlc17\fP parser. Current CLI startup does not auto-load TOML.
+.IP
+Example TOML:
+.nf
+mode = "text"
+output_file = "hasciicam.asc"
+device = "/dev/video0"
+char_size = "80x25"
+sdl_renderer = "software"
+sdl_vsync = "off"
+.fi
 .SH NOTES
 When using a usb webcam, a supported size needs to be specified. The minimum or maximum detected size should work, also a size of 160x120 mostly gives good results, with unsupported sizes you will get unexpected results.
 .SH BUGS
