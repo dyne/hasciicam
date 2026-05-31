@@ -698,29 +698,8 @@ static void SDL_flush(aa_context *c)
             unsigned char ch = c->textbuffer[pos];
             int attr = c->attrbuffer[pos];
             
-            int fg_color, bg_color;
-            
-            if (d->inverted) {
-                bg_color = d->bold_color;
-                switch (attr) {
-                    case AA_DIM:      fg_color = d->dim_color; break;
-                    case AA_BOLD:     
-                    case AA_BOLDFONT: fg_color = d->black_color; break;
-                    case AA_REVERSE:  fg_color = d->bold_color; bg_color = d->black_color; break;
-                    case AA_SPECIAL:  fg_color = d->special_color; break;
-                    default:          fg_color = d->normal_color; break;
-                }
-            } else {
-                bg_color = d->black_color;
-                switch (attr) {
-                    case AA_DIM:      fg_color = d->dim_color; break;
-                    case AA_BOLD:     
-                    case AA_BOLDFONT: fg_color = d->bold_color; break;
-                    case AA_REVERSE:  fg_color = d->black_color; bg_color = d->normal_color; break;
-                    case AA_SPECIAL:  fg_color = d->special_color; break;
-                    default:          fg_color = d->normal_color; break;
-                }
-            }
+            int fg_color = d->normal_color;
+            int bg_color = d->black_color;
             
             if (ch != d->previoust[pos] || attr != d->previousa[pos]) {
                 SDL_stream_draw_char(d, ch, x, y, fg_color, bg_color);
@@ -791,37 +770,18 @@ static unsigned int clamp_rgb24(unsigned int rgb) {
     return rgb & 0x00FFFFFFu;
 }
 
-static int adjust_component(int value, float factor) {
-    int out = (int)(value * factor);
-    if (out < 0) out = 0;
-    if (out > 255) out = 255;
-    return out;
-}
-
 static void SDL_apply_runtime_colors(struct sdldriverdata *d,
                                      unsigned int foreground_rgb,
                                      unsigned int background_rgb) {
-    int fg_r;
-    int fg_g;
-    int fg_b;
     if (d == NULL)
         return;
     foreground_rgb = clamp_rgb24(foreground_rgb);
     background_rgb = clamp_rgb24(background_rgb);
     d->normal_color = (int)foreground_rgb;
     d->black_color = (int)background_rgb;
+    d->dim_color = d->normal_color;
+    d->bold_color = d->normal_color;
     d->special_color = d->normal_color;
-
-    fg_r = (int)((foreground_rgb >> 16) & 0xFF);
-    fg_g = (int)((foreground_rgb >> 8) & 0xFF);
-    fg_b = (int)(foreground_rgb & 0xFF);
-
-    d->dim_color = (adjust_component(fg_r, 0.55f) << 16) |
-                   (adjust_component(fg_g, 0.55f) << 8) |
-                   adjust_component(fg_b, 0.55f);
-    d->bold_color = (adjust_component(fg_r, 1.2f) << 16) |
-                    (adjust_component(fg_g, 1.2f) << 8) |
-                    adjust_component(fg_b, 1.2f);
     d->force_clear = 1;
 }
 
