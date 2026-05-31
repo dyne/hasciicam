@@ -104,6 +104,69 @@ static void test_cli_overrides_env(void) {
     clear_test_env();
 }
 
+static void test_default_toml_load(void) {
+    hasciicam_config cfg;
+    char *argv[] = {
+        (char *)"hasciicam"
+    };
+    int argc = (int)(sizeof(argv) / sizeof(argv[0]));
+    const char *path = "hasciicam.toml";
+    FILE *fp = fopen(path, "wb");
+    expect_true(fp != NULL, "should open default startup toml");
+    if (fp) {
+        fputs("mode = \"text\"\n", fp);
+        fputs("output_file = \"default-config.asc\"\n", fp);
+        fputs("aa_bright = 88\n", fp);
+        fclose(fp);
+    }
+
+    clear_test_env();
+    hasciicam_config_init_defaults(&cfg);
+    optind = 1;
+    hasciicam_config_parse(&cfg, argc, argv, "aahelp", "pkg", "1.0");
+
+    expect_true(cfg.mode == 2, "default toml mode should be text");
+    expect_true(strcmp(cfg.aafile, "default-config.asc") == 0,
+                "default toml output_file should load");
+    expect_true(cfg.aa_bright == 88, "default toml aa_bright should load");
+
+    remove(path);
+    clear_test_env();
+}
+
+static void test_explicit_toml_precedence(void) {
+    hasciicam_config cfg;
+    char *argv[] = {
+        (char *)"hasciicam",
+        (char *)"--config", (char *)"test_app_config_startup.toml",
+        (char *)"--mode", (char *)"text",
+        (char *)"-o", (char *)"cli.asc"
+    };
+    int argc = (int)(sizeof(argv) / sizeof(argv[0]));
+    FILE *fp = fopen("test_app_config_startup.toml", "wb");
+    expect_true(fp != NULL, "should open explicit startup toml");
+    if (fp) {
+        fputs("mode = \"html\"\n", fp);
+        fputs("output_file = \"toml.html\"\n", fp);
+        fputs("font_size = 4\n", fp);
+        fclose(fp);
+    }
+
+    clear_test_env();
+    set_env_var("font_size", "3");
+    hasciicam_config_init_defaults(&cfg);
+    optind = 1;
+    hasciicam_config_parse(&cfg, argc, argv, "aahelp", "pkg", "1.0");
+
+    expect_true(cfg.mode == 2, "cli mode should override explicit toml");
+    expect_true(strcmp(cfg.aafile, "cli.asc") == 0,
+                "cli output_file should override explicit toml");
+    expect_true(cfg.fontsize == 3, "env font_size should override explicit toml");
+
+    remove("test_app_config_startup.toml");
+    clear_test_env();
+}
+
 static void test_toml_roundtrip(void) {
     hasciicam_config cfg;
     hasciicam_config loaded;
@@ -200,6 +263,8 @@ static void test_env_size_key_ignored(void) {
 int main(void) {
     test_env_load();
     test_cli_overrides_env();
+    test_default_toml_load();
+    test_explicit_toml_precedence();
     test_toml_roundtrip();
     test_toml_unknown_key();
     test_toml_mirror_roundtrip();

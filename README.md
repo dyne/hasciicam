@@ -47,6 +47,19 @@ File chooser behavior:
 - Windows: native `GetOpenFileNameW` dialog
 - Other platforms: fallback path field in the panel
 
+## Startup Configuration
+
+At startup, HasciiCam checks for `hasciicam.toml` in the current working
+directory and loads it when present. Use `--config path/to/file.toml` to load a
+specific TOML file instead.
+
+Configuration precedence is:
+
+1. Built-in defaults
+2. Startup TOML (`hasciicam.toml` or `--config`)
+3. Lowercase environment variables using canonical config-key names
+4. Command-line options
+
 ## Runtime Pipeline (2.0)
 
 The executable pipeline is split into explicit capture and conversion stages:
@@ -55,7 +68,7 @@ The executable pipeline is split into explicit capture and conversion stages:
 2. Open a capture backend through `src/capture/capture_backend.c`.
 3. Read frames through the backend `capture_ops` contract in `src/capture/capture.h`.
 4. Convert backend pixel formats to grayscale via `src/capture/frame_convert.c`.
-5. Write grayscale into AA-lib image memory and render ASCII with `aa_fastrender`.
+5. Write grayscale into AA-lib image memory and render ASCII with AA render params.
 6. Flush output through AA-lib driver selection (`SDL`, `stdout`, save drivers).
 
 This keeps platform camera code out of the render path and lets new backends
