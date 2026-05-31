@@ -1,6 +1,8 @@
 #ifndef HASCIICAM_APP_CONFIG_H
 #define HASCIICAM_APP_CONFIG_H
 
+#include <stddef.h>
+
 typedef enum hasciicam_size_intent {
     HASCIICAM_SIZE_NONE = 0,
     HASCIICAM_SIZE_PIXELS,
@@ -24,11 +26,15 @@ typedef struct hasciicam_config {
     hasciicam_size_intent size_intent;
     int explicit_size;
     int explicit_aadriver;
+    int explicit_output;
     int sdl_vsync;
     int sdl_fullscreen;
     int mirror_x;
     int mirror_y;
     int max_frames;
+    int show_help;
+    int show_aahelp;
+    int show_version;
     int uid;
     int gid;
     char device[256];
@@ -47,5 +53,14 @@ void hasciicam_config_parse(hasciicam_config *cfg,
                             const char *aa_help_text,
                             const char *package,
                             const char *version);
+int hasciicam_config_load_env(hasciicam_config *cfg, char *err, size_t err_size);
+int hasciicam_config_load_toml(hasciicam_config *cfg,
+                               const char *path,
+                               char *err,
+                               size_t err_size);
+int hasciicam_config_save_toml(const hasciicam_config *cfg,
+                               const char *path,
+                               char *err,
+                               size_t err_size);
 
 #endif

@@ -1,0 +1,4 @@
+Vendored third-party dependency: cktan/tomlc17
+Upstream: https://github.com/cktan/tomlc17
+Source commit: main branch snapshot downloaded on 2026-05-31
+Files used: src/tomlc17.h, src/tomlc17.c, LICENSE

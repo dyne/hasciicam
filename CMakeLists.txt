@@ -137,8 +137,10 @@ add_library(hasciicam_core STATIC
     ${HASCIICAM_OUTPUT_SOURCES}
     ${HASCIICAM_RENDER_SOURCES}
     ${HASCIICAM_CAPTURE_SOURCES}
+    src/app/tomlc17/tomlc17.c
 )
 target_include_directories(hasciicam_core PUBLIC include)
+target_include_directories(hasciicam_core PRIVATE src/app)
 if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
   target_sources(hasciicam_core PRIVATE src/capture/capture_avfoundation.mm)
 endif()
@@ -241,6 +243,20 @@ if(HASCIICAM_ENABLE_TESTS)
   target_include_directories(test_app_size PRIVATE src/app)
   add_test(NAME app_size COMMAND test_app_size)
   set_tests_properties(app_size PROPERTIES LABELS "unit;core")
+
+  add_executable(test_app_config
+    tests/test_app_config.c
+    src/app/app_config.c
+    src/app/tomlc17/tomlc17.c
+  )
+  target_include_directories(test_app_config PRIVATE src/app)
+  if(WIN32)
+    target_sources(test_app_config PRIVATE src/compat/getopt.c)
+    target_include_directories(test_app_config PRIVATE src/compat)
+    target_compile_definitions(test_app_config PRIVATE _CRT_SECURE_NO_WARNINGS)
+  endif()
+  add_test(NAME app_config COMMAND test_app_config)
+  set_tests_properties(app_config PROPERTIES LABELS "unit;core")
 
   add_executable(test_capture_size
     tests/test_capture_size.c
