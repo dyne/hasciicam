@@ -1,0 +1,175 @@
+#+TITLE: On-Screen GUI
+#+SUBTITLE: Add an optional right-click Dear ImGui control panel for live HasciiCam tuning and TOML config load/save
+#+DATE: 2026-05-31
+#+KEYWORDS: gui imgui sdl live tuning toml hasciicam
+
+* DONE [#A] Define the live control model
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Establish the smallest runtime state and use-case boundaries needed for a live on-screen GUI without coupling Dear ImGui directly to capture or AA-lib internals.
+:Notes: Challenge the first idea of putting all GUI state in `src/aalib/aasdl.c`: that file owns the SDL driver, but it should not know about TOML, capture semantics, or HasciiCam config rules. Prefer a small app-slice control state owned by `src/hasciicam.c`, with SDL/ImGui acting as an adapter. Keep this live-mode only at first; text and HTML modes have no window to host a GUI.
+:END:
+
+** DONE [#A] Inventory realtime-adjustable settings and ownership
+:PROPERTIES:
+:Why: The GUI should expose values that can actually change while frames are flowing, and avoid controls that require reopening capture or rebuilding AA-lib context.
+:Change: List settings in three groups. AA rendering group: `aa_bright`, `aa_contrast`, `aa_gamma`, and `invert`, applied through `hasciicam_render_session_apply_tuning()` and the existing render params. Display/output group: foreground and background colors for SDL live rendering, plus possibly fullscreen and mirror if they are safe to apply immediately. Capture group: mirror X/Y can already be applied through `hasciicam_session_set_mirror()`. Treat device, input channel, capture pixel size, and capture backend as non-realtime for the first version because changing them requires stop/reopen/re-negotiate.
+:Tests: No code tests for inventory. Verify with `rg -n "aa_bright|aa_contrast|aa_gamma|invert|mirror|background|foreground|capture_request|hasciicam_session_set_mirror" src include`.
+:Done when: The implementation notes clearly state which values are realtime controls, which are display-only, and which are intentionally deferred because they require capture/session restart.
+:END:
+
+** DONE [#A] Add a small GUI settings snapshot type
+:PROPERTIES:
+:Why: The GUI adapter needs a stable C boundary that can be tested without running SDL or ImGui.
+:Change: Add `src/gui/gui_state.h` and `src/gui/gui_state.c` with a plain C `hasciicam_gui_state` struct. Include current values for AA brightness, contrast, gamma, invert, mirror flags, live foreground/background colors as RGB triples or packed `0xRRGGBB`, save path, load path, and one-shot actions such as `save_requested` and `load_requested`. Provide native doc-comments for new public functions. Add helpers to initialize from `hasciicam_config`, copy changed values back to `hasciicam_config`, parse/format hex colors, and consume one-shot actions. Keep this as a use-case slice, not a generic property system.
+:Tests: Add or extend a plain C test executable for color parse/format, init-from-config, copy-to-config, and one-shot action consumption. Run the new touched test only after this L2.
+:Done when: GUI state can be initialized, changed, and converted back to config without SDL, ImGui, capture, or AA-lib dependencies.
+:END:
+
+** DONE [#B] Add runtime apply helpers
+:PROPERTIES:
+:Why: A changed slider should take effect on the next frame without spreading application logic through the GUI renderer.
+:Change: Add small app-level helpers, likely in `src/app/app_live_controls.c`, to apply a changed `hasciicam_gui_state` to `hasciicam_render_session`, `hasciicam_session`, and `hasciicam_config`. Apply AA values through `hasciicam_render_session_apply_tuning()`. Apply mirror through `hasciicam_session_set_mirror()`. For foreground/background, add a narrow SDL live-color adapter call rather than changing HTML config behavior. Keep non-live config fields synchronized only for save/load.
+:Tests: Unit test the pure config-copying path. For render/session calls, use existing smoke coverage unless a simple fake can be added without overbuilding. Run touched tests only after this L2.
+:Done when: The render loop can call one function after GUI input and all supported realtime values are applied through existing ports or one narrow display adapter.
+:END:
+
+* DONE [#A] Vendor and build Dear ImGui as an optional GUI dependency
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Vendor only the needed Dear ImGui source files from the local `imgui/` reference checkout into HasciiCam, then build the GUI only when SDL support is available.
+:Notes: Treat `imgui/` as read-only reference input: copy from it, but do not compile directly from it and do not mutate it. Challenge the first idea of copying the whole checkout: keep the vendored set minimal and auditable. Dear ImGui is useful enough here to justify an optional vendored dependency, but it should not become mandatory for CLI, text, HTML, or non-SDL builds.
+:END:
+
+** DONE [#A] Vendor the minimal Dear ImGui source set
+:PROPERTIES:
+:Why: The project should own the exact third-party files it builds, while keeping the reference checkout untouched.
+:Change: Copy only the needed files from `imgui/` into a vendored directory such as `third_party/imgui/` or `src/third_party/imgui/`: `imgui.cpp`, `imgui_draw.cpp`, `imgui_tables.cpp`, `imgui_widgets.cpp`, `imgui.h`, `imconfig.h`, `imgui_internal.h`, `imstb_rectpack.h`, `imstb_textedit.h`, `imstb_truetype.h`, `backends/imgui_impl_sdl2.cpp`, `backends/imgui_impl_sdl2.h`, `backends/imgui_impl_sdlrenderer2.cpp`, and `backends/imgui_impl_sdlrenderer2.h`. Do not copy `imgui_demo.cpp`, examples, fonts, debugger helpers, or unused renderer backends. Copy `LICENSE.txt` and add a short `README.hasciicam.md` recording the source path, upstream version or commit if available, copied file list, and update procedure.
+:Tests: Verify the copied files compile from the vendored path and that `git status` shows no modifications under `imgui/`.
+:Done when: HasciiCam has a minimal vendored ImGui subtree with license/provenance and no build dependency on the local reference checkout.
+:END:
+
+** DONE [#A] Add GUI build options and source lists
+:PROPERTIES:
+:Why: HasciiCam must continue to build without GUI support, and GUI support should not depend on the reference checkout once vendored.
+:Change: Add `HASCIICAM_ENABLE_GUI` as an option defaulting `ON` only when `HASCIICAM_WITH_SDL` is true and the vendored ImGui files exist, otherwise effectively off with a clear status message. Compile the vendored ImGui sources listed above, including only the SDL2 platform backend and SDL_Renderer2 renderer backend. Include vendored `imgui/` and `imgui/backends/` privately. Define `HASCIICAM_ENABLE_GUI=1` for targets that need the GUI adapter.
+:Tests: Configure/build with `HASCIICAM_ENABLE_GUI=ON` and with `HASCIICAM_ENABLE_GUI=OFF`. If SDL is absent, verify configure reports GUI disabled and the rest still builds.
+:Done when: The build can include or exclude GUI support deterministically from vendored files only.
+:END:
+
+** DONE [#B] Keep C and C++ boundaries narrow
+:PROPERTIES:
+:Why: The app is C, while Dear ImGui is C++; the boundary should be explicit and small.
+:Change: Add `src/gui/gui_overlay.h` as a C-callable header and `src/gui/gui_overlay.cpp` as the C++ adapter. Expose functions such as `hasciicam_gui_overlay_init(SDL_Window *, SDL_Renderer *)`, `hasciicam_gui_overlay_handle_event(const SDL_Event *)`, `hasciicam_gui_overlay_draw(hasciicam_gui_state *)`, and `hasciicam_gui_overlay_shutdown()`. Keep all ImGui includes in the `.cpp` file. Make the header compile cleanly from C by forward-declaring SDL types and wrapping declarations in `extern "C"` when compiled as C++.
+:Tests: Build both C and C++ targets. Add a minimal compile/link smoke test if CMake does not already catch the boundary. Run touched build/test target after this L2.
+:Done when: C files can call GUI overlay functions without including C++ or ImGui headers.
+:END:
+
+** DONE [#C] Document dependency and license handling
+:PROPERTIES:
+:Why: Optional third-party GUI code should be auditable and easy to disable.
+:Change: Add a short note to `README.md`, `AGENTS.md`, or a focused developer doc explaining that Dear ImGui is vendored under the chosen third-party path, copied from the local `imgui/` reference checkout, and built only when `HASCIICAM_ENABLE_GUI` and SDL are available. Mention the vendored license/provenance file and the update procedure. Avoid broad build-system documentation churn.
+:Tests: No code tests. Verify documentation names the exact CMake option and fallback behavior.
+:Done when: A future maintainer can tell how GUI support is enabled and why the repository still builds without it.
+:END:
+
+* DONE [#A] Wire the right-click overlay into SDL live output
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Show and hide the GUI on right mouse click in live SDL mode, render it over the ASCII capture, and let it consume input without breaking existing quit/fullscreen keys.
+:Notes: The SDL driver already owns the window, renderer, event polling, and present call. Keep integration there, but pass only GUI state and actions across the adapter boundary. Avoid changing X11, curses, stdout, HTML, or text output paths.
+:END:
+
+** DONE [#A] Extend the SDL driver with optional GUI hooks
+:PROPERTIES:
+:Why: The GUI must receive SDL events before they are discarded by `SDL_process_events()` and must render before `SDL_RenderPresent()`.
+:Change: Under `#if defined(HASCIICAM_ENABLE_GUI)`, add GUI fields to `struct sdldriverdata` in `src/aalib/aasdlint.h`: initialized flag, visible flag, and pointer/reference to shared `hasciicam_gui_state`. Add a small C-callable registration function from the app side, for example `hasciicam_sdl_set_gui_state(aa_context *, hasciicam_gui_state *)`, implemented only by the SDL driver. If the active driver is not SDL or GUI is disabled, the function should be a harmless no-op returning false.
+:Tests: Build with GUI off to prove the SDL driver remains unchanged for non-GUI builds. Build with GUI on to prove the new fields and registration function link.
+:Done when: `src/hasciicam.c` can register GUI state after `hasciicam_render_session_open()` without knowing SDL driver internals.
+:END:
+
+** DONE [#A] Toggle the overlay on right mouse click
+:PROPERTIES:
+:Why: The requested activation gesture is right mouse click, and it should work independently of keyboard focus.
+:Change: In the SDL event loop, forward every event to ImGui when GUI is initialized. On `SDL_MOUSEBUTTONDOWN` with `SDL_BUTTON_RIGHT`, toggle the overlay visible flag unless ImGui wants to capture the mouse for an active widget. Keep existing handling for quit, close, `q`, `Ctrl+C`, fullscreen `f`, and fullscreen escape. When the overlay is visible, let ImGui consume left-clicks, drags, text input, and keyboard navigation for widgets.
+:Tests: Add manual visual smoke steps because automated mouse/GUI tests may be brittle: run live mode with `-d synthetic:// --frames 0` or without frame limit, right-click to show/hide, drag a slider, press `q` to quit. If a headless SDL dummy smoke is practical, add it as an opt-in visual test only.
+:Done when: Right-click reliably opens and closes the control panel and existing keyboard controls still work.
+:END:
+
+** DONE [#B] Render the panel over the ASCII output
+:PROPERTIES:
+:Why: The GUI should be on-screen without replacing the live capture view.
+:Change: In `SDL_flush()`, after rendering the ASCII stream texture and cursor but before `SDL_RenderPresent()`, call the GUI overlay draw function when visible. Use a side panel anchored to the right side of the window when there is enough width; otherwise use a compact floating panel. Keep the capture centered and do not resize or crop ASCII output just to make room for the first version.
+:Tests: Manual visual check on desktop window sizes: normal, narrow, and fullscreen. Verify the panel does not flicker and does not leave stale pixels after hiding.
+:Done when: The overlay draws above the ASCII capture and remains usable across window resize and fullscreen toggles.
+:END:
+
+* DONE [#A] Implement live controls and config actions
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Provide the requested sliders, color pickers, Save button, and Load button with simple, predictable behavior.
+:Notes: Favor immediate-mode clarity over a complex model-view layer. Use ImGui widgets directly in the C++ overlay, but route all durable state through `hasciicam_gui_state` and existing config APIs.
+:END:
+
+** DONE [#A] Add AA rendering controls
+:PROPERTIES:
+:Why: Brightness, contrast, and gamma are the main visible AA-lib tuning values requested by the user.
+:Change: Add sliders for `aa_bright`, `aa_contrast`, and `aa_gamma`. Use conservative ranges based on existing defaults and AA-lib parser behavior; if unsure after inspecting `src/aalib/aaparse.c`, choose ranges wide enough for current CLI values but not so wide that tiny mouse movement makes the output unusable. Add an invert checkbox if existing config supports realtime inversion through render params. Show current numeric values beside sliders using ImGui defaults.
+:Tests: Unit test state changes and manual live smoke by moving each slider while synthetic capture is running. Run touched tests only after this L2.
+:Done when: Slider changes visibly affect the next rendered frames without restarting capture or the app.
+:END:
+
+** DONE [#B] Add capture-side controls that are safe at runtime
+:PROPERTIES:
+:Why: The user asked for controls on the capture side when available, but not every capture parameter can be changed live.
+:Change: Add a "Capture" section with mirror X/Y checkboxes as the first realtime capture controls. Display negotiated capture width, height, stride, and pixel format as read-only text from `capture_info`. Defer device/input/size changes and backend-specific camera properties unless a capture adapter exposes a safe setter later. If future backend controls are desired, plan a narrow `capture_control` port rather than embedding V4L2/Media Foundation details in the GUI.
+:Tests: Unit test config/state mirror propagation. Manual smoke: toggle mirror controls and verify frame orientation changes on synthetic or real capture.
+:Done when: Capture section includes useful live controls where available and read-only diagnostics for values that cannot be safely changed live yet.
+:END:
+
+** DONE [#A] Add foreground/background color pickers
+:PROPERTIES:
+:Why: Live SDL colors are currently hard-coded-ish in the SDL driver, while config already persists foreground/background hex values for file output.
+:Change: Add ImGui color editors for foreground and background using RGB floats mapped to `0xRRGGBB` and `hasciicam_config.background`/`foreground` hex strings. Update the SDL renderer color mapping so normal text and clear/background use the chosen colors. Preserve AA attributes by deriving dim/bold colors from the selected foreground, for example dim as a darker foreground and bold as the foreground or a clamped brighter variant. Keep HTML save/load config using the same hex strings.
+:Tests: Unit test hex parse/format and color derivation bounds. Manual visual smoke: choose black/green defaults, a bright foreground, and a light background.
+:Done when: Changing foreground/background in the panel immediately changes live SDL output and persists as TOML-compatible hex colors.
+:END:
+
+** DONE [#A] Add Save and Load actions
+:PROPERTIES:
+:Why: The requested GUI must persist the current settings and load them back from TOML.
+:Change: Add a Save button that writes the current `hasciicam_config` through `hasciicam_config_save_toml()`. Use a default path such as `hasciicam.toml` in the current working directory unless a loaded/saved path is already known. Add a Load button that chooses a TOML path, calls `hasciicam_config_load_toml()`, updates GUI state, and applies realtime settings. Implement file choosing through a small platform adapter, for example `src/gui/gui_file_dialog.h` plus platform sources selected at build time. First implement Windows only with `GetOpenFileNameW` in a Windows-specific source guarded by `WIN32` and linked with the normal system libraries already available to Win32 builds. Add a portable fallback source for non-Windows and for disabled native dialogs: it returns "not available" so the ImGui panel shows a path text box and an explicit "Load path" button. Keep the adapter API narrow: open existing TOML file, return selected path or cancel/error. Defer macOS `NSOpenPanel` and Linux portal/GTK dialogs to later L2s unless implementing on those platforms during this plan. Do not add a new dialog dependency without asking.
+:Tests: Unit test save/load roundtrip through existing config tests. Manual smoke: save a TOML, edit or reload it, verify sliders/colors update and rendering changes. Run `app_config` tests after this L2.
+:Done when: Save creates a TOML file, Load can select or enter a TOML path, loaded values update both config and live rendering, and errors are shown in the panel without exiting the app.
+:END:
+
+* WIP [#B] Update documentation and verification
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Make the feature understandable for users and reviewers, and verify it does not regress non-GUI modes.
+:Notes: Keep docs concise. User-facing behavior changes belong in README/man page if a CLI/build option is exposed; implementation details belong in AGENTS only if they help future LLM agents work safely.
+:END:
+
+** DONE [#B] Document the GUI behavior
+:PROPERTIES:
+:Why: Users need to know that the panel is live-mode SDL-only and activated with right-click.
+:Change: Update `README.md` and, if appropriate, `docs/hasciicam.1` with a short section: enable/build requirements, right-click toggles the panel, sliders apply immediately, Save writes TOML, Load reads TOML, and the file chooser may fall back to a path field on platforms without a native dialog adapter.
+:Tests: No code tests. Verify command names and option names match CMake and runtime behavior.
+:Done when: User docs describe how to build and use the GUI without overstating support in non-SDL modes.
+:END:
+
+** DONE [#B] Add reviewer notes to AGENTS.md
+:PROPERTIES:
+:Why: Future agents should know where the GUI boundary lives and how vendored ImGui is managed.
+:Change: Add a brief AGENTS.md summary only after implementation: GUI is optional, live SDL-only, C app state lives under `src/gui`, ImGui C++ adapter lives behind a C ABI, vendored ImGui files live under the chosen third-party path, and `imgui/` is only a local reference checkout for copying/updating vendor files.
+:Tests: No code tests.
+:Done when: AGENTS.md contains only durable implementation guidance, not temporary plan details.
+:END:
+
+** TODO [#A] Run full build and test matrix for this feature
+:PROPERTIES:
+:Why: The feature touches build configuration, SDL live rendering, config persistence, and the main render loop.
+:Change: Run a normal CMake/Ninja build, `ctest --output-on-failure --test-dir build`, `hasciicam -h`, and `hasciicam -H` if AA option parsing or help text changed. Also run GUI-enabled and GUI-disabled builds if possible. Run live synthetic smoke with SDL and right-click GUI interaction. On platforms where a native file picker is implemented, manually test cancel, invalid file, and successful load.
+:Tests: This L2 is the verification pass. Fix any failures before marking done.
+:Done when: Automated tests pass, GUI-disabled build still works, GUI-enabled SDL live smoke works, and any platform-specific smoke gaps are documented for reviewers.
+:END:

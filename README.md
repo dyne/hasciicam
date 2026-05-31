@@ -33,6 +33,20 @@ cmake --preset windows-vcpkg-ninja
 ```
 Other presets are `linux-ninja`, `macos-ninja`, and `wasm-emscripten`.
 
+## On-Screen GUI (SDL Live Mode)
+
+HasciiCam can show an optional on-screen control panel in live SDL mode.
+
+- Build toggle: `HASCIICAM_ENABLE_GUI` (requires SDL and vendored Dear ImGui under `third_party/imgui/`)
+- Activation: right mouse click in the SDL window
+- Live controls: AA brightness/contrast/gamma, invert, mirror, foreground/background colors
+- Config actions: `Save` writes TOML, `Load` reads TOML
+
+File chooser behavior:
+
+- Windows: native `GetOpenFileNameW` dialog
+- Other platforms: fallback path field in the panel
+
 ## Runtime Pipeline (2.0)
 
 The executable pipeline is split into explicit capture and conversion stages:
