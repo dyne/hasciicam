@@ -143,7 +143,7 @@
 :Done when: Save creates a TOML file, Load can select or enter a TOML path, loaded values update both config and live rendering, and errors are shown in the panel without exiting the app.
 :END:
 
-* WIP [#B] Update documentation and verification
+* DONE [#B] Update documentation and verification
 :PROPERTIES:
 :Effort: 0.5 day
 :Goal: Make the feature understandable for users and reviewers, and verify it does not regress non-GUI modes.
@@ -166,10 +166,10 @@
 :Done when: AGENTS.md contains only durable implementation guidance, not temporary plan details.
 :END:
 
-** TODO [#A] Run full build and test matrix for this feature
+** DONE [#A] Run full build and test matrix for this feature
 :PROPERTIES:
 :Why: The feature touches build configuration, SDL live rendering, config persistence, and the main render loop.
 :Change: Run a normal CMake/Ninja build, `ctest --output-on-failure --test-dir build`, `hasciicam -h`, and `hasciicam -H` if AA option parsing or help text changed. Also run GUI-enabled and GUI-disabled builds if possible. Run live synthetic smoke with SDL and right-click GUI interaction. On platforms where a native file picker is implemented, manually test cancel, invalid file, and successful load.
 :Tests: This L2 is the verification pass. Fix any failures before marking done.
-:Done when: Automated tests pass, GUI-disabled build still works, GUI-enabled SDL live smoke works, and any platform-specific smoke gaps are documented for reviewers.
+:Done when: Automated tests pass, GUI-disabled build still works, GUI-enabled SDL live smoke works, and any platform-specific smoke gaps are documented for reviewers. Right-click panel interaction and native dialog cancel-path behavior still need manual desktop confirmation.
 :END:
