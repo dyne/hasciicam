@@ -1,0 +1,207 @@
+#+TITLE: Config System
+#+SUBTITLE: Map every launch switch to small config variables with CLI, environment, and TOML support through tomlc17
+#+DATE: 2026-05-31
+#+KEYWORDS: config cli environment toml hasciicam
+
+* DONE [#A] Inventory current configurable behavior
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Produce one complete source of truth for every current HasciiCam option and runtime switch before changing parser behavior.
+:Notes: Challenge the first idea of only wrapping `getopt_long`: this would miss mode side effects, SDL variables, and action options such as help/version. Keep the inventory small and code-adjacent, not a generated schema framework.
+:END:
+
+** DONE [#A] Catalog all command-line options and parser side effects
+:PROPERTIES:
+:Why: The new config system must match existing behavior, including options that do not simply assign one field.
+:Change: Read `src/app/app_config.c` and list every option from `long_options`, `short_options`, `help_text`, and the `switch` in `hasciicam_config_parse`. Record the current behavior, default value, validation, and side effects for each option. Include `-h/--help`, `-H/--aahelp`, and `-v/--version` as launch actions even though they exit today. Include `-s/--size` as a contextual alias that becomes character size in HTML mode and pixel size in live/text mode. Include mode side effects where `--mode html` defaults `aafile` to `hasciicam.html` and `--mode text` defaults it to `hasciicam.asc`. Note that the current short option string contains `f:` and `Q:` without implemented switch cases; do not add behavior for them unless a matching existing user-facing option is found.
+:Tests: No code tests; this is design inventory. Verify by comparing the final inventory against `hasciicam -h` output and the current option arrays.
+:Done when: The implementation notes contain every current option, its variable name, default, accepted values, and current side effects.
+:END:
+
+** DONE [#A] Catalog non-CLI runtime switches already used by the app
+:PROPERTIES:
+:Why: The request includes other configurable switches, and SDL behavior is currently controlled through process environment variables set from config.
+:Change: Inspect `src/hasciicam.c`, `src/aalib/aasdl.c`, and adjacent app/session modules for runtime switches outside normal CLI parsing. Include `HASCIICAM_SDL_RENDERER`, `HASCIICAM_SDL_VSYNC`, and `HASCIICAM_SDL_FULLSCREEN` as config-backed variables because the app already bridges them. Distinguish runtime config from CMake build options such as `HASCIICAM_ENABLE_SDL`; build options are not launch-time variables and should not be loaded from user TOML.
+:Tests: No code tests. Verify with `rg -n "getenv|setenv|SetEnvironmentVariable|HASCIICAM_" src include`.
+:Done when: The inventory explicitly states which switches are runtime config and which are compile-time build toggles excluded from launch config.
+:END:
+
+** DONE [#B] Choose final variable names and aliases
+:PROPERTIES:
+:Why: Variable names must be short, predictable, and valid across CLI, environment, and TOML sources.
+:Change: Define a table of canonical config keys using one or two words, three only when needed, all lowercase words separated by underscores. Use these keys for TOML and environment variables. Proposed canonical keys: `show_help`, `show_aahelp`, `show_version`, `quiet`, `mode`, `device`, `input`, `size`, `pixel_size`, `char_size`, `output_file`, `aa_driver`, `daemon`, `font_size`, `font_face`, `refresh`, `aa_bright`, `aa_contrast`, `aa_gamma`, `invert`, `background`, `foreground`, `uid`, `gid`, `frames`, `sdl_renderer`, `sdl_vsync`, `fullscreen`, `mirror`, plus derived/internal fields `size_intent`, `line_space`, `explicit_size`, and `explicit_driver`. Prefer `output_file` as the config key while keeping `--aafile` as the compatibility CLI spelling. Prefer `aa_driver` as the key while keeping `--aadriver`. Prefer `frames` over `max_frames` because it matches launch wording and is shorter.
+:Tests: No code tests. Review every key against the naming rule: one or two words by default, maximum three when needed, underscores only.
+:Done when: A checked-in comment or developer note near the config table shows the command-line option, environment/TOML key, struct field, parser, and default for every variable.
+:END:
+
+* DONE [#A] Build a table-driven config core
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Centralize config defaults, parsing, validation, and serialization metadata without introducing a large abstraction layer.
+:Notes: Keep this in the app slice. The simplest viable shape is a small descriptor table plus plain C helper functions in `src/app/app_config.*`. Do not introduce a generic reflection system.
+:END:
+
+** DONE [#A] Add config variable descriptors
+:PROPERTIES:
+:Why: One descriptor table prevents CLI, environment, and TOML support from drifting apart.
+:Change: Add a static table in `src/app/app_config.c` or a small new `src/app/app_config_vars.c` if the file becomes too large. Each row should contain canonical key, value type, target field offset or setter callback, default string or default callback, validation parser, and flags for serialize/load. Use callbacks for variables with side effects: `mode`, `size`, `pixel_size`, `char_size`, `font_size`, `sdl_vsync`, `sdl_renderer`, `mirror`, `show_help`, `show_aahelp`, and `show_version`. Keep simple ints and strings as direct setters when validation is trivial.
+:Tests: Add a plain C unit test executable if none already covers config parsing directly. Test descriptor lookup for a few known keys and that every command-line option has a descriptor or an explicit launch-action descriptor.
+:Done when: There is one authoritative descriptor table covering all keys from the inventory, and existing defaults still initialize to the same values.
+:END:
+
+** DONE [#A] Preserve current defaults and mode side effects
+:PROPERTIES:
+:Why: Config refactoring should not change startup behavior.
+:Change: Keep `hasciicam_config_init_defaults` as the single default initializer. Move repeated default values into descriptor defaults only if it keeps the code clearer. Ensure non-Windows device defaults still choose `/dev/video` when present and `/dev/video0` otherwise. Ensure `mode=html` assigns `output_file=hasciicam.html` only when the output file was not explicitly set by a higher-precedence source. Ensure `mode=text` assigns `output_file=hasciicam.asc` only when not explicit. Track explicitness with small flags such as `explicit_output`, `explicit_size`, and `explicit_driver`.
+:Tests: Add config tests for default live mode, default device behavior where practical, `mode=html` output default, `mode=text` output default, and explicit output overriding mode defaults.
+:Done when: A default config produces the same runtime values as before, and tests prove mode/output precedence.
+:END:
+
+** DONE [#A] Normalize parser functions by value type
+:PROPERTIES:
+:Why: Environment and TOML inputs need the same validation rules as CLI options.
+:Change: Extract reusable setters for boolean, integer, bounded integer when needed, string copy, mode, `WxH` sizes, SDL vsync, SDL renderer, mirror axis, and color strings. For booleans accept `1`, `0`, `true`, `false`, `yes`, `no`, `on`, and `off` where appropriate. Keep `sdl_vsync` special because it also accepts `auto`. Preserve current permissive integer behavior only where required, but prefer clear errors for invalid new env/TOML values.
+:Tests: Unit test accepted and rejected values for booleans, `mode`, `size`, `sdl_vsync`, `sdl_renderer`, and `mirror`.
+:Done when: CLI, environment, and TOML setters call the same validation helpers instead of duplicating parsing logic.
+:END:
+
+** DONE [#B] Add config error reporting helpers
+:PROPERTIES:
+:Why: Existing CLI errors print and exit; env/TOML loaders should report which key failed without spreading `fprintf` calls everywhere.
+:Change: Add a small `hasciicam_config_error` struct or callback-free helper that formats messages like `invalid value for sdl_vsync: expected on, off, or auto`. Keep CLI behavior as print-to-stderr then exit for invalid launch options. Make internal TOML load functions return an error code and optional message buffer instead of exiting.
+:Tests: Unit test one invalid CLI-style setter and one invalid TOML-style load path.
+:Done when: Invalid values are reported with key names and expected values, and internal load functions do not terminate the process.
+:END:
+
+* DONE [#A] Wire launch-time precedence for environment and CLI
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Let every config variable be set at launch from environment variables and command-line options, while keeping command-line options highest precedence.
+:Notes: Use lowercase environment variable names exactly matching canonical keys, as requested: for example `mode=html`, `font_size=2`, and `sdl_vsync=off`. This is unusual on Windows and Unix, but it is the requested contract. Do not add uppercase aliases unless explicitly requested later.
+:END:
+
+** DONE [#A] Load environment variables after defaults
+:PROPERTIES:
+:Why: Environment variables should provide launch defaults without overriding explicit CLI options.
+:Change: Add `hasciicam_config_load_env(hasciicam_config *cfg, char *err, size_t err_size)`. Iterate the descriptor table and call `getenv(key)` for each canonical key. If the variable exists and is non-empty, parse and apply it through the descriptor setter. Treat empty environment variables as unset to avoid accidental blank strings. Record explicitness for values supplied by env so mode side effects do not overwrite `output_file`, `size`, or driver choices unintentionally.
+:Tests: Add config unit tests that set temporary environment variables for `mode`, `output_file`, `font_size`, `invert`, `sdl_vsync`, and `char_size`, then verify resulting fields. Restore the previous process environment after each test.
+:Done when: Every descriptor can be loaded from a lowercase environment variable and invalid env values produce a readable launch error.
+:END:
+
+** DONE [#A] Keep command-line options as highest precedence
+:PROPERTIES:
+:Why: Users expect explicit CLI arguments to override environment defaults.
+:Change: Refactor `hasciicam_config_parse` so each option delegates to the same descriptor setters used by env/TOML. Call order at launch should become defaults, environment, then command-line. Preserve AA-lib parsing order outside this function as it exists today. Preserve `-h`, `-H`, and `-v` behavior by setting launch-action variables and then executing those actions after parsing enough context to print the same output. If keeping immediate exits is much simpler, document that these three action options are represented in the table but still exit immediately.
+:Tests: Add tests where env sets `mode=html` and CLI sets `--mode text`; env sets `font_size=4` and CLI sets `--font-size 2`; env sets `output_file=env.html` and CLI sets `-o cli.html`. Existing CLI smoke tests must still pass.
+:Done when: CLI values consistently override environment values, and current help/version behavior remains user-compatible.
+:END:
+
+** DONE [#B] Decide and document option aliases
+:PROPERTIES:
+:Why: CLI option names are historical while config keys should be clearer and shorter.
+:Change: Keep existing command-line spellings for compatibility: `--aafile`, `--aadriver`, `--pixel-size`, `--char-size`, `--font-size`, `--font-face`, `--sdl-renderer`, `--sdl-vsync`. Do not add new CLI aliases unless tests or documentation show a strong need. Environment and TOML use canonical names: `output_file`, `aa_driver`, `pixel_size`, `char_size`, `font_size`, `font_face`, `sdl_renderer`, and `sdl_vsync`.
+:Tests: Existing CLI tests prove old spellings still work. Add env/TOML tests proving canonical names work.
+:Done when: Backward-compatible CLI spellings and canonical config keys are both documented.
+:END:
+
+** DONE [#B] Apply SDL environment bridge from config once
+:PROPERTIES:
+:Why: SDL currently reads `HASCIICAM_SDL_RENDERER`, `HASCIICAM_SDL_VSYNC`, and `HASCIICAM_SDL_FULLSCREEN`; the new env contract uses lowercase config variables instead.
+:Change: Keep the existing bridge in `src/hasciicam.c` or move it to a clearly named helper. It should translate config fields into the existing `HASCIICAM_SDL_*` process variables before SDL initializes. Do not require users to set `HASCIICAM_SDL_*` directly. If both old `HASCIICAM_SDL_*` and new lowercase config variables are present, prefer the config field because it can come from CLI or lowercase env.
+:Tests: Add or update an SDL-related smoke test only if it can run headless/deterministically. Otherwise unit test the bridge helper by checking process environment values after applying a config.
+:Done when: `sdl_renderer`, `sdl_vsync`, and `fullscreen` work from CLI and lowercase env without changing SDL driver internals.
+:END:
+
+* DONE [#A] Add TOML load and save functions with tomlc17
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Provide internal config file helpers that use the vendored `cktan/tomlc17` C parser for TOML reading and a small flat writer for TOML saving.
+:Notes: This is internal API, not a new launch feature unless requested later. The dependency is explicitly requested: vendor only the C header/source needed by `tomlc17`, keep it statically built in the app source slice, and avoid wrapping it in a broad config framework.
+:END:
+
+** DONE [#A] Vendor tomlc17 into the app source slice
+:PROPERTIES:
+:Why: The plan should use the requested TOML implementation rather than a custom parser, while keeping HasciiCam buildable without system packages.
+:Change: Copy `tomlc17.h` and `tomlc17.c` from `https://github.com/cktan/tomlc17` into a local source-slice directory such as `src/app/tomlc17/` or `src/app/config/tomlc17/`. Include the upstream MIT license text or copyright notice in a local `LICENSE.tomlc17`/comment according to the library license. Record the upstream commit or release tag in a short comment or `README` near the vendored files so future updates are auditable. Do not vendor the C++ wrapper, tests, examples, or Makefile unless they are needed.
+:Tests: Configure and build after adding the files. Verify the vendored header is included through a local path and no external TOML package is required.
+:Done when: The repository contains the `tomlc17` C header/source, license notice, and source provenance, and the build can compile them statically.
+:END:
+
+** DONE [#A] Add tomlc17 to CMake statically
+:PROPERTIES:
+:Why: The parser must be included in the build without adding runtime or system dependencies.
+:Change: Add the vendored `tomlc17.c` to the appropriate target source list, preferably `hasciicam_core` if TOML load/save functions live in the app/config code. Add the vendored include directory privately to the target that needs it. Keep compiler options local if the third-party code needs warning suppression; do not lower warning quality for HasciiCam sources. Confirm `tomlc17` is C-compatible in the current build modes and does not force C++.
+:Tests: Run `cmake --build build` or configure/build if the build tree does not exist.
+:Done when: `tomlc17.c` is compiled into HasciiCam targets that use config file support, with no system TOML dependency.
+:END:
+
+** DONE [#A] Define internal file API
+:PROPERTIES:
+:Why: Tests and future embedding code need stable functions without exposing unnecessary parser details.
+:Change: Add declarations in `src/app/app_config.h`: `int hasciicam_config_load_toml(hasciicam_config *cfg, const char *path, char *err, size_t err_size);` and `int hasciicam_config_save_toml(const hasciicam_config *cfg, const char *path, char *err, size_t err_size);`. If direct file IO in tests is awkward, also add string helpers with internal linkage or test-only exposure: parse from `toml_datum_t`/`FILE *` and write to `FILE *`.
+:Tests: Build tests must include the new declarations from C and compile without warnings.
+:Done when: Internal callers can load and save config files through small C functions that return success/failure instead of exiting.
+:END:
+
+** DONE [#A] Implement TOML loading through tomlc17
+:PROPERTIES:
+:Why: Using the requested library avoids maintaining custom TOML parsing code and gives clear syntax errors from a tested parser.
+:Change: In `hasciicam_config_load_toml`, call `toml_parse_file_ex(path)`, check `result.ok`, and always call `toml_free(result)` before returning. Iterate the top-level table (`result.toptab.u.tab`) and reject nested tables, arrays, dates, times, floats, and unknown keys because HasciiCam config is still a flat canonical key list. Accept TOML strings for string/enum/size fields, TOML integers for integer fields, and TOML booleans for boolean fields. For convenience, also allow strings for all values so examples like `font_size = "2"` still pass through the shared setter. Convert each accepted TOML datum into the same string/setter path used by CLI/env where practical, or call typed setters that share validation. Include `datum.lineno`/`datum.colno` in errors when available.
+:Tests: Unit test a file containing strings, integers, booleans, TOML comments, whitespace, `size = "80x25"`, `mode = "html"`, and `sdl_vsync = "auto"`. Unit test unknown key, invalid value, malformed TOML syntax reported by `tomlc17`, nested table rejection, array rejection, float rejection, and date/time rejection.
+:Done when: Loading a flat TOML file parsed by `tomlc17` updates the config through the same validation paths as other sources, and unsupported TOML structures fail with clear errors.
+:END:
+
+** DONE [#A] Implement the TOML writer
+:PROPERTIES:
+:Why: Saving config should round-trip current values and provide users a readable example file.
+:Change: Use a small HasciiCam writer rather than expecting `tomlc17` to encode output; the library is a parser. Write only canonical keys that represent persisted config values. Exclude transient launch actions `show_help`, `show_aahelp`, and `show_version`. Include derived fields only if they are user meaningful; prefer writing `pixel_size` or `char_size` based on `size_intent` rather than raw `size_intent`, `explicit_size`, or `line_space`. Quote strings and escape backslash, quote, newline, tab, and other control characters needed for valid TOML basic strings. Write booleans as bare TOML booleans, integers as bare integers, and enum-like values such as `mode`, `sdl_vsync`, and `mirror` as quoted strings.
+:Tests: Unit test save then load round-trip for a representative config. Verify the saved file contains canonical keys and no historical CLI names such as `aafile` or `aadriver`.
+:Done when: A saved config can be loaded back into an equivalent `hasciicam_config` for all persisted user-facing variables.
+:END:
+
+** DONE [#B] Keep TOML precedence internal and explicit
+:PROPERTIES:
+:Why: The request asks for internal load/save functions, not automatic startup file discovery.
+:Change: Do not auto-load `~/.hasciicam.toml`, current-directory files, or platform config directories. Document that callers may choose the order explicitly. Recommended future launch order, if a `--config` option is later requested, would be defaults, config file, environment, command-line.
+:Tests: No runtime tests beyond ensuring current CLI startup does not read files unexpectedly.
+:Done when: No automatic config file lookup is added, and docs/comments state the intended order for future callers.
+:END:
+
+* WIP [#B] Update documentation and automated coverage
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Make the new config behavior discoverable and covered by deterministic CTest tests.
+:Notes: Documentation should help users without expanding scope. Keep examples short and use existing option names plus canonical config keys.
+:END:
+
+** DONE [#A] Add focused config unit tests
+:PROPERTIES:
+:Why: This change affects launch behavior and needs deterministic coverage without camera or display dependencies.
+:Change: Add a plain C test target under the existing CMake/CTest setup, for example `config_parse`. Cover defaults, CLI parsing, environment parsing, CLI-over-env precedence, mode/output side effects, size intent, invalid values, TOML load, and TOML save/load round-trip. Keep generated TOML files in the build tree. Use process env carefully so tests do not leak variables across cases.
+:Tests: Run `cmake --build build` and `ctest --output-on-failure --test-dir build -R config`.
+:Done when: Config behavior has direct unit coverage and does not rely only on CLI smoke tests.
+:END:
+
+** DONE [#A] Keep existing CLI smoke tests passing
+:PROPERTIES:
+:Why: Existing smoke tests protect compatibility for users and packaging scripts.
+:Change: Run the current CLI tests after refactoring. Update tests only when they assert implementation details that intentionally changed; do not change user-facing command behavior casually. Include `hasciicam -h` and `hasciicam -H` because help and AA-help option parsing are special action paths.
+:Tests: Run `ctest --output-on-failure --test-dir build -L cli`, plus direct `build/hasciicam -h` and `build/hasciicam -H` when the executable path is available.
+:Done when: Existing CLI smoke tests still pass with the new config system.
+:END:
+
+** TODO [#B] Document environment variables and TOML examples
+:PROPERTIES:
+:Why: Users need to know the canonical lowercase key names, and maintainers need to know that TOML parsing is delegated to vendored `tomlc17` while HasciiCam intentionally accepts only flat config keys.
+:Change: Update `AGENTS.md` if useful for future LLM work, and update user-facing docs such as `doc/hasciicam.1` or a docs page if config behavior is exposed publicly. Show examples: `mode=html output_file=frame.html hasciicam`, `font_size=2 foreground=FFFFFF hasciicam -m html`, and a minimal TOML file with `mode = "text"`, `output_file = "hasciicam.asc"`, `device = "/dev/video0"`, `char_size = "80x25"`, `sdl_renderer = "software"`, and `sdl_vsync = "off"`. State that TOML load/save functions are internal unless a CLI `--config` option is added later. Document the vendored `tomlc17` source, license, and update path in the source tree rather than only in user docs.
+:Tests: No automated doc tests unless the repository already has them. Man page formatting should be checked if the toolchain is available.
+:Done when: The docs list canonical config keys and explain CLI/env/TOML scope without implying unsupported auto-loading.
+:END:
+
+** DONE [#B] Run full verification before final commits
+:PROPERTIES:
+:Why: Config parsing touches startup and tests across CLI modes.
+:Change: After all L2 implementation commits are complete, run the normal project verification: configure/build with CMake and Ninja, run all CTest tests, run `hasciicam -h`, and run `hasciicam -H` because AA-lib option ordering must remain intact.
+:Tests: `cmake --build build`, `ctest --output-on-failure --test-dir build`, `build/hasciicam -h`, and `build/hasciicam -H`. On Windows, use the configured build directory and executable path.
+:Done when: Build, full tests, help, and AA-help pass or any platform limitation is documented in the reviewer summary.
+:END:
