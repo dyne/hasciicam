@@ -51,9 +51,12 @@ set(HASCIICAM_AALIB_SOURCES
 
 set(HASCIICAM_APP_SOURCES
     src/app/app_config.c
+    src/app/app_live_controls.c
     src/app/app_size.c
     src/app/app_session.c
     src/display/display_size.c
+    src/gui/gui_bridge_stub.c
+    src/gui/gui_state.c
     src/public/hasciicam_api.c
 )
 

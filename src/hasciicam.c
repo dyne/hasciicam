@@ -45,10 +45,14 @@
 
 #include <aalib.h>
 #include "app/app_config.h"
+#include "app/app_live_controls.h"
 #include "app/app_size.h"
 #include "app/app_session.h"
 #include "capture/capture_backend.h"
 #include "display/display_size.h"
+#include "gui/gui_bridge.h"
+#include "gui/gui_file_dialog.h"
+#include "gui/gui_state.h"
 #include "output/output.h"
 #include "output/output_file.h"
 #include "render/render_session.h"
@@ -122,6 +126,7 @@ main (int argc, char **argv) {
   const capture_info *cap_info = NULL;
   hasciicam_session session;
   hasciicam_render_session render_session;
+  hasciicam_gui_state gui_state;
   hasciicam_output output;
   struct geometry aa_geo;
   struct geometry vid_geo;
@@ -346,6 +351,13 @@ main (int argc, char **argv) {
                                         aa_geo.bright,
                                         aa_geo.contrast,
                                         (float)aa_geo.gamma);
+  render_session.render_params->inversion = appcfg.invert ? 1 : 0;
+  hasciicam_gui_state_init(&gui_state, &appcfg);
+  hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
+  hasciicam_sdl_set_runtime_colors(render_session.context,
+                                   gui_state.foreground_rgb,
+                                   gui_state.background_rgb);
+  hasciicam_sdl_set_gui_state(render_session.context, &gui_state);
   // those are left to be setted by aalib options
   //  ascii_rndparms->dither = AA_FLOYD_S;
   //  ascii_rndparms->inversion = invert;
@@ -371,6 +383,73 @@ main (int argc, char **argv) {
     const unsigned char *gray_frame = NULL;
     int gray_size = 0;
     int frame_rendered = 0;
+    char cfg_err[256];
+
+    if (gui_state.open_load_dialog_requested) {
+      hasciicam_gui_file_dialog_result dialog_res;
+      char dialog_err[256];
+      dialog_err[0] = '\0';
+      gui_state.open_load_dialog_requested = 0;
+      dialog_res = hasciicam_gui_select_toml_file(gui_state.load_path,
+                                                  sizeof(gui_state.load_path),
+                                                  dialog_err,
+                                                  sizeof(dialog_err));
+      if (dialog_res == HASCIICAM_GUI_FILE_DIALOG_SELECTED) {
+        snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                 "selected: %s", gui_state.load_path);
+        gui_state.status_is_error = 0;
+      } else if (dialog_res == HASCIICAM_GUI_FILE_DIALOG_ERROR) {
+        snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                 "%s", dialog_err[0] ? dialog_err : "file dialog error");
+        gui_state.status_is_error = 1;
+      }
+    }
+
+    if (gui_state.save_requested) {
+      gui_state.save_requested = 0;
+      hasciicam_gui_state_copy_to_config(&gui_state, &appcfg);
+      cfg_err[0] = '\0';
+      if (hasciicam_config_save_toml(&appcfg, gui_state.save_path, cfg_err, sizeof(cfg_err))) {
+        snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                 "saved: %s", gui_state.save_path);
+        gui_state.status_is_error = 0;
+      } else {
+        snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                 "save failed: %s", cfg_err[0] ? cfg_err : "unknown error");
+        gui_state.status_is_error = 1;
+      }
+    }
+
+    if (gui_state.load_requested) {
+      char loaded_path[260];
+      char saved_path[260];
+      gui_state.load_requested = 0;
+      strncpy(loaded_path, gui_state.load_path, sizeof(loaded_path) - 1);
+      loaded_path[sizeof(loaded_path) - 1] = '\0';
+      strncpy(saved_path, gui_state.save_path, sizeof(saved_path) - 1);
+      saved_path[sizeof(saved_path) - 1] = '\0';
+      cfg_err[0] = '\0';
+      if (hasciicam_config_load_toml(&appcfg, gui_state.load_path, cfg_err, sizeof(cfg_err))) {
+        hasciicam_gui_state_init(&gui_state, &appcfg);
+        strncpy(gui_state.load_path, loaded_path, sizeof(gui_state.load_path) - 1);
+        gui_state.load_path[sizeof(gui_state.load_path) - 1] = '\0';
+        strncpy(gui_state.save_path, saved_path, sizeof(gui_state.save_path) - 1);
+        gui_state.save_path[sizeof(gui_state.save_path) - 1] = '\0';
+        hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
+        snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                 "loaded: %s", loaded_path);
+        gui_state.status_is_error = 0;
+      } else {
+        snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                 "load failed: %s", cfg_err[0] ? cfg_err : "unknown error");
+        gui_state.status_is_error = 1;
+      }
+    }
+
+    hasciicam_live_controls_apply(&render_session, &session, &appcfg, &gui_state);
+    hasciicam_sdl_set_runtime_colors(render_session.context,
+                                     gui_state.foreground_rgb,
+                                     gui_state.background_rgb);
 
     if (!hasciicam_session_step(&session, aa_imgwidth(render_session.context),
                                 aa_imgheight(render_session.context),

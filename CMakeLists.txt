@@ -18,6 +18,7 @@ set(HASCIICAM_TEST_CAMERA_DEVICE "" CACHE STRING "Camera device selector for opt
 option(HASCIICAM_ENABLE_SDL "Enable SDL output driver" ON)
 option(HASCIICAM_ENABLE_X11 "Enable X11 output driver" ON)
 option(HASCIICAM_ENABLE_CURSES "Enable curses output driver" ON)
+option(HASCIICAM_ENABLE_GUI "Enable on-screen Dear ImGui controls in SDL live mode" ON)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   option(HASCIICAM_ENABLE_CAPTURE_V4L2 "Enable V4L2 capture backend" ON)
 else()
@@ -139,10 +140,43 @@ add_library(hasciicam_core STATIC
     ${HASCIICAM_CAPTURE_SOURCES}
     src/app/tomlc17/tomlc17.c
 )
+if(WIN32)
+  target_sources(hasciicam_core PRIVATE src/gui/gui_file_dialog_win32.c)
+else()
+  target_sources(hasciicam_core PRIVATE src/gui/gui_file_dialog_fallback.c)
+endif()
 target_include_directories(hasciicam_core PUBLIC include)
 target_include_directories(hasciicam_core PRIVATE src/app)
 if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
   target_sources(hasciicam_core PRIVATE src/capture/capture_avfoundation.mm)
+endif()
+
+set(HASCIICAM_WITH_GUI OFF)
+set(HASCIICAM_GUI_SOURCES)
+set(HASCIICAM_IMGUI_SOURCES)
+if(HASCIICAM_ENABLE_GUI AND HASCIICAM_WITH_SDL)
+  if(EXISTS "${CMAKE_SOURCE_DIR}/third_party/imgui/imgui.h")
+    set(HASCIICAM_WITH_GUI ON)
+    list(APPEND HASCIICAM_IMGUI_SOURCES
+      third_party/imgui/imgui.cpp
+      third_party/imgui/imgui_draw.cpp
+      third_party/imgui/imgui_tables.cpp
+      third_party/imgui/imgui_widgets.cpp
+      third_party/imgui/backends/imgui_impl_sdl2.cpp
+      third_party/imgui/backends/imgui_impl_sdlrenderer2.cpp
+    )
+    list(APPEND HASCIICAM_GUI_SOURCES src/gui/gui_overlay.cpp)
+    target_sources(hasciicam_core PRIVATE ${HASCIICAM_GUI_SOURCES} ${HASCIICAM_IMGUI_SOURCES})
+    target_include_directories(hasciicam_core PRIVATE
+      third_party/imgui
+      third_party/imgui/backends
+      src/gui
+    )
+    target_compile_definitions(hasciicam_core PRIVATE HASCIICAM_ENABLE_GUI=1)
+    target_compile_definitions(aalib PRIVATE HASCIICAM_ENABLE_GUI=1)
+  else()
+    message(STATUS "HASCIICAM_ENABLE_GUI requested but third_party/imgui not found; GUI disabled")
+  endif()
 endif()
 target_compile_definitions(hasciicam_core PRIVATE ${HASCIICAM_CAPTURE_DEFINITIONS})
 target_link_libraries(hasciicam_core PUBLIC aalib)
@@ -172,6 +206,9 @@ endif()
 
 if(HASCIICAM_ENABLE_CAPTURE_MF OR HASCIICAM_ENABLE_CAPTURE_DSHOW)
   target_link_libraries(hasciicam_core PUBLIC mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+endif()
+if(HASCIICAM_WITH_GUI AND WIN32)
+  target_link_libraries(hasciicam_core PUBLIC comdlg32)
 endif()
 
 if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
@@ -215,6 +252,7 @@ message(STATUS "  HASCIICAM_TEST_CAMERA_DEVICE=${HASCIICAM_TEST_CAMERA_DEVICE}")
 message(STATUS "  HASCIICAM_ENABLE_SDL=${HASCIICAM_ENABLE_SDL} (found=${HASCIICAM_WITH_SDL})")
 message(STATUS "  HASCIICAM_ENABLE_X11=${HASCIICAM_ENABLE_X11} (found=${HASCIICAM_WITH_X11})")
 message(STATUS "  HASCIICAM_ENABLE_CURSES=${HASCIICAM_ENABLE_CURSES} (found=${HASCIICAM_WITH_CURSES})")
+message(STATUS "  HASCIICAM_ENABLE_GUI=${HASCIICAM_ENABLE_GUI} (enabled=${HASCIICAM_WITH_GUI})")
 message(STATUS "  HASCIICAM_ENABLE_CAPTURE_V4L2=${HASCIICAM_ENABLE_CAPTURE_V4L2}")
 message(STATUS "  HASCIICAM_ENABLE_CAPTURE_MF=${HASCIICAM_ENABLE_CAPTURE_MF}")
 message(STATUS "  HASCIICAM_ENABLE_CAPTURE_DSHOW=${HASCIICAM_ENABLE_CAPTURE_DSHOW}")
@@ -257,6 +295,14 @@ if(HASCIICAM_ENABLE_TESTS)
   endif()
   add_test(NAME app_config COMMAND test_app_config)
   set_tests_properties(app_config PROPERTIES LABELS "unit;core")
+
+  add_executable(test_gui_state
+    tests/test_gui_state.c
+    src/gui/gui_state.c
+  )
+  target_include_directories(test_gui_state PRIVATE src/gui src/app src/capture)
+  add_test(NAME gui_state COMMAND test_gui_state)
+  set_tests_properties(gui_state PROPERTIES LABELS "unit;core")
 
   add_executable(test_capture_size
     tests/test_capture_size.c

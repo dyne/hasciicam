@@ -3,6 +3,8 @@
 
 #include <SDL2/SDL.h>
 
+struct hasciicam_gui_state;
+
 struct sdldriverdata {
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -31,6 +33,8 @@ struct sdldriverdata {
     int inverted;
     int cvisible;
     int fullscreen;
+    int gui_ready;
+    int gui_visible;
     int Xpos;
     int Ypos;
     
@@ -38,6 +42,7 @@ struct sdldriverdata {
     unsigned char *previousa;
     
     __AA_CONST struct aa_font *font;
+    struct hasciicam_gui_state *gui_state;
 };
 
 #endif

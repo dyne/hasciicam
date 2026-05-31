@@ -1,0 +1,160 @@
+#include "gui_overlay.h"
+
+#if defined(HASCIICAM_ENABLE_GUI)
+
+#include <stdio.h>
+#include <string.h>
+
+#include "../../third_party/imgui/imgui.h"
+#include "../../third_party/imgui/backends/imgui_impl_sdl2.h"
+#include "../../third_party/imgui/backends/imgui_impl_sdlrenderer2.h"
+
+static int g_initialized = 0;
+
+static void rgb_to_float3(unsigned int rgb, float out_rgb[3]) {
+    out_rgb[0] = ((rgb >> 16) & 0xFF) / 255.0f;
+    out_rgb[1] = ((rgb >> 8) & 0xFF) / 255.0f;
+    out_rgb[2] = (rgb & 0xFF) / 255.0f;
+}
+
+static unsigned int float3_to_rgb(const float in_rgb[3]) {
+    int r = (int)(in_rgb[0] * 255.0f + 0.5f);
+    int g = (int)(in_rgb[1] * 255.0f + 0.5f);
+    int b = (int)(in_rgb[2] * 255.0f + 0.5f);
+    if (r < 0) r = 0; if (r > 255) r = 255;
+    if (g < 0) g = 0; if (g > 255) g = 255;
+    if (b < 0) b = 0; if (b > 255) b = 255;
+    return ((unsigned int)r << 16) | ((unsigned int)g << 8) | (unsigned int)b;
+}
+
+int hasciicam_gui_overlay_init(SDL_Window *window, SDL_Renderer *renderer) {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    if (!ImGui_ImplSDL2_InitForSDLRenderer(window, renderer))
+        return 0;
+    if (!ImGui_ImplSDLRenderer2_Init(renderer))
+        return 0;
+    g_initialized = 1;
+    return 1;
+}
+
+void hasciicam_gui_overlay_shutdown(void) {
+    if (!g_initialized)
+        return;
+    ImGui_ImplSDLRenderer2_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+    g_initialized = 0;
+}
+
+void hasciicam_gui_overlay_new_frame(void) {
+    if (!g_initialized)
+        return;
+    ImGui_ImplSDLRenderer2_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+}
+
+int hasciicam_gui_overlay_process_event(const SDL_Event *event) {
+    if (!g_initialized || event == NULL)
+        return 0;
+    return ImGui_ImplSDL2_ProcessEvent(event) ? 1 : 0;
+}
+
+void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
+    float fg[3];
+    float bg[3];
+
+    if (!g_initialized || state == NULL)
+        return;
+
+    ImGui::SetNextWindowSize(ImVec2(360.0f, 0.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowBgAlpha(0.92f);
+    ImGui::Begin("HasciiCam Controls", NULL, ImGuiWindowFlags_NoCollapse);
+
+    ImGui::Text("AA Rendering");
+    ImGui::SliderInt("Brightness", &state->aa_bright, 0, 255);
+    ImGui::SliderInt("Contrast", &state->aa_contrast, 0, 127);
+    ImGui::SliderFloat("Gamma", &state->aa_gamma, 0.5f, 4.0f, "%.2f");
+    ImGui::Checkbox("Invert", &state->invert);
+
+    ImGui::Separator();
+    ImGui::Text("Capture");
+    ImGui::Checkbox("Mirror X", &state->mirror_x);
+    ImGui::Checkbox("Mirror Y", &state->mirror_y);
+    ImGui::Text("Size: %dx%d", state->capture_width, state->capture_height);
+    ImGui::Text("Stride: %d bytes", state->capture_stride_bytes);
+    ImGui::Text("Pixel format: %d", (int)state->capture_pixel_format);
+
+    ImGui::Separator();
+    ImGui::Text("Colors");
+    rgb_to_float3(state->foreground_rgb, fg);
+    rgb_to_float3(state->background_rgb, bg);
+    if (ImGui::ColorEdit3("Foreground", fg))
+        state->foreground_rgb = float3_to_rgb(fg);
+    if (ImGui::ColorEdit3("Background", bg))
+        state->background_rgb = float3_to_rgb(bg);
+
+    ImGui::Separator();
+    ImGui::Text("Config");
+    ImGui::InputText("Save path", state->save_path, IM_ARRAYSIZE(state->save_path));
+    if (ImGui::Button("Save"))
+        state->save_requested = 1;
+
+    ImGui::InputText("Load path", state->load_path, IM_ARRAYSIZE(state->load_path));
+    ImGui::SameLine();
+    if (ImGui::Button("Browse"))
+        state->open_load_dialog_requested = 1;
+    if (ImGui::Button("Load"))
+        state->load_requested = 1;
+
+    if (state->status_message[0] != '\0') {
+        if (state->status_is_error)
+            ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%s", state->status_message);
+        else
+            ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "%s", state->status_message);
+    }
+
+    ImGui::End();
+    ImGui::Render();
+}
+
+void hasciicam_gui_overlay_render(SDL_Renderer *renderer) {
+    if (!g_initialized || renderer == NULL)
+        return;
+    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+}
+
+int hasciicam_gui_overlay_wants_mouse(void) {
+    if (!g_initialized)
+        return 0;
+    return ImGui::GetIO().WantCaptureMouse ? 1 : 0;
+}
+
+int hasciicam_gui_overlay_wants_keyboard(void) {
+    if (!g_initialized)
+        return 0;
+    return ImGui::GetIO().WantCaptureKeyboard ? 1 : 0;
+}
+
+#else
+
+int hasciicam_gui_overlay_init(SDL_Window *window, SDL_Renderer *renderer) {
+    (void)window;
+    (void)renderer;
+    return 0;
+}
+void hasciicam_gui_overlay_shutdown(void) {}
+void hasciicam_gui_overlay_new_frame(void) {}
+int hasciicam_gui_overlay_process_event(const SDL_Event *event) {
+    (void)event;
+    return 0;
+}
+void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) { (void)state; }
+void hasciicam_gui_overlay_render(SDL_Renderer *renderer) { (void)renderer; }
+int hasciicam_gui_overlay_wants_mouse(void) { return 0; }
+int hasciicam_gui_overlay_wants_keyboard(void) { return 0; }
+
+#endif
