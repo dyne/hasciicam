@@ -11,6 +11,9 @@
       "displayName": "Windows + vcpkg + Ninja",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/presets/windows-vcpkg-ninja",
+      "environment": {
+        "AR": ""
+      },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
