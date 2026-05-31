@@ -40,7 +40,12 @@ static void unset_env_var(const char *key) {
 
 static void clear_test_env(void) {
     const char *keys[] = {
-        "mode", "output_file", "font_size", "invert", "sdl_vsync", "char_size", "refresh"
+        "show_help", "show_aahelp", "show_version",
+        "quiet", "mode", "device", "input", "size", "pixel_size", "char_size",
+        "output_file", "aa_driver", "daemon", "font_size", "font_face",
+        "refresh", "aa_bright", "aa_contrast", "aa_gamma", "invert",
+        "background", "foreground", "uid", "gid", "frames",
+        "sdl_renderer", "sdl_vsync", "fullscreen", "mirror"
     };
     size_t i;
     for (i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i) {
@@ -146,11 +151,60 @@ static void test_toml_unknown_key(void) {
     remove(path);
 }
 
+static void test_toml_mirror_roundtrip(void) {
+    hasciicam_config cfg;
+    hasciicam_config loaded;
+    char err[200];
+    const char *path = "test_app_config_mirror.toml";
+
+    hasciicam_config_init_defaults(&cfg);
+    cfg.mirror_x = 0;
+    cfg.mirror_y = 1;
+    expect_true(hasciicam_config_save_toml(&cfg, path, err, sizeof(err)), "save_toml mirror should succeed");
+
+    hasciicam_config_init_defaults(&loaded);
+    expect_true(hasciicam_config_load_toml(&loaded, path, err, sizeof(err)), "load_toml mirror should succeed");
+    expect_true(loaded.mirror_x == 0, "mirror_x should roundtrip");
+    expect_true(loaded.mirror_y == 1, "mirror_y should roundtrip");
+    remove(path);
+}
+
+static void test_toml_size_key_rejected(void) {
+    hasciicam_config cfg;
+    char err[200];
+    const char *path = "test_app_config_size_alias.toml";
+    FILE *fp = fopen(path, "wb");
+    expect_true(fp != NULL, "should open size alias toml");
+    if (fp) {
+        fputs("size = \"80x25\"\n", fp);
+        fclose(fp);
+    }
+
+    hasciicam_config_init_defaults(&cfg);
+    expect_true(!hasciicam_config_load_toml(&cfg, path, err, sizeof(err)), "load_toml should reject size alias");
+    remove(path);
+}
+
+static void test_env_size_key_ignored(void) {
+    hasciicam_config cfg;
+    char err[200];
+
+    clear_test_env();
+    set_env_var("size", "80x25");
+    hasciicam_config_init_defaults(&cfg);
+    expect_true(hasciicam_config_load_env(&cfg, err, sizeof(err)), "load_env should ignore size alias");
+    expect_true(cfg.explicit_size == 0, "size alias should not set explicit size");
+    clear_test_env();
+}
+
 int main(void) {
     test_env_load();
     test_cli_overrides_env();
     test_toml_roundtrip();
     test_toml_unknown_key();
+    test_toml_mirror_roundtrip();
+    test_toml_size_key_rejected();
+    test_env_size_key_ignored();
 
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);
