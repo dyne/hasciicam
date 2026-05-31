@@ -125,6 +125,8 @@ The current path in `src/hasciicam.c` is:
 The CLI is defined in `src/hasciicam.c` by `long_options`, `short_options`, and
 the help string.
 
+Config parsing and normalization now live in `src/app/app_config.c`.
+
 Core options:
 
 - `-h`, `--help`: HasciiCam help.
@@ -158,6 +160,47 @@ Rendering options:
 
 AA-lib also parses its own options before HasciiCam parses its options. When
 changing CLI parsing, preserve that ordering.
+
+## Launch Configuration
+
+HasciiCam launch config supports three sources:
+
+1. Defaults from `hasciicam_config_init_defaults()`
+2. Lowercase environment variables with canonical config-key names
+3. Command-line options (highest precedence)
+
+Canonical config keys:
+
+- `quiet`
+- `mode`
+- `device`
+- `input`
+- `pixel_size`
+- `char_size`
+- `output_file`
+- `aa_driver`
+- `daemon`
+- `font_size`
+- `font_face`
+- `refresh`
+- `aa_bright`
+- `aa_contrast`
+- `aa_gamma`
+- `invert`
+- `background`
+- `foreground`
+- `uid`
+- `gid`
+- `frames`
+- `sdl_renderer`
+- `sdl_vsync`
+- `fullscreen`
+- `mirror`
+
+Compatibility note:
+
+- CLI names remain historical (`--aafile`, `--aadriver`) while env/TOML use
+  canonical names (`output_file`, `aa_driver`).
 
 Size intent and negotiation:
 
@@ -301,6 +344,17 @@ In `TEXT` mode:
 
 The save driver writes from AA-lib `textbuffer` and `attrbuffer`, so file output
 and live output share the same render stage.
+
+## TOML Config API
+
+Internal config file APIs are declared in `src/app/app_config.h`:
+
+- `hasciicam_config_load_toml(...)`
+- `hasciicam_config_save_toml(...)`
+
+TOML parsing uses vendored `cktan/tomlc17` source in `src/app/tomlc17/`.
+Current startup does not auto-load a TOML file and does not implement CLI
+`--config` discovery.
 
 ## Portability Notes
 
