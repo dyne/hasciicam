@@ -58,6 +58,16 @@ Main feature toggles are explicit:
 - `HASCIICAM_ENABLE_CAPTURE_MF`
 - `HASCIICAM_ENABLE_CAPTURE_DSHOW`
 - `HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION`
+- `HASCIICAM_ENABLE_GUI`
+
+Optional on-screen GUI notes:
+
+- Live GUI is SDL-driver only and intended for `--mode live`.
+- Runtime GUI state lives in `src/gui/` and app-side apply logic in
+  `src/app/app_live_controls.c`.
+- Dear ImGui sources used for build are vendored in `third_party/imgui/`.
+- Local `imgui/` is a reference checkout used for vendor updates and should be
+  treated as read-only input.
 
 Cross-platform configure presets are in `CMakePresets.json`:
 
