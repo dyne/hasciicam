@@ -1,0 +1,183 @@
+#+TITLE: Capture Controls Preview
+#+SUBTITLE: Add optional OS camera controls and an opaque grayscale pre-AA preview to the SDL overlay
+#+DATE: 2026-06-01
+#+KEYWORDS: capture controls gui sdl preview grayscale v4l2 directshow mediafoundation avfoundation
+
+* WIP [#A] Define a minimal capture-control port
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Expose camera-side tweakable controls through the capture abstraction without mixing them with AA-lib render controls.
+:Notes: Challenge the first idea of adding backend-specific sliders directly in the GUI. Brightness/contrast/gamma in AA-lib are renderer controls; camera brightness/contrast/gamma are device controls and may not exist on every backend/device. Use a small optional capture port with queryable metadata so the GUI only shows supported controls.
+:END:
+
+** DONE [#A] Add portable control descriptors to `capture.h`
+:PROPERTIES:
+:Why: The GUI needs to know which camera controls exist, their ranges, defaults, current values, and whether they are writable before drawing sliders.
+:Change: Add `capture_control_id`, `capture_control_kind`, and `capture_control_desc` in `src/capture/capture.h`. Include IDs for `brightness`, `contrast`, `gamma`, `gain`, `saturation`, `sharpness`, `exposure`, `white_balance`, and `focus`. Keep fields plain: stable name, label, min, max, step, default, current, writable, auto_supported, auto_enabled. Avoid floats at the capture boundary; OS APIs generally expose integer ranges.
+:Tests: Add a compile/link unit test that initializes descriptors and verifies enum/string helpers if implemented. Existing capture backends must still compile with zero controls.
+:Done when: Capture control metadata can be represented without any backend-specific headers leaking outside `src/capture`.
+:END:
+
+** DONE [#A] Extend `capture_ops` with optional control functions
+:PROPERTIES:
+:Why: Existing backends should continue to work, while capable backends can report and apply controls.
+:Change: Add optional function pointers to `capture_ops`: `list_controls(capture_device *, capture_control_desc *, int max_controls)`, `set_control(capture_device *, capture_control_id, int value)`, and optionally `set_control_auto(capture_device *, capture_control_id, int enabled)`. Treat NULL pointers as "no controls". Add small wrapper helpers, likely in `src/capture/capture_control.c`, so application code calls `capture_controls_list(...)` and `capture_control_set(...)` instead of checking function pointers everywhere.
+:Tests: Add a fake/test capture ops instance to verify wrapper behavior for NULL ops, zero controls, successful set, and failed set. Existing synthetic capture should report no controls unless explicitly extended for tests.
+:Done when: The application can safely ask any active backend for controls and apply changes without knowing backend type.
+:END:
+
+** TODO [#B] Decide canonical control names and config scope
+:PROPERTIES:
+:Why: Some device controls are runtime-only and hardware-specific; persisting them can fail on another camera or OS.
+:Change: Keep capture controls runtime-only in the first implementation. Do not add TOML/CLI persistence until the backend API is proven. Name GUI sections clearly: "Camera Controls" for OS/device controls and "AA Rendering" for renderer controls. If later persistence is needed, create a separate plan for per-device profiles.
+:Tests: No code test if this only documents/structures scope.
+:Done when: The implementation avoids silently saving hardware-specific controls into the existing generic `hasciicam.toml`.
+:END:
+
+* TODO [#A] Implement backend control adapters incrementally
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Surface real camera controls where practical, starting with the current Windows-first target while keeping Linux/macOS paths ready.
+:Notes: Do not add dependencies. Prefer OS APIs already available from current backend headers/libraries. Backends may support different subsets, and device drivers may report ranges differently.
+:END:
+
+** TODO [#A] Add DirectShow `IAMVideoProcAmp` and `IAMCameraControl` support
+:PROPERTIES:
+:Why: DirectShow exposes the common camera controls most directly on Windows fallback devices.
+:Change: In `src/capture/capture_dshow.cpp`, store `IAMVideoProcAmp *video_proc_amp` and `IAMCameraControl *camera_control` when available. Map `VideoProcAmp_Brightness`, `Contrast`, `Gamma`, `Gain`, `Saturation`, `Sharpness`, and `WhiteBalance` to capture controls. Map `CameraControl_Exposure`, `Focus`, and optionally `Zoom` if included. Use `GetRange()` for min/max/step/default/auto flags and `Get()` for current value/auto state. Use `Set()` to apply values, preserving auto/manual flags as appropriate.
+:Tests: Add compile-time coverage through Windows build. Add unit-level mapping helper tests if mappings are factored into pure functions. Manual test on a Windows camera: confirm supported controls appear and moving sliders changes the camera feed before AA rendering.
+:Done when: DirectShow devices with supported controls expose correct metadata and accept runtime changes without breaking frame capture.
+:END:
+
+** TODO [#B] Investigate Media Foundation control support before implementing
+:PROPERTIES:
+:Why: Media Foundation capture in this repo currently uses `IMFSourceReader`; camera controls are not as uniformly exposed through that path.
+:Change: Check whether the active `IMFMediaSource` can expose `IKsControl`, `IAMVideoProcAmp`, or a related control interface for the selected device on Windows. If it is straightforward, implement the same `capture_ops` functions in `src/capture/capture_mf.c`. If it requires substantial device-activation or KS property plumbing, document MF as "controls unavailable" for this slice and rely on DirectShow fallback for Windows camera-control support.
+:Tests: Build on Windows. If implemented, manually test on a real camera. If not implemented, verify MF backend reports zero controls and GUI hides the section.
+:Done when: MF behavior is explicit: either supported through the same port or intentionally returns no controls with no GUI breakage.
+:END:
+
+** TODO [#B] Add V4L2 control mapping
+:PROPERTIES:
+:Why: Linux commonly exposes camera controls through V4L2 CIDs.
+:Change: In `src/capture/capture_v4l2.c`, query supported controls with `VIDIOC_QUERYCTRL`/`VIDIOC_QUERY_EXT_CTRL` where available and current values with `VIDIOC_G_CTRL`. Map common CIDs: `V4L2_CID_BRIGHTNESS`, `CONTRAST`, `GAMMA`, `GAIN`, `SATURATION`, `SHARPNESS`, `EXPOSURE_ABSOLUTE`, `AUTO_EXPOSURE` where applicable, `WHITE_BALANCE_TEMPERATURE`, `AUTO_WHITE_BALANCE`, and focus controls if present. Hide disabled/inactive controls. Set values through `VIDIOC_S_CTRL`.
+:Tests: Compile on Linux preset when available. Unit-test mapping helpers where possible. Manual Linux smoke with a V4L2 camera: list controls and adjust one visible slider.
+:Done when: V4L2 can expose common controls without requiring a camera for automated tests.
+:END:
+
+** TODO [#C] Leave AVFoundation as capability-aware follow-up unless needed
+:PROPERTIES:
+:Why: macOS camera controls differ from brightness/contrast/gamma and often require device locking plus hardware-specific availability checks.
+:Change: In `src/capture/capture_avfoundation.mm`, return zero controls initially or expose only safe controls that are clearly available through `AVCaptureDevice` (`exposure`, `focus`, `white_balance`) if implementation remains small. Avoid pretending brightness/contrast/gamma are OS camera controls on macOS when they would really be post-processing.
+:Tests: macOS build when available. Manual AVFoundation check only if controls are implemented.
+:Done when: macOS behavior is safe and does not show fake controls.
+:END:
+
+* TODO [#A] Add GUI state and live application for camera controls
+:PROPERTIES:
+:Effort: 0.75 day
+:Goal: Show OS/device capture controls in the existing right-click overlay and apply changes live when supported.
+:Notes: Keep the overlay dense and operational. If a backend reports no controls, show nothing or a single disabled "No camera controls" row; do not clutter the panel.
+:END:
+
+** TODO [#A] Extend GUI state with capture-control snapshots
+:PROPERTIES:
+:Why: The ImGui C++ layer should draw controls from plain state and set request flags; it should not know backend-specific APIs.
+:Change: Add a fixed-size array to `hasciicam_gui_state`, for example `capture_control_desc capture_controls[16]`, `capture_control_count`, and per-control dirty flags or a one-shot request field with changed ID/value. Add helper functions to load descriptors from an active `hasciicam_session` or capture wrapper. Keep size fixed to avoid GUI-time allocation.
+:Tests: Extend `tests/test_gui_state.c` to verify controls initialize empty, descriptors copy correctly, and dirty/request flags are set/cleared predictably.
+:Done when: GUI state can represent supported camera controls independently of SDL/ImGui.
+:END:
+
+** TODO [#A] Render a "Camera Controls" section in the overlay
+:PROPERTIES:
+:Why: Users need sliders for camera-side values, separate from AA render sliders.
+:Change: In `src/gui/gui_overlay.cpp`, add a section after "Capture" or before "AA Rendering" named "Camera Controls". For each writable integer control, draw a slider using min/max and step if ImGui supports it cleanly; otherwise use `SliderInt`. For read-only controls, draw label/value disabled. If auto is supported, draw a checkbox next to the control or just above it. When a value changes, set the GUI state's change request; avoid sending a backend call every frame if the value did not change.
+:Tests: Build GUI. Unit-test state-level request behavior. Manual overlay test with fake/no controls should not crash; with a real DirectShow/V4L2 camera, sliders should appear only for supported controls.
+:Done when: Overlay can display and request capture-control changes without direct backend coupling.
+:END:
+
+** TODO [#A] Apply capture-control changes from the app loop
+:PROPERTIES:
+:Why: Backend calls should happen in the C app/session layer, not in the overlay renderer.
+:Change: In `src/hasciicam.c` or a small `src/app/app_capture_controls.c`, after GUI events are processed and before reading the next frame, consume pending control requests from `gui_state`, call the capture-control wrapper on the active session, refresh the descriptor current value, and update `status_message` on failure. Ensure failed changes do not stop capture.
+:Tests: Add wrapper tests with fake ops. Manual camera test: moving a slider affects the next captured frames and error status is visible for rejected values.
+:Done when: Camera-control changes apply live and safely from the main loop.
+:END:
+
+* WIP [#A] Add an opaque grayscale pre-AA preview to the SDL overlay
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Show a small scaled preview of the luminance buffer exactly after capture conversion/mirroring and immediately before AA-lib consumes it.
+:Notes: This preview is diagnostic: it should show the grayscale image that goes into AA-lib, not the raw camera frame and not the final ASCII result. It must be 100% opaque even though the overlay window itself currently uses alpha.
+:END:
+
+** DONE [#A] Store latest pre-AA grayscale frame in GUI state
+:PROPERTIES:
+:Why: The render loop already receives `gray_frame` from `hasciicam_session_step()` before copying to `aa_image()`. The overlay needs a stable snapshot because the session buffer can be reallocated on resize/font changes.
+:Change: Add preview fields to `hasciicam_gui_state`: `preview_width`, `preview_height`, `preview_stride`, `preview_generation`, a fixed upper bound or heap buffer pointer for grayscale pixels, and capacity. Prefer a small helper `hasciicam_gui_state_update_preview(state, gray_frame, width, height)` that copies the grayscale frame after `hasciicam_session_step()` succeeds and before `memcpy(aa_image(...))`. If heap allocation is added, make ownership explicit with init/reset/free helpers.
+:Tests: Extend `test_gui_state.c` to update preview with a small grayscale pattern, verify dimensions/copy/generation, and verify resize reallocates or rejects safely.
+:Done when: GUI state owns the latest pre-AA luminance snapshot and survives output-size changes.
+:END:
+
+** DONE [#A] Upload preview pixels to an SDL/ImGui texture
+:PROPERTIES:
+:Why: ImGui needs a texture ID, not a raw grayscale pointer, and the texture must update when dimensions or generation change.
+:Change: In the SDL GUI implementation, add preview texture state near the overlay or SDL driver GUI state. Convert GRAY8 to an opaque RGBA/RGB texture with `alpha = 255` for every pixel. Use nearest-neighbor scaling in ImGui by drawing `ImGui::Image()` at a small size, preserving aspect ratio. Recreate the texture if preview dimensions change. Destroy it on GUI shutdown.
+:Tests: Build with SDL/GUI. Add a manual SDL synthetic smoke: open overlay and confirm the preview is visible, grayscale, opaque, and not tinted by foreground/background controls.
+:Done when: The preview renders from the latest luminance buffer and every preview pixel is uploaded with full opacity.
+:END:
+
+** DONE [#B] Place preview in the overlay without crowding controls
+:PROPERTIES:
+:Why: The panel is already dense. The preview should help tuning without pushing primary controls off-screen.
+:Change: Add a "Pre-AA Preview" block near the top or under "Capture". Use a width capped around 160-220 px and compute height from aspect ratio. Use a dark border or label only if needed; avoid nested cards. If no frame has arrived yet, draw a small disabled text row such as "No preview yet".
+:Tests: Manual visual smoke with `synthetic://` in SDL live mode. Resize the overlay/window and confirm no clipping or overlap.
+:Done when: The overlay includes a small usable preview and still fits common Windows display sizes.
+:END:
+
+** TODO [#B] Keep preview updates cheap
+:PROPERTIES:
+:Why: The preview should not dominate frame time or allocate every frame.
+:Change: Reuse the GUI preview buffer and SDL texture between frames. Only recreate on dimension change. If the AA image is large, optionally downsample while copying to a max preview texture size, but keep the source semantics documented: it is sampled from the exact pre-AA grayscale buffer. Start simple; add downsampling only if profiling shows noticeable cost.
+:Tests: Manual SDL run for several seconds with overlay open. Confirm no visible stalls and no unbounded memory growth.
+:Done when: Preview updates continuously without repeated allocations in the steady state.
+:END:
+
+* TODO [#B] Verify, document, and update the plan status
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Keep the feature discoverable and leave a clear test trail across Windows-first and portable backends.
+:Notes: This is a user-facing GUI feature and a backend capability feature. Documentation should make clear that camera controls are device-dependent.
+:END:
+
+** TODO [#A] Add focused automated tests
+:PROPERTIES:
+:Why: The most important logic can be tested without a camera: control wrappers, GUI state requests, and grayscale preview copying.
+:Change: Add or extend plain C tests for capture-control wrapper behavior, GUI state control requests, and preview buffer copying/resizing. Add CTest entries. Keep real camera tests opt-in/manual.
+:Tests: Run touched tests after each L2, then full CTest on Windows vcpkg preset at the end.
+:Done when: Core state/control logic is covered without requiring a camera or window.
+:END:
+
+** TODO [#B] Document camera-control behavior and limitations
+:PROPERTIES:
+:Why: Users need to understand why controls appear on one camera/OS but not another.
+:Change: Update `README.md`, `docs/hasciicam.1`, and `AGENTS.md`. Describe "Camera Controls" as OS/device controls, separate from "AA Rendering". Note that supported sliders are backend/device-dependent and may include brightness/contrast/gamma/gain/exposure/focus/white balance. Document that the pre-AA preview shows the grayscale luminance frame after capture conversion/mirroring and before AA-lib rendering.
+:Tests: Existing help/doc tests if any. Manual review for terminology consistency.
+:Done when: Documentation avoids promising universal controls and clearly explains the preview.
+:END:
+
+** TODO [#A] Run Windows-first validation
+:PROPERTIES:
+:Why: Windows is the current target and DirectShow/SDL are the likely first working control/preview path.
+:Change: Run `cmake --preset windows-vcpkg-ninja`, `cmake --build --preset windows-vcpkg-ninja`, and `ctest --preset windows-vcpkg-ninja` from a `vcvarsall.bat` environment. Then manually run `hasciicam -q -d synthetic:// -O SDL --frames 2` for no-camera GUI safety and an interactive camera run where the overlay preview and any exposed camera controls are exercised.
+:Tests: Full CTest plus manual SDL smoke. If a real camera is unavailable, state that only synthetic/no-control GUI behavior was manually verified.
+:Done when: The feature builds, automated tests pass, and manual validation notes are recorded.
+:END:
+
+** TODO [#C] Keep follow-up scope explicit
+:PROPERTIES:
+:Why: Camera controls can grow into per-device profiles, image post-processing, and platform-specific tuning UIs.
+:Change: Do not add persisted camera profiles, software post-processing brightness/contrast/gamma, native camera property dialogs, or external dependencies in this slice. If MF/AVFoundation control support is not small, document it as follow-up rather than blocking DirectShow/V4L2 and preview work.
+:Tests: No code tests.
+:Done when: The first implementation remains limited to optional backend-reported controls and the pre-AA grayscale preview.
+:END:

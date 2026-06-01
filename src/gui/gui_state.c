@@ -1,6 +1,7 @@
 #include "gui_state.h"
 
 #include <ctype.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -93,4 +94,42 @@ void hasciicam_gui_state_set_capture_info(hasciicam_gui_state *state, const capt
     state->capture_height = info->height;
     state->capture_stride_bytes = info->stride_bytes;
     state->capture_pixel_format = info->pixel_format;
+}
+
+int hasciicam_gui_state_update_preview(hasciicam_gui_state *state,
+                                       const unsigned char *gray_frame,
+                                       int width,
+                                       int height) {
+    int size;
+    if (state == NULL || gray_frame == NULL || width <= 0 || height <= 0)
+        return 0;
+    size = width * height;
+    if (size <= 0)
+        return 0;
+    if (state->preview_capacity < size) {
+        unsigned char *new_buf = (unsigned char *)malloc((size_t)size);
+        if (new_buf == NULL)
+            return 0;
+        free(state->preview_gray);
+        state->preview_gray = new_buf;
+        state->preview_capacity = size;
+    }
+    memcpy(state->preview_gray, gray_frame, (size_t)size);
+    state->preview_width = width;
+    state->preview_height = height;
+    state->preview_stride = width;
+    state->preview_generation++;
+    return 1;
+}
+
+void hasciicam_gui_state_reset_preview(hasciicam_gui_state *state) {
+    if (state == NULL)
+        return;
+    free(state->preview_gray);
+    state->preview_gray = NULL;
+    state->preview_capacity = 0;
+    state->preview_width = 0;
+    state->preview_height = 0;
+    state->preview_stride = 0;
+    state->preview_generation = 0;
 }
