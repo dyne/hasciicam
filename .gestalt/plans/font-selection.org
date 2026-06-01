@@ -3,7 +3,7 @@
 #+DATE: 2026-06-01
 #+KEYWORDS: font aalib cli config gui sdl resize live
 
-* WIP [#A] Define a small AA font catalog API
+* DONE [#A] Define a small AA font catalog API
 :PROPERTIES:
 :Effort: 0.5 day
 :Goal: Provide one tested C API for listing, looking up, and describing bundled AA-lib fonts without exposing callers to direct `aa_fonts[]` iteration.
@@ -65,7 +65,7 @@
 :Done when: Startup selected font affects AA-lib render context, size planning, and output without needing a camera.
 :END:
 
-* WIP [#A] Make SDL live font switching safe
+* DONE [#A] Make SDL live font switching safe
 :PROPERTIES:
 :Effort: 1 day
 :Goal: Allow changing fonts from the right-click GUI combo box in live SDL mode without crashes, stale textures, stale buffers, or invalid capture/frame sizes.
@@ -96,7 +96,7 @@
 :Done when: Switching fonts live recreates SDL font/stream resources, keeps rendering, and has no stale texture or buffer access.
 :END:
 
-** TODO [#A] Reconcile live resize with capture and grayscale buffers
+** DONE [#A] Reconcile live resize with capture and grayscale buffers
 :PROPERTIES:
 :Why: Changing font height changes how many ASCII rows fit in the same SDL window. The render loop currently asks capture conversion for `aa_imgwidth()`/`aa_imgheight()` and copies into AA image memory; if those dimensions change, the gray frame allocation and copy bounds must remain valid.
 :Change: Audit `hasciicam_session_step()`, gray buffer ownership, and `aa_resize()`. If `aa_imgwidth()`/`aa_imgheight()` changes after a live font switch, ensure the next frame conversion allocates or returns a gray buffer of the new size and the app recomputes `dest_size` each frame as it already does. If any cached dimensions exist outside AA-lib/SDL, update them after successful font switch. Do not reopen the camera for live font changes in the first implementation; instead, keep the capture backend resolution fixed and resample the current camera frame into the new AA image dimensions. Revisit only if tests show poor sizing.
@@ -104,7 +104,7 @@
 :Done when: Live font switching never writes past image/text/attr buffers and does not require camera reopen.
 :END:
 
-** TODO [#B] Keep final video output sizing predictable
+** DONE [#B] Keep final video output sizing predictable
 :PROPERTIES:
 :Why: User expectations differ: changing font may mean more rows/cols in the same window, or same rows/cols with a resized window. The least surprising live behavior is to keep the SDL window pixel size stable and recompute the ASCII grid from the new cell height.
 :Change: For live SDL switching, keep the current window pixel size and derive `d->width = window_width / 8`, `d->height = window_height / font->height`. This means smaller fonts show more rows in the same window; larger fonts show fewer rows. For startup `--font`, apply the same metrics before size planning. For text/HTML output, the font affects AA-lib glyph analysis and render tables, but not terminal text cell dimensions; do not alter output file dimensions unless `--size` pixel intent is being converted through display metrics for live SDL.
@@ -112,14 +112,14 @@
 :Done when: Font size behavior is documented and implemented consistently across startup and live SDL mode.
 :END:
 
-* TODO [#B] Persist, document, and verify the feature
+* DONE [#B] Persist, document, and verify the feature
 :PROPERTIES:
 :Effort: 0.5 day
 :Goal: Make font selection discoverable, saved, loaded, tested, and documented without disturbing existing rendering paths.
 :Notes: Keep docs concise. This is a user-facing option, so update help, man page, README, and AGENTS. Do not update generated website docs unless that is already part of the repo workflow.
 :END:
 
-** TODO [#A] Save and load font in TOML
+** DONE [#A] Save and load font in TOML
 :PROPERTIES:
 :Why: The GUI Save/Load buttons and startup config should round-trip the selected font.
 :Change: Include `font` in the persisted config keys. Saving writes the short name, for example `font = "vga16"`. Loading validates through the font catalog; if invalid, fail the load with an actionable message and leave live state unchanged. For GUI load, keep current save/load paths preserved as the existing GUI code does.
@@ -127,7 +127,7 @@
 :Done when: TOML can persist a selected font and invalid font config does not silently fall back.
 :END:
 
-** TODO [#B] Update user-facing docs and help
+** DONE [#B] Update user-facing docs and help
 :PROPERTIES:
 :Why: Users need to know `--font list`, valid config key, and live GUI behavior.
 :Change: Update `src/app/app_config.c` help text, `docs/hasciicam.1`, `README.md`, and `AGENTS.md`. Add `font` to canonical config keys. Describe `--font NAME`, `--font list`, and live GUI font combo. Clarify that `--font-face` remains HTML CSS font face and is unrelated to AA-lib bitmap font selection.
@@ -135,7 +135,7 @@
 :Done when: Help and docs describe the new option without confusing it with HTML `font_face`.
 :END:
 
-** TODO [#A] Full verification on Windows vcpkg preset
+** DONE [#A] Full verification on Windows vcpkg preset
 :PROPERTIES:
 :Why: The requested target is Windows first, and SDL/GUI/font switching are platform-sensitive.
 :Change: Run the standard Windows commands from a Visual Studio environment: `cmake --preset windows-vcpkg-ninja`, `cmake --build --preset windows-vcpkg-ninja`, and `ctest --preset windows-vcpkg-ninja`. Then run focused manual commands: `hasciicam --font list`, `hasciicam -q -d synthetic:// --frames 2 -m text --font vga8 -o ...`, `hasciicam -q -d synthetic:// -O SDL --frames 2 --font vga8`, and one interactive SDL session where fonts are changed repeatedly from the combo box.
@@ -143,7 +143,7 @@
 :Done when: Automated tests pass, CLI list works, startup font selection works, and live SDL switching has been exercised without crash.
 :END:
 
-** TODO [#C] Keep follow-up scope explicit
+** DONE [#C] Keep follow-up scope explicit
 :PROPERTIES:
 :Why: Font switching touches sizing and can invite broader renderer refactors; this plan should stay minimal.
 :Change: Do not add proportional fonts, external font loading, TTF rendering, ImGui fonts, or platform-native font pickers. Do not change HTML `font_face` behavior beyond documentation. If future work wants external fonts, create a separate plan after this one is stable.
