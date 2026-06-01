@@ -42,7 +42,7 @@ static void clear_test_env(void) {
     const char *keys[] = {
         "show_help", "show_aahelp", "show_version",
         "quiet", "mode", "device", "input", "size", "pixel_size", "char_size",
-        "output_file", "aa_driver", "daemon", "font_size", "font_face",
+        "output_file", "aa_driver", "daemon", "font_size", "font_face", "font",
         "refresh", "aa_bright", "aa_contrast", "aa_gamma", "invert",
         "background", "foreground", "uid", "gid", "frames",
         "sdl_renderer", "sdl_vsync", "fullscreen", "mirror"
@@ -61,6 +61,7 @@ static void test_env_load(void) {
     set_env_var("mode", "html");
     set_env_var("output_file", "env.html");
     set_env_var("font_size", "3");
+    set_env_var("font", "vga8");
     set_env_var("invert", "true");
     set_env_var("sdl_vsync", "off");
     set_env_var("char_size", "80x25");
@@ -70,6 +71,7 @@ static void test_env_load(void) {
     expect_true(cfg.mode == 1, "mode should be html");
     expect_true(strcmp(cfg.aafile, "env.html") == 0, "output_file should be env.html");
     expect_true(cfg.fontsize == 3, "font_size should be 3");
+    expect_true(strcmp(cfg.font, "vga8") == 0, "font should be vga8");
     expect_true(cfg.invert == 1, "invert should be true");
     expect_true(cfg.sdl_vsync == 0, "sdl_vsync should be off");
     expect_true(cfg.size_intent == HASCIICAM_SIZE_CHARS, "char_size should set char intent");
@@ -84,6 +86,7 @@ static void test_cli_overrides_env(void) {
         (char *)"hasciicam",
         (char *)"--mode", (char *)"text",
         (char *)"--font-size", (char *)"2",
+        (char *)"--font", (char *)"vga9",
         (char *)"-o", (char *)"cli.html"
     };
     int argc = (int)(sizeof(argv) / sizeof(argv[0]));
@@ -91,6 +94,7 @@ static void test_cli_overrides_env(void) {
     clear_test_env();
     set_env_var("mode", "html");
     set_env_var("font_size", "4");
+    set_env_var("font", "vga8");
     set_env_var("output_file", "env.html");
 
     hasciicam_config_init_defaults(&cfg);
@@ -99,6 +103,7 @@ static void test_cli_overrides_env(void) {
 
     expect_true(cfg.mode == 2, "cli mode should override env mode");
     expect_true(cfg.fontsize == 2, "cli font_size should override env font_size");
+    expect_true(strcmp(cfg.font, "vga9") == 0, "cli font should override env font");
     expect_true(strcmp(cfg.aafile, "cli.html") == 0, "cli output_file should override env output_file");
 
     clear_test_env();
@@ -117,6 +122,7 @@ static void test_default_toml_load(void) {
         fputs("mode = \"text\"\n", fp);
         fputs("output_file = \"default-config.asc\"\n", fp);
         fputs("aa_bright = 88\n", fp);
+        fputs("font = \"courier\"\n", fp);
         fclose(fp);
     }
 
@@ -129,6 +135,7 @@ static void test_default_toml_load(void) {
     expect_true(strcmp(cfg.aafile, "default-config.asc") == 0,
                 "default toml output_file should load");
     expect_true(cfg.aa_bright == 88, "default toml aa_bright should load");
+    expect_true(strcmp(cfg.font, "courier") == 0, "default toml font should load");
 
     remove(path);
     clear_test_env();
@@ -154,6 +161,7 @@ static void test_explicit_toml_precedence(void) {
 
     clear_test_env();
     set_env_var("font_size", "3");
+    set_env_var("font", "vga8");
     hasciicam_config_init_defaults(&cfg);
     optind = 1;
     hasciicam_config_parse(&cfg, argc, argv, "aahelp", "pkg", "1.0");
@@ -183,6 +191,7 @@ static void test_toml_roundtrip(void) {
     cfg.size_w = 90;
     cfg.size_h = 30;
     cfg.explicit_size = 1;
+    strcpy(cfg.font, "vga8");
 
     expect_true(hasciicam_config_save_toml(&cfg, path, err, sizeof(err)), "save_toml should succeed");
 
@@ -194,6 +203,7 @@ static void test_toml_roundtrip(void) {
     expect_true(loaded.invert == 1, "roundtrip invert should match");
     expect_true(loaded.size_intent == HASCIICAM_SIZE_CHARS, "roundtrip size intent should be chars");
     expect_true(loaded.size_w == 90 && loaded.size_h == 30, "roundtrip size should match");
+    expect_true(strcmp(loaded.font, "vga8") == 0, "roundtrip font should match");
 
     remove(path);
 }
@@ -211,6 +221,23 @@ static void test_toml_unknown_key(void) {
 
     hasciicam_config_init_defaults(&cfg);
     expect_true(!hasciicam_config_load_toml(&cfg, path, err, sizeof(err)), "load_toml should reject unknown key");
+    remove(path);
+}
+
+static void test_toml_invalid_font(void) {
+    hasciicam_config cfg;
+    char err[200];
+    const char *path = "test_app_config_bad_font.toml";
+    FILE *fp = fopen(path, "wb");
+    expect_true(fp != NULL, "should open bad font toml file");
+    if (fp) {
+        fputs("font = \"missing-font\"\n", fp);
+        fclose(fp);
+    }
+
+    hasciicam_config_init_defaults(&cfg);
+    expect_true(!hasciicam_config_load_toml(&cfg, path, err, sizeof(err)),
+                "load_toml should reject invalid font");
     remove(path);
 }
 
@@ -267,6 +294,7 @@ int main(void) {
     test_explicit_toml_precedence();
     test_toml_roundtrip();
     test_toml_unknown_key();
+    test_toml_invalid_font();
     test_toml_mirror_roundtrip();
     test_toml_size_key_rejected();
     test_env_size_key_ignored();
@@ -277,3 +305,5 @@ int main(void) {
     }
     return 0;
 }
+
+

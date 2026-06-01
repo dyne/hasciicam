@@ -41,6 +41,7 @@ typedef struct hasciicam_config {
     char aafile[256];
     char background[64];
     char foreground[64];
+    char font[64];
     char fontface[256];
     char aadriver[64];
     char sdl_renderer[32];

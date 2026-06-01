@@ -8,6 +8,7 @@
 #include "../../third_party/imgui/imgui.h"
 #include "../../third_party/imgui/backends/imgui_impl_sdl2.h"
 #include "../../third_party/imgui/backends/imgui_impl_sdlrenderer2.h"
+#include "../render/render_font.h"
 
 static int g_initialized = 0;
 
@@ -84,6 +85,44 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
     invert = state->invert != 0;
     if (ImGui::Checkbox("Invert", &invert))
         state->invert = invert ? 1 : 0;
+    {
+        int font_count = hasciicam_font_count();
+        int selected_index = -1;
+        int i;
+        for (i = 0; i < font_count; ++i) {
+            hasciicam_font_desc desc = hasciicam_font_at(i);
+            if (desc.short_name != NULL && strcmp(desc.short_name, state->font) == 0) {
+                selected_index = i;
+                break;
+            }
+        }
+        if (selected_index < 0 && font_count > 0) {
+            hasciicam_font_desc first = hasciicam_font_at(0);
+            if (first.short_name != NULL)
+                strncpy(state->font, first.short_name, sizeof(state->font) - 1);
+            selected_index = 0;
+        }
+        if (ImGui::BeginCombo("Font", state->font[0] ? state->font : "(none)")) {
+            for (i = 0; i < font_count; ++i) {
+                hasciicam_font_desc desc = hasciicam_font_at(i);
+                char label[128];
+                bool is_selected;
+                if (desc.short_name == NULL)
+                    continue;
+                snprintf(label, sizeof(label), "%s (%dx%d)", desc.short_name, 8, desc.height);
+                is_selected = (i == selected_index);
+                if (ImGui::Selectable(label, is_selected)) {
+                    strncpy(state->font, desc.short_name, sizeof(state->font) - 1);
+                    state->font[sizeof(state->font) - 1] = '\0';
+                    if (strcmp(state->font, state->active_font) != 0)
+                        state->font_change_requested = 1;
+                }
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+    }
 
     ImGui::Separator();
     ImGui::Text("Capture");

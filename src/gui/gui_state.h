@@ -19,6 +19,9 @@ typedef struct hasciicam_gui_state {
 
     unsigned int foreground_rgb;
     unsigned int background_rgb;
+    char font[64];
+    char active_font[64];
+    int font_change_requested;
 
     int capture_width;
     int capture_height;
