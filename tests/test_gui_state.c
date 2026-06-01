@@ -14,6 +14,7 @@ static int expect_true(int condition, const char *message) {
 int main(void) {
     hasciicam_config cfg;
     hasciicam_gui_state state;
+    unsigned char sample[6] = {0, 64, 128, 192, 224, 255};
     unsigned int rgb = 0;
 
     memset(&cfg, 0, sizeof(cfg));
@@ -64,6 +65,16 @@ int main(void) {
     if (!expect_true(strcmp(cfg.background, "0000FF") == 0, "background copy failed")) return 1;
     if (!expect_true(strcmp(cfg.foreground, "FF0000") == 0, "foreground copy failed")) return 1;
     if (!expect_true(strcmp(cfg.font, "vga8") == 0, "font copy failed")) return 1;
+
+    if (!expect_true(hasciicam_gui_state_update_preview(&state, sample, 3, 2) == 1,
+                     "preview update failed")) return 1;
+    if (!expect_true(state.preview_width == 3 && state.preview_height == 2,
+                     "preview size failed")) return 1;
+    if (!expect_true(state.preview_gray != NULL && state.preview_gray[1] == 64 && state.preview_gray[5] == 255,
+                     "preview copy failed")) return 1;
+    hasciicam_gui_state_reset_preview(&state);
+    if (!expect_true(state.preview_gray == NULL && state.preview_capacity == 0,
+                     "preview reset failed")) return 1;
 
     return 0;
 }

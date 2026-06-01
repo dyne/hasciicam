@@ -11,6 +11,11 @@
 #include "../render/render_font.h"
 
 static int g_initialized = 0;
+static SDL_Renderer *g_renderer = NULL;
+static SDL_Texture *g_preview_texture = NULL;
+static int g_preview_width = 0;
+static int g_preview_height = 0;
+static unsigned int g_preview_generation = 0;
 
 static void rgb_to_float3(unsigned int rgb, float out_rgb[3]) {
     out_rgb[0] = ((rgb >> 16) & 0xFF) / 255.0f;
@@ -37,6 +42,7 @@ int hasciicam_gui_overlay_init(SDL_Window *window, SDL_Renderer *renderer) {
         return 0;
     if (!ImGui_ImplSDLRenderer2_Init(renderer))
         return 0;
+    g_renderer = renderer;
     g_initialized = 1;
     return 1;
 }
@@ -44,10 +50,61 @@ int hasciicam_gui_overlay_init(SDL_Window *window, SDL_Renderer *renderer) {
 void hasciicam_gui_overlay_shutdown(void) {
     if (!g_initialized)
         return;
+    if (g_preview_texture != NULL) {
+        SDL_DestroyTexture(g_preview_texture);
+        g_preview_texture = NULL;
+    }
+    g_renderer = NULL;
+    g_preview_width = 0;
+    g_preview_height = 0;
+    g_preview_generation = 0;
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
     g_initialized = 0;
+}
+
+static void update_preview_texture(const hasciicam_gui_state *state) {
+    int x;
+    int y;
+    int pitch;
+    void *pixels = NULL;
+    if (!g_initialized || state == NULL || g_renderer == NULL)
+        return;
+    if (state->preview_gray == NULL || state->preview_width <= 0 || state->preview_height <= 0)
+        return;
+    if (g_preview_generation == state->preview_generation)
+        return;
+    if (g_preview_texture != NULL &&
+        (g_preview_width != state->preview_width || g_preview_height != state->preview_height)) {
+        SDL_DestroyTexture(g_preview_texture);
+        g_preview_texture = NULL;
+        g_preview_width = 0;
+        g_preview_height = 0;
+    }
+    if (g_preview_texture == NULL) {
+        g_preview_texture = SDL_CreateTexture(g_renderer,
+                                              SDL_PIXELFORMAT_ARGB8888,
+                                              SDL_TEXTUREACCESS_STREAMING,
+                                              state->preview_width,
+                                              state->preview_height);
+        if (g_preview_texture == NULL)
+            return;
+        g_preview_width = state->preview_width;
+        g_preview_height = state->preview_height;
+    }
+    if (SDL_LockTexture(g_preview_texture, NULL, &pixels, &pitch) != 0)
+        return;
+    for (y = 0; y < state->preview_height; ++y) {
+        Uint32 *row = (Uint32 *)((unsigned char *)pixels + (size_t)y * (size_t)pitch);
+        const unsigned char *src = state->preview_gray + (size_t)y * (size_t)state->preview_stride;
+        for (x = 0; x < state->preview_width; ++x) {
+            unsigned int g = src[x];
+            row[x] = 0xFF000000u | (g << 16) | (g << 8) | g;
+        }
+    }
+    SDL_UnlockTexture(g_preview_texture);
+    g_preview_generation = state->preview_generation;
 }
 
 void hasciicam_gui_overlay_new_frame(void) {
@@ -73,6 +130,7 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
 
     if (!g_initialized || state == NULL)
         return;
+    update_preview_texture(state);
 
     ImGui::SetNextWindowSize(ImVec2(360.0f, 0.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowBgAlpha(0.92f);
@@ -135,6 +193,16 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
     ImGui::Text("Size: %dx%d", state->capture_width, state->capture_height);
     ImGui::Text("Stride: %d bytes", state->capture_stride_bytes);
     ImGui::Text("Pixel format: %d", (int)state->capture_pixel_format);
+
+    ImGui::Separator();
+    ImGui::Text("Pre-AA Preview");
+    if (g_preview_texture != NULL && state->preview_width > 0 && state->preview_height > 0) {
+        float preview_w = 180.0f;
+        float preview_h = (preview_w * (float)state->preview_height) / (float)state->preview_width;
+        ImGui::Image((ImTextureID)g_preview_texture, ImVec2(preview_w, preview_h));
+    } else {
+        ImGui::TextDisabled("No preview yet");
+    }
 
     ImGui::Separator();
     ImGui::Text("Colors");

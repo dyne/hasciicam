@@ -442,6 +442,7 @@ main (int argc, char **argv) {
         char previous_font[64];
         strncpy(previous_font, gui_state.active_font, sizeof(previous_font) - 1);
         previous_font[sizeof(previous_font) - 1] = '\0';
+        hasciicam_gui_state_reset_preview(&gui_state);
         hasciicam_gui_state_init(&gui_state, &appcfg);
         strncpy(gui_state.load_path, loaded_path, sizeof(gui_state.load_path) - 1);
         gui_state.load_path[sizeof(gui_state.load_path) - 1] = '\0';
@@ -492,6 +493,7 @@ main (int argc, char **argv) {
       int copy_size;
 
       framenum = 0;
+      hasciicam_gui_state_update_preview(&gui_state, gray_frame, ascii_width, ascii_height);
       dest_size = aa_imgwidth(render_session.context) * aa_imgheight(render_session.context);
       copy_size = (gray_size < dest_size) ? gray_size : dest_size;
       if (copy_size > 0) {
@@ -522,6 +524,7 @@ main (int argc, char **argv) {
   /* CLEAN EXIT */
 
   hasciicam_session_stop(&session);
+  hasciicam_gui_state_reset_preview(&gui_state);
   hasciicam_output_close(&output);
   hasciicam_render_session_close(&render_session);
   fprintf (stderr, "cya!\n");

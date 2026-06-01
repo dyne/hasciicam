@@ -27,6 +27,12 @@ typedef struct hasciicam_gui_state {
     int capture_height;
     int capture_stride_bytes;
     capture_pixel_format capture_pixel_format;
+    unsigned char *preview_gray;
+    int preview_capacity;
+    int preview_width;
+    int preview_height;
+    int preview_stride;
+    unsigned int preview_generation;
 
     char save_path[260];
     char load_path[260];
@@ -52,6 +58,11 @@ void hasciicam_gui_state_copy_to_config(const hasciicam_gui_state *state, hascii
  * Set capture info fields shown in the GUI panel.
  */
 void hasciicam_gui_state_set_capture_info(hasciicam_gui_state *state, const capture_info *info);
+int hasciicam_gui_state_update_preview(hasciicam_gui_state *state,
+                                       const unsigned char *gray_frame,
+                                       int width,
+                                       int height);
+void hasciicam_gui_state_reset_preview(hasciicam_gui_state *state);
 
 /**
  * Parse a 6-digit RGB hex string into 0xRRGGBB.
