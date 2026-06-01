@@ -179,6 +179,10 @@ sdl_vsync = "off"
 .fi
 .SH NOTES
 When using a usb webcam, a supported size needs to be specified. The minimum or maximum detected size should work, also a size of 160x120 mostly gives good results, with unsupported sizes you will get unexpected results.
+.IP
+In SDL live mode, the right-click GUI can expose camera controls when the active capture backend and camera driver support them. Available controls are device-dependent.
+.IP
+The SDL GUI also shows a small pre-AA preview: the grayscale luminance frame after capture conversion/mirroring and immediately before AA-lib consumes it.
 .SH BUGS
 Report bugs to hasciicam@dyne.org. Please include a complete, self-contained example that will allow the bug to be reproduced, information about which version of hasciicam you are using, which operative system and the complete device detection output.
 .SH AUTHOR

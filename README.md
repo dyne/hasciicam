@@ -40,6 +40,8 @@ HasciiCam can show an optional on-screen control panel in live SDL mode.
 - Build toggle: `HASCIICAM_ENABLE_GUI` (requires SDL and vendored Dear ImGui under `third_party/imgui/`)
 - Activation: right mouse click in the SDL window
 - Live controls: AA brightness/contrast/gamma, invert, mirror, foreground/background colors, AA font
+- Camera controls: device/driver-dependent controls (when backend reports them), e.g. brightness/contrast/gamma/exposure/focus
+- Pre-AA preview: small opaque grayscale preview of the luminance frame right before AA-lib rendering
 - Config actions: `Save` writes TOML, `Load` reads TOML
 
 File chooser behavior:

@@ -235,6 +235,7 @@ Capture is now behind a small C port in `src/capture/capture.h`:
 - response: actual width, height, stride, and pixel format.
 - operations: open, start, read/dequeue one frame, release/requeue frame, stop,
   close.
+- optional control hooks: list/set camera controls (backend/device dependent).
 
 Current adapters:
 
@@ -360,6 +361,18 @@ In `TEXT` mode:
 
 The save driver writes from AA-lib `textbuffer` and `attrbuffer`, so file output
 and live output share the same render stage.
+
+## SDL GUI Notes
+
+In SDL live mode, the right-click overlay can show:
+
+- AA rendering controls (renderer-side brightness/contrast/gamma/invert)
+- camera controls exposed by the active capture backend/device
+- a small pre-AA grayscale preview of the luminance frame that is copied into
+  `aa_image(...)` before rendering
+
+Camera controls are optional and backend/device dependent. Do not assume they
+exist on every platform or every camera.
 
 ## TOML Config API
 

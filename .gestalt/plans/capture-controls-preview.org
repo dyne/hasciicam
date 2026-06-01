@@ -3,7 +3,7 @@
 #+DATE: 2026-06-01
 #+KEYWORDS: capture controls gui sdl preview grayscale v4l2 directshow mediafoundation avfoundation
 
-* WIP [#A] Define a minimal capture-control port
+* DONE [#A] Define a minimal capture-control port
 :PROPERTIES:
 :Effort: 0.5 day
 :Goal: Expose camera-side tweakable controls through the capture abstraction without mixing them with AA-lib render controls.
@@ -26,7 +26,7 @@
 :Done when: The application can safely ask any active backend for controls and apply changes without knowing backend type.
 :END:
 
-** TODO [#B] Decide canonical control names and config scope
+** DONE [#B] Decide canonical control names and config scope
 :PROPERTIES:
 :Why: Some device controls are runtime-only and hardware-specific; persisting them can fail on another camera or OS.
 :Change: Keep capture controls runtime-only in the first implementation. Do not add TOML/CLI persistence until the backend API is proven. Name GUI sections clearly: "Camera Controls" for OS/device controls and "AA Rendering" for renderer controls. If later persistence is needed, create a separate plan for per-device profiles.
@@ -104,7 +104,7 @@
 :Done when: Camera-control changes apply live and safely from the main loop.
 :END:
 
-* WIP [#A] Add an opaque grayscale pre-AA preview to the SDL overlay
+* DONE [#A] Add an opaque grayscale pre-AA preview to the SDL overlay
 :PROPERTIES:
 :Effort: 1 day
 :Goal: Show a small scaled preview of the luminance buffer exactly after capture conversion/mirroring and immediately before AA-lib consumes it.
@@ -135,7 +135,7 @@
 :Done when: The overlay includes a small usable preview and still fits common Windows display sizes.
 :END:
 
-** TODO [#B] Keep preview updates cheap
+** DONE [#B] Keep preview updates cheap
 :PROPERTIES:
 :Why: The preview should not dominate frame time or allocate every frame.
 :Change: Reuse the GUI preview buffer and SDL texture between frames. Only recreate on dimension change. If the AA image is large, optionally downsample while copying to a max preview texture size, but keep the source semantics documented: it is sampled from the exact pre-AA grayscale buffer. Start simple; add downsampling only if profiling shows noticeable cost.
@@ -143,7 +143,7 @@
 :Done when: Preview updates continuously without repeated allocations in the steady state.
 :END:
 
-* TODO [#B] Verify, document, and update the plan status
+* WIP [#B] Verify, document, and update the plan status
 :PROPERTIES:
 :Effort: 0.5 day
 :Goal: Keep the feature discoverable and leave a clear test trail across Windows-first and portable backends.
@@ -158,7 +158,7 @@
 :Done when: Core state/control logic is covered without requiring a camera or window.
 :END:
 
-** TODO [#B] Document camera-control behavior and limitations
+** DONE [#B] Document camera-control behavior and limitations
 :PROPERTIES:
 :Why: Users need to understand why controls appear on one camera/OS but not another.
 :Change: Update `README.md`, `docs/hasciicam.1`, and `AGENTS.md`. Describe "Camera Controls" as OS/device controls, separate from "AA Rendering". Note that supported sliders are backend/device-dependent and may include brightness/contrast/gamma/gain/exposure/focus/white balance. Document that the pre-AA preview shows the grayscale luminance frame after capture conversion/mirroring and before AA-lib rendering.
@@ -166,7 +166,7 @@
 :Done when: Documentation avoids promising universal controls and clearly explains the preview.
 :END:
 
-** TODO [#A] Run Windows-first validation
+** DONE [#A] Run Windows-first validation
 :PROPERTIES:
 :Why: Windows is the current target and DirectShow/SDL are the likely first working control/preview path.
 :Change: Run `cmake --preset windows-vcpkg-ninja`, `cmake --build --preset windows-vcpkg-ninja`, and `ctest --preset windows-vcpkg-ninja` from a `vcvarsall.bat` environment. Then manually run `hasciicam -q -d synthetic:// -O SDL --frames 2` for no-camera GUI safety and an interactive camera run where the overlay preview and any exposed camera controls are exercised.
