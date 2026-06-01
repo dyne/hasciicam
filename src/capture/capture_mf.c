@@ -439,6 +439,27 @@ static void mf_close(capture_device *dev) {
     free(dev);
 }
 
+static int mf_list_controls(capture_device *dev, capture_control_desc *out, int max_controls) {
+    (void)dev;
+    (void)out;
+    (void)max_controls;
+    return 0;
+}
+
+static int mf_set_control(capture_device *dev, capture_control_id id, int value) {
+    (void)dev;
+    (void)id;
+    (void)value;
+    return 0;
+}
+
+static int mf_set_control_auto(capture_device *dev, capture_control_id id, int enabled) {
+    (void)dev;
+    (void)id;
+    (void)enabled;
+    return 0;
+}
+
 #else
 
 struct capture_device {
@@ -497,9 +518,9 @@ static const capture_ops ops = {
     mf_stop,
     mf_close,
     mf_name,
-    NULL,
-    NULL,
-    NULL
+    mf_list_controls,
+    mf_set_control,
+    mf_set_control_auto
 };
 
 const capture_ops *capture_mf_ops(void) {

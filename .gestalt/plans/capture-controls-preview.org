@@ -34,7 +34,7 @@
 :Done when: The implementation avoids silently saving hardware-specific controls into the existing generic `hasciicam.toml`.
 :END:
 
-* WIP [#A] Implement backend control adapters incrementally
+* DONE [#A] Implement backend control adapters incrementally
 :PROPERTIES:
 :Effort: 1 day
 :Goal: Surface real camera controls where practical, starting with the current Windows-first target while keeping Linux/macOS paths ready.
@@ -49,7 +49,7 @@
 :Done when: DirectShow devices with supported controls expose correct metadata and accept runtime changes without breaking frame capture.
 :END:
 
-** TODO [#B] Investigate Media Foundation control support before implementing
+** DONE [#B] Investigate Media Foundation control support before implementing
 :PROPERTIES:
 :Why: Media Foundation capture in this repo currently uses `IMFSourceReader`; camera controls are not as uniformly exposed through that path.
 :Change: Check whether the active `IMFMediaSource` can expose `IKsControl`, `IAMVideoProcAmp`, or a related control interface for the selected device on Windows. If it is straightforward, implement the same `capture_ops` functions in `src/capture/capture_mf.c`. If it requires substantial device-activation or KS property plumbing, document MF as "controls unavailable" for this slice and rely on DirectShow fallback for Windows camera-control support.
@@ -57,7 +57,7 @@
 :Done when: MF behavior is explicit: either supported through the same port or intentionally returns no controls with no GUI breakage.
 :END:
 
-** TODO [#B] Add V4L2 control mapping
+** DONE [#B] Add V4L2 control mapping
 :PROPERTIES:
 :Why: Linux commonly exposes camera controls through V4L2 CIDs.
 :Change: In `src/capture/capture_v4l2.c`, query supported controls with `VIDIOC_QUERYCTRL`/`VIDIOC_QUERY_EXT_CTRL` where available and current values with `VIDIOC_G_CTRL`. Map common CIDs: `V4L2_CID_BRIGHTNESS`, `CONTRAST`, `GAMMA`, `GAIN`, `SATURATION`, `SHARPNESS`, `EXPOSURE_ABSOLUTE`, `AUTO_EXPOSURE` where applicable, `WHITE_BALANCE_TEMPERATURE`, `AUTO_WHITE_BALANCE`, and focus controls if present. Hide disabled/inactive controls. Set values through `VIDIOC_S_CTRL`.
@@ -65,7 +65,7 @@
 :Done when: V4L2 can expose common controls without requiring a camera for automated tests.
 :END:
 
-** TODO [#C] Leave AVFoundation as capability-aware follow-up unless needed
+** DONE [#C] Leave AVFoundation as capability-aware follow-up unless needed
 :PROPERTIES:
 :Why: macOS camera controls differ from brightness/contrast/gamma and often require device locking plus hardware-specific availability checks.
 :Change: In `src/capture/capture_avfoundation.mm`, return zero controls initially or expose only safe controls that are clearly available through `AVCaptureDevice` (`exposure`, `focus`, `white_balance`) if implementation remains small. Avoid pretending brightness/contrast/gamma are OS camera controls on macOS when they would really be post-processing.
@@ -143,14 +143,14 @@
 :Done when: Preview updates continuously without repeated allocations in the steady state.
 :END:
 
-* WIP [#B] Verify, document, and update the plan status
+* DONE [#B] Verify, document, and update the plan status
 :PROPERTIES:
 :Effort: 0.5 day
 :Goal: Keep the feature discoverable and leave a clear test trail across Windows-first and portable backends.
 :Notes: This is a user-facing GUI feature and a backend capability feature. Documentation should make clear that camera controls are device-dependent.
 :END:
 
-** TODO [#A] Add focused automated tests
+** DONE [#A] Add focused automated tests
 :PROPERTIES:
 :Why: The most important logic can be tested without a camera: control wrappers, GUI state requests, and grayscale preview copying.
 :Change: Add or extend plain C tests for capture-control wrapper behavior, GUI state control requests, and preview buffer copying/resizing. Add CTest entries. Keep real camera tests opt-in/manual.
@@ -174,7 +174,7 @@
 :Done when: The feature builds, automated tests pass, and manual validation notes are recorded.
 :END:
 
-** TODO [#C] Keep follow-up scope explicit
+** DONE [#C] Keep follow-up scope explicit
 :PROPERTIES:
 :Why: Camera controls can grow into per-device profiles, image post-processing, and platform-specific tuning UIs.
 :Change: Do not add persisted camera profiles, software post-processing brightness/contrast/gamma, native camera property dialogs, or external dependencies in this slice. If MF/AVFoundation control support is not small, document it as follow-up rather than blocking DirectShow/V4L2 and preview work.
