@@ -184,6 +184,7 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
 
     ImGui::Separator();
     ImGui::Text("Capture");
+    ImGui::BeginGroup();
     mirror_x = state->mirror_x != 0;
     mirror_y = state->mirror_y != 0;
     if (ImGui::Checkbox("Mirror X", &mirror_x))
@@ -193,6 +194,29 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
     ImGui::Text("Size: %dx%d", state->capture_width, state->capture_height);
     ImGui::Text("Stride: %d bytes", state->capture_stride_bytes);
     ImGui::Text("Pixel format: %d", (int)state->capture_pixel_format);
+    ImGui::EndGroup();
+    if (g_preview_texture != NULL && state->preview_width > 0 && state->preview_height > 0) {
+        float aspect_w = (float)state->preview_width;
+        float aspect_h = (float)state->preview_height;
+        float preview_w;
+        float preview_h;
+        if (state->capture_width > 0 && state->capture_height > 0) {
+            aspect_w = (float)state->capture_width;
+            aspect_h = (float)state->capture_height;
+        }
+        if (aspect_w <= 0.0f || aspect_h <= 0.0f) {
+            aspect_w = 4.0f;
+            aspect_h = 3.0f;
+        }
+        preview_w = 150.0f;
+        preview_h = preview_w * (aspect_h / aspect_w);
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - preview_w);
+        ImGui::Image((ImTextureID)g_preview_texture, ImVec2(preview_w, preview_h));
+    } else {
+        ImGui::SameLine();
+        ImGui::TextDisabled("No preview yet");
+    }
     ImGui::Separator();
     ImGui::Text("Camera Controls");
     if (state->capture_control_count <= 0) {
@@ -228,16 +252,6 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
                 ImGui::Text("%s: %d", c->label ? c->label : c->name, c->current_value);
             }
         }
-    }
-
-    ImGui::Separator();
-    ImGui::Text("Pre-AA Preview");
-    if (g_preview_texture != NULL && state->preview_width > 0 && state->preview_height > 0) {
-        float preview_w = 180.0f;
-        float preview_h = (preview_w * (float)state->preview_height) / (float)state->preview_width;
-        ImGui::Image((ImTextureID)g_preview_texture, ImVec2(preview_w, preview_h));
-    } else {
-        ImGui::TextDisabled("No preview yet");
     }
 
     ImGui::Separator();
