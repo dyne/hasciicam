@@ -3,6 +3,8 @@
 
 #include <stddef.h>
 
+#define CAPTURE_MAX_CONTROLS 16
+
 /* Canonical frame formats exposed by capture backends. */
 typedef enum capture_pixel_format {
     CAPTURE_PIXFMT_UNKNOWN = 0,

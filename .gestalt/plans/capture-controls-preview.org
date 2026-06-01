@@ -34,14 +34,14 @@
 :Done when: The implementation avoids silently saving hardware-specific controls into the existing generic `hasciicam.toml`.
 :END:
 
-* TODO [#A] Implement backend control adapters incrementally
+* WIP [#A] Implement backend control adapters incrementally
 :PROPERTIES:
 :Effort: 1 day
 :Goal: Surface real camera controls where practical, starting with the current Windows-first target while keeping Linux/macOS paths ready.
 :Notes: Do not add dependencies. Prefer OS APIs already available from current backend headers/libraries. Backends may support different subsets, and device drivers may report ranges differently.
 :END:
 
-** TODO [#A] Add DirectShow `IAMVideoProcAmp` and `IAMCameraControl` support
+** DONE [#A] Add DirectShow `IAMVideoProcAmp` and `IAMCameraControl` support
 :PROPERTIES:
 :Why: DirectShow exposes the common camera controls most directly on Windows fallback devices.
 :Change: In `src/capture/capture_dshow.cpp`, store `IAMVideoProcAmp *video_proc_amp` and `IAMCameraControl *camera_control` when available. Map `VideoProcAmp_Brightness`, `Contrast`, `Gamma`, `Gain`, `Saturation`, `Sharpness`, and `WhiteBalance` to capture controls. Map `CameraControl_Exposure`, `Focus`, and optionally `Zoom` if included. Use `GetRange()` for min/max/step/default/auto flags and `Get()` for current value/auto state. Use `Set()` to apply values, preserving auto/manual flags as appropriate.
@@ -73,14 +73,14 @@
 :Done when: macOS behavior is safe and does not show fake controls.
 :END:
 
-* TODO [#A] Add GUI state and live application for camera controls
+* DONE [#A] Add GUI state and live application for camera controls
 :PROPERTIES:
 :Effort: 0.75 day
 :Goal: Show OS/device capture controls in the existing right-click overlay and apply changes live when supported.
 :Notes: Keep the overlay dense and operational. If a backend reports no controls, show nothing or a single disabled "No camera controls" row; do not clutter the panel.
 :END:
 
-** TODO [#A] Extend GUI state with capture-control snapshots
+** DONE [#A] Extend GUI state with capture-control snapshots
 :PROPERTIES:
 :Why: The ImGui C++ layer should draw controls from plain state and set request flags; it should not know backend-specific APIs.
 :Change: Add a fixed-size array to `hasciicam_gui_state`, for example `capture_control_desc capture_controls[16]`, `capture_control_count`, and per-control dirty flags or a one-shot request field with changed ID/value. Add helper functions to load descriptors from an active `hasciicam_session` or capture wrapper. Keep size fixed to avoid GUI-time allocation.
@@ -88,7 +88,7 @@
 :Done when: GUI state can represent supported camera controls independently of SDL/ImGui.
 :END:
 
-** TODO [#A] Render a "Camera Controls" section in the overlay
+** DONE [#A] Render a "Camera Controls" section in the overlay
 :PROPERTIES:
 :Why: Users need sliders for camera-side values, separate from AA render sliders.
 :Change: In `src/gui/gui_overlay.cpp`, add a section after "Capture" or before "AA Rendering" named "Camera Controls". For each writable integer control, draw a slider using min/max and step if ImGui supports it cleanly; otherwise use `SliderInt`. For read-only controls, draw label/value disabled. If auto is supported, draw a checkbox next to the control or just above it. When a value changes, set the GUI state's change request; avoid sending a backend call every frame if the value did not change.
@@ -96,7 +96,7 @@
 :Done when: Overlay can display and request capture-control changes without direct backend coupling.
 :END:
 
-** TODO [#A] Apply capture-control changes from the app loop
+** DONE [#A] Apply capture-control changes from the app loop
 :PROPERTIES:
 :Why: Backend calls should happen in the C app/session layer, not in the overlay renderer.
 :Change: In `src/hasciicam.c` or a small `src/app/app_capture_controls.c`, after GUI events are processed and before reading the next frame, consume pending control requests from `gui_state`, call the capture-control wrapper on the active session, refresh the descriptor current value, and update `status_message` on failure. Ensure failed changes do not stop capture.

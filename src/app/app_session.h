@@ -31,5 +31,14 @@ void hasciicam_session_stop(hasciicam_session *session);
 const capture_info *hasciicam_session_capture_info(const hasciicam_session *session);
 void hasciicam_session_request_stop(hasciicam_session *session);
 int hasciicam_session_should_stop(const hasciicam_session *session);
+int hasciicam_session_list_controls(hasciicam_session *session,
+                                    capture_control_desc *out,
+                                    int max_controls);
+int hasciicam_session_set_control(hasciicam_session *session,
+                                  capture_control_id id,
+                                  int value);
+int hasciicam_session_set_control_auto(hasciicam_session *session,
+                                       capture_control_id id,
+                                       int enabled);
 
 #endif

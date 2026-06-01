@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../capture/capture_backend.h"
+#include "../capture/capture_control.h"
 #include "../capture/capture_external.h"
 #include "../capture/frame_convert.h"
 
@@ -120,4 +121,28 @@ int hasciicam_session_should_stop(const hasciicam_session *session) {
     if (session == NULL)
         return 1;
     return session->stop_requested;
+}
+
+int hasciicam_session_list_controls(hasciicam_session *session,
+                                    capture_control_desc *out,
+                                    int max_controls) {
+    if (session == NULL)
+        return 0;
+    return capture_controls_list(session->capture_dev, session->capture_ops, out, max_controls);
+}
+
+int hasciicam_session_set_control(hasciicam_session *session,
+                                  capture_control_id id,
+                                  int value) {
+    if (session == NULL)
+        return 0;
+    return capture_control_set(session->capture_dev, session->capture_ops, id, value);
+}
+
+int hasciicam_session_set_control_auto(hasciicam_session *session,
+                                       capture_control_id id,
+                                       int enabled) {
+    if (session == NULL)
+        return 0;
+    return capture_control_set_auto(session->capture_dev, session->capture_ops, id, enabled);
 }

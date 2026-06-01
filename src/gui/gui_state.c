@@ -96,6 +96,22 @@ void hasciicam_gui_state_set_capture_info(hasciicam_gui_state *state, const capt
     state->capture_pixel_format = info->pixel_format;
 }
 
+void hasciicam_gui_state_set_capture_controls(hasciicam_gui_state *state,
+                                              const capture_control_desc *controls,
+                                              int control_count) {
+    int i;
+    if (state == NULL)
+        return;
+    if (control_count < 0)
+        control_count = 0;
+    if (control_count > CAPTURE_MAX_CONTROLS)
+        control_count = CAPTURE_MAX_CONTROLS;
+    state->capture_control_count = control_count;
+    for (i = 0; i < control_count; ++i) {
+        state->capture_controls[i] = controls[i];
+    }
+}
+
 int hasciicam_gui_state_update_preview(hasciicam_gui_state *state,
                                        const unsigned char *gray_frame,
                                        int width,
