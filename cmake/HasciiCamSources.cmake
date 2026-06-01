@@ -67,6 +67,7 @@ set(HASCIICAM_OUTPUT_SOURCES
 )
 
 set(HASCIICAM_RENDER_SOURCES
+    src/render/render_font.c
     src/render/render_session.c
 )
 

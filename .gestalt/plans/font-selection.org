@@ -1,0 +1,152 @@
+#+TITLE: Font Selection
+#+SUBTITLE: Expose AA-lib font selection through CLI, TOML/env config, and SDL live GUI without unsafe live resizing
+#+DATE: 2026-06-01
+#+KEYWORDS: font aalib cli config gui sdl resize live
+
+* WIP [#A] Define a small AA font catalog API
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Provide one tested C API for listing, looking up, and describing bundled AA-lib fonts without exposing callers to direct `aa_fonts[]` iteration.
+:Notes: Challenge the first idea of having CLI, config, GUI, and SDL each iterate `aa_fonts[]` directly. That repeats lookup rules and makes `--font list` formatting drift from the GUI labels. Use a tiny adapter over existing AA-lib data instead. Do not add a dependency.
+:END:
+
+** DONE [#A] Add font lookup/list helpers
+:PROPERTIES:
+:Why: CLI parsing, TOML/env parsing, GUI combo boxes, and live SDL switching all need the same list of valid fonts.
+:Change: Add a small module, likely `src/render/render_font.h` and `src/render/render_font.c`, or `src/app/app_font.*` if it fits better after inspecting ownership. Implement helpers around AA-lib's existing `aa_fonts[]`: `hasciicam_font_count()`, `hasciicam_font_at(index)`, `hasciicam_font_find(name_or_shortname)`, and `hasciicam_font_default()`. The descriptor should expose short name, long name, height, and `const struct aa_font *font`. Match AA-lib's existing lookup semantics: accept either `font->shortname` or `font->name`, but store and persist the short name. Keep optional `vyhen` naturally included only if AA-lib registers it.
+:Tests: Add a plain C unit test that asserts the default build sees at least the known bundled fonts, can find `vga16`, can find the long name `"Standard vga 8x16 font"`, rejects an unknown name, and returns stable short names.
+:Done when: All code that needs a font can use one helper API, and tests prove lookup behavior without opening SDL or a camera.
+:END:
+
+** TODO [#A] Decide the canonical default font
+:PROPERTIES:
+:Why: The current default is implicit: AA-lib/SDL fall back to `aa_font16`, but config and GUI need an explicit value to show.
+:Change: Define the default font short name as `vga16` in the new font API. Keep behavior unchanged when no font is configured. During render session initialization, keep `hwparams.font = NULL` unless a configured font is selected; this preserves driver defaults. When exposing the current value to config/GUI, report `vga16` if the context or hardware params have no explicit font and SDL would use its fallback.
+:Tests: Unit test that the default helper returns `vga16`. Existing smoke tests must still render with no `--font` option.
+:Done when: The UI and saved TOML have a stable default name while runtime rendering remains backward-compatible.
+:END:
+
+** TODO [#B] Add a font listing formatter
+:PROPERTIES:
+:Why: `--font list` should be deterministic, readable, and reusable in tests without duplicating print code in the parser.
+:Change: Add a helper that writes all fonts to a `FILE *`, one font per line, with the short name first. Suggested format: `vga16\tStandard vga 8x16 font\t8x16`. Width is always 8 for these AA-lib bitmap fonts; height comes from `font->height`. Do not promise that all future fonts are width 8 unless the AA-lib `aa_font` structure remains width-less.
+:Tests: Unit test the formatter through a temporary file or direct helper if practical. At minimum, add a CLI test for `--font list` that checks `vga16` and `courier` are present.
+:Done when: Font listing has one implementation and a stable testable output shape.
+:END:
+
+* TODO [#A] Add startup CLI and config support
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Let users choose the AA render font from CLI, TOML, and environment while preserving current precedence and AA-lib option parsing.
+:Notes: There is already an AA-lib `-font` option parsed before HasciiCam CLI parsing. Keep that working, but add a HasciiCam-level `--font` option because users asked for CLI/config support and `--font list`. Be careful: AA-lib's `aa_parseoptions()` runs before `hasciicam_config_parse()`, so `--font` must not be eaten by AA-lib and `--font list` should exit cleanly before camera/display startup.
+:END:
+
+** TODO [#A] Add canonical `font` config key
+:PROPERTIES:
+:Why: TOML/env need a concise canonical key, and `font_face` already means HTML CSS font face, not AA-lib bitmap font.
+:Change: Add `char font[64]` or similarly named field to `hasciicam_config`. Use canonical key `font` for env/TOML. Do not reuse `font_face`; document the distinction: `font` is AA-lib bitmap rendering font, `font_face` is HTML CSS output face. Initialize to `vga16` or empty plus default helper; prefer storing `vga16` after parsing so the GUI can show a selected combo item.
+:Tests: Extend `tests/test_app_config.c` to load `font = "vga8"` from TOML/env and to save it back. Add rejection tests for an unknown font.
+:Done when: Config can persist and load a font short name and rejects invalid names before render startup.
+:END:
+
+** TODO [#A] Add `--font NAME` and `--font list`
+:PROPERTIES:
+:Why: Users need a direct startup option and a discoverability path for available font names.
+:Change: Add long option `--font` with required argument to `src/app/app_config.c`. If value is `list`, print the font list to stdout or stderr consistently with existing help behavior, then exit 0 before camera/display startup. Otherwise validate the value through the font API and store the short name in config. Avoid a short option because legacy `-f` was historically FTP in docs and AA-lib already has `-font`; adding a new short alias risks confusion. Keep `-font` AA-lib compatibility unchanged if it currently works. If both AA-lib `-font` and HasciiCam `--font` are supplied, HasciiCam config precedence should win by assigning `render_session.hwparams.font` after `hasciicam_config_parse()`.
+:Tests: Add CLI tests: `hasciicam --font list` exits 0 and prints known short names; `hasciicam --font vga8 -d synthetic:// --frames 1 -m text -o ...` exits 0; `hasciicam --font no-such-font -h` or equivalent parse-only command exits nonzero with a useful error. Ensure `hasciicam -H` still shows AA-lib help and current tests pass.
+:Done when: Font selection is available from CLI, `--font list` is implemented, bad names fail early, and existing AA-lib option parsing remains compatible.
+:END:
+
+** TODO [#B] Apply configured font before opening AA-lib
+:PROPERTIES:
+:Why: AA-lib uses `hwparams.font` during context initialization and buffer sizing. The configured font must be applied before `hasciicam_render_session_open()`.
+:Change: Add `hasciicam_render_session_set_font_by_name()` or equivalent, using the font API to set `render_session.hwparams.font`. Call it in `src/hasciicam.c` after HasciiCam config parsing and before size planning/render session open. Update size metrics before capture negotiation: display cell height should come from the selected font height, and width should remain 8 unless a future AA-lib font API exposes width. Rebuild `hasciicam_size_metrics` after font selection so `--size` pixel intent and default live sizing derive the correct ASCII grid.
+:Tests: Add or extend app size tests so a font with height 8 (`vga8`) produces more rows for the same pixel target than `vga16`. Add a CLI smoke that selects `vga8` and text output using synthetic capture.
+:Done when: Startup selected font affects AA-lib render context, size planning, and output without needing a camera.
+:END:
+
+* TODO [#A] Make SDL live font switching safe
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Allow changing fonts from the right-click GUI combo box in live SDL mode without crashes, stale textures, stale buffers, or invalid capture/frame sizes.
+:Notes: This is the risky part. `aa_setfont()` invalidates AA-lib render tables, but the SDL driver also caches `d->font`, `char_width`, `char_height`, `font_texture`, stream texture, previous text/attr buffers, and content offsets. Changing only `c->params.font` is insufficient. Prefer an explicit SDL bridge function that owns driver-side refresh.
+:END:
+
+** TODO [#A] Add font fields and change request to GUI state
+:PROPERTIES:
+:Why: The C++ ImGui adapter should not call AA-lib directly; it should only update state and request an application-level change.
+:Change: Extend `hasciicam_gui_state` with current font short name, selected font index or short name, and a one-shot `font_change_requested` flag. Initialize from config/current render font. Copy current font back to config for save/load. When config is loaded from the GUI, refresh the selected font field and request a live apply if the loaded font differs from the current one.
+:Tests: Extend `test_gui_state.c` to cover init/copy of `font`, requested change flag behavior, and load-state preservation of save/load paths.
+:Done when: GUI state can represent font selection and save/load it without linking SDL or ImGui.
+:END:
+
+** TODO [#A] Add the ImGui font combo box
+:PROPERTIES:
+:Why: Users need live mode selection from the available bundled fonts.
+:Change: In `src/gui/gui_overlay.cpp`, add a combo box under a display/rendering section. Populate it from the font catalog API, showing short names and optionally long names in the label. On selection, write the selected short name into GUI state and set `font_change_requested = 1`. Use stable indices each frame; do not allocate per-frame strings. If the font catalog API is C-only, expose a C function suitable for C++ calls.
+:Tests: Build GUI on Windows vcpkg preset. Manual visual smoke: run SDL synthetic mode, open the panel, confirm the combo is populated and selecting another font does not close or corrupt the panel.
+:Done when: The GUI displays all registered fonts and emits a single clear change request when the selection changes.
+:END:
+
+** TODO [#A] Implement an SDL font-switch bridge
+:PROPERTIES:
+:Why: SDL live output must rebuild driver-side font resources in one place, not through scattered app code.
+:Change: Add a bridge function such as `hasciicam_sdl_set_runtime_font(aa_context *, const char *shortname, int *out_ascii_w, int *out_ascii_h)`. In the SDL implementation, validate active driver is SDL, find the font, call `aa_setfont(context, font)`, update `struct sdldriverdata`: `d->font = font`, `d->char_width = 8`, `d->char_height = font->height`, destroy/recreate `font_texture`, destroy/recreate stream texture, clear `previoust` and `previousa`, set `force_clear = 1`, recompute window-derived `d->width`/`d->height` in character cells, update AA context size through `aa_resize(context)` if needed, and report resulting `aa_imgwidth()`/`aa_imgheight()`. Ensure all allocations are checked and that failure leaves the previous font usable where possible. Keep stub implementation returning false when SDL/GUI is off.
+:Tests: Add a non-window unit test for font lookup; for the SDL bridge, use a visual/smoke test only unless existing visual SDL CTest can be enabled locally. Run `hasciicam -q -d synthetic:// -O SDL --frames 2 --font vga8` and `--font vga16`. Manually exercise live switching with a real or synthetic stream for several font changes.
+:Done when: Switching fonts live recreates SDL font/stream resources, keeps rendering, and has no stale texture or buffer access.
+:END:
+
+** TODO [#A] Reconcile live resize with capture and grayscale buffers
+:PROPERTIES:
+:Why: Changing font height changes how many ASCII rows fit in the same SDL window. The render loop currently asks capture conversion for `aa_imgwidth()`/`aa_imgheight()` and copies into AA image memory; if those dimensions change, the gray frame allocation and copy bounds must remain valid.
+:Change: Audit `hasciicam_session_step()`, gray buffer ownership, and `aa_resize()`. If `aa_imgwidth()`/`aa_imgheight()` changes after a live font switch, ensure the next frame conversion allocates or returns a gray buffer of the new size and the app recomputes `dest_size` each frame as it already does. If any cached dimensions exist outside AA-lib/SDL, update them after successful font switch. Do not reopen the camera for live font changes in the first implementation; instead, keep the capture backend resolution fixed and resample the current camera frame into the new AA image dimensions. Revisit only if tests show poor sizing.
+:Tests: Add or extend a synthetic-session test if possible to render a frame, switch the render context font/size through a test helper, render another frame, and assert no crash and non-empty output. If direct context switching is too coupled to SDL, document this as manual SDL smoke and rely on live test commands.
+:Done when: Live font switching never writes past image/text/attr buffers and does not require camera reopen.
+:END:
+
+** TODO [#B] Keep final video output sizing predictable
+:PROPERTIES:
+:Why: User expectations differ: changing font may mean more rows/cols in the same window, or same rows/cols with a resized window. The least surprising live behavior is to keep the SDL window pixel size stable and recompute the ASCII grid from the new cell height.
+:Change: For live SDL switching, keep the current window pixel size and derive `d->width = window_width / 8`, `d->height = window_height / font->height`. This means smaller fonts show more rows in the same window; larger fonts show fewer rows. For startup `--font`, apply the same metrics before size planning. For text/HTML output, the font affects AA-lib glyph analysis and render tables, but not terminal text cell dimensions; do not alter output file dimensions unless `--size` pixel intent is being converted through display metrics for live SDL.
+:Tests: Size tests for pixel-intent startup metrics. Manual SDL check: switch `vga16` to `vga8` and confirm the window stays the same pixel size while more rows are visible.
+:Done when: Font size behavior is documented and implemented consistently across startup and live SDL mode.
+:END:
+
+* TODO [#B] Persist, document, and verify the feature
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Make font selection discoverable, saved, loaded, tested, and documented without disturbing existing rendering paths.
+:Notes: Keep docs concise. This is a user-facing option, so update help, man page, README, and AGENTS. Do not update generated website docs unless that is already part of the repo workflow.
+:END:
+
+** TODO [#A] Save and load font in TOML
+:PROPERTIES:
+:Why: The GUI Save/Load buttons and startup config should round-trip the selected font.
+:Change: Include `font` in the persisted config keys. Saving writes the short name, for example `font = "vga16"`. Loading validates through the font catalog; if invalid, fail the load with an actionable message and leave live state unchanged. For GUI load, keep current save/load paths preserved as the existing GUI code does.
+:Tests: Extend TOML round-trip tests to include `font = "courier"` or `vga8`. Add load failure test for `font = "missing"`.
+:Done when: TOML can persist a selected font and invalid font config does not silently fall back.
+:END:
+
+** TODO [#B] Update user-facing docs and help
+:PROPERTIES:
+:Why: Users need to know `--font list`, valid config key, and live GUI behavior.
+:Change: Update `src/app/app_config.c` help text, `docs/hasciicam.1`, `README.md`, and `AGENTS.md`. Add `font` to canonical config keys. Describe `--font NAME`, `--font list`, and live GUI font combo. Clarify that `--font-face` remains HTML CSS font face and is unrelated to AA-lib bitmap font selection.
+:Tests: Existing `cli_help` and `cli_aahelp` tests should still pass. Add or update a CLI help assertion only if current CTest checks exact text elsewhere.
+:Done when: Help and docs describe the new option without confusing it with HTML `font_face`.
+:END:
+
+** TODO [#A] Full verification on Windows vcpkg preset
+:PROPERTIES:
+:Why: The requested target is Windows first, and SDL/GUI/font switching are platform-sensitive.
+:Change: Run the standard Windows commands from a Visual Studio environment: `cmake --preset windows-vcpkg-ninja`, `cmake --build --preset windows-vcpkg-ninja`, and `ctest --preset windows-vcpkg-ninja`. Then run focused manual commands: `hasciicam --font list`, `hasciicam -q -d synthetic:// --frames 2 -m text --font vga8 -o ...`, `hasciicam -q -d synthetic:// -O SDL --frames 2 --font vga8`, and one interactive SDL session where fonts are changed repeatedly from the combo box.
+:Tests: Full CTest plus the manual smoke commands above. Record any manual limitation in the final reviewer summary.
+:Done when: Automated tests pass, CLI list works, startup font selection works, and live SDL switching has been exercised without crash.
+:END:
+
+** TODO [#C] Keep follow-up scope explicit
+:PROPERTIES:
+:Why: Font switching touches sizing and can invite broader renderer refactors; this plan should stay minimal.
+:Change: Do not add proportional fonts, external font loading, TTF rendering, ImGui fonts, or platform-native font pickers. Do not change HTML `font_face` behavior beyond documentation. If future work wants external fonts, create a separate plan after this one is stable.
+:Tests: No code tests.
+:Done when: The implementation stays limited to bundled AA-lib fonts and the requested CLI/config/GUI surfaces.
+:END:
