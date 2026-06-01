@@ -58,6 +58,32 @@ typedef struct capture_info {
     capture_pixel_format pixel_format;
 } capture_info;
 
+typedef enum capture_control_id {
+    CAPTURE_CONTROL_BRIGHTNESS = 0,
+    CAPTURE_CONTROL_CONTRAST,
+    CAPTURE_CONTROL_GAMMA,
+    CAPTURE_CONTROL_GAIN,
+    CAPTURE_CONTROL_SATURATION,
+    CAPTURE_CONTROL_SHARPNESS,
+    CAPTURE_CONTROL_EXPOSURE,
+    CAPTURE_CONTROL_WHITE_BALANCE,
+    CAPTURE_CONTROL_FOCUS
+} capture_control_id;
+
+typedef struct capture_control_desc {
+    capture_control_id id;
+    const char *name;
+    const char *label;
+    int min_value;
+    int max_value;
+    int step;
+    int default_value;
+    int current_value;
+    int writable;
+    int auto_supported;
+    int auto_enabled;
+} capture_control_desc;
+
 typedef struct capture_device capture_device;
 
 typedef struct capture_ops {
@@ -77,6 +103,12 @@ typedef struct capture_ops {
     void (*close)(capture_device *dev);
     /* Stable backend identifier for diagnostics. */
     const char *(*name)(void);
+    /* Optional: enumerate supported controls. Returns count written to out[]. */
+    int (*list_controls)(capture_device *dev, capture_control_desc *out, int max_controls);
+    /* Optional: set a control value. */
+    int (*set_control)(capture_device *dev, capture_control_id id, int value);
+    /* Optional: set control auto mode (enabled=0/1). */
+    int (*set_control_auto)(capture_device *dev, capture_control_id id, int enabled);
 } capture_ops;
 
 #endif

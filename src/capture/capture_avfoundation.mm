@@ -223,7 +223,10 @@ static const capture_ops ops = {
     avf_release,
     avf_stop,
     avf_close,
-    avf_name
+    avf_name,
+    NULL,
+    NULL,
+    NULL
 };
 
 const capture_ops *capture_avfoundation_ops(void) {

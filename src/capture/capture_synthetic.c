@@ -111,7 +111,10 @@ static const capture_ops ops = {
     synthetic_release,
     synthetic_stop,
     synthetic_close,
-    synthetic_name
+    synthetic_name,
+    NULL,
+    NULL,
+    NULL
 };
 
 const capture_ops *capture_synthetic_ops(void) {

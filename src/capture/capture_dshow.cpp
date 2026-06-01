@@ -459,7 +459,10 @@ static const capture_ops ops = {
     dshow_release,
     dshow_stop,
     dshow_close,
-    dshow_name
+    dshow_name,
+    NULL,
+    NULL,
+    NULL
 };
 
 const capture_ops *capture_dshow_ops(void) {
