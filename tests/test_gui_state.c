@@ -14,6 +14,7 @@ static int expect_true(int condition, const char *message) {
 int main(void) {
     hasciicam_config cfg;
     hasciicam_gui_state state;
+    capture_control_desc controls[2];
     unsigned char sample[6] = {0, 64, 128, 192, 224, 255};
     unsigned int rgb = 0;
 
@@ -65,6 +66,19 @@ int main(void) {
     if (!expect_true(strcmp(cfg.background, "0000FF") == 0, "background copy failed")) return 1;
     if (!expect_true(strcmp(cfg.foreground, "FF0000") == 0, "foreground copy failed")) return 1;
     if (!expect_true(strcmp(cfg.font, "vga8") == 0, "font copy failed")) return 1;
+
+    memset(controls, 0, sizeof(controls));
+    controls[0].id = CAPTURE_CONTROL_BRIGHTNESS;
+    controls[0].name = "brightness";
+    controls[0].label = "Brightness";
+    controls[0].min_value = 0;
+    controls[0].max_value = 255;
+    controls[0].current_value = 100;
+    controls[0].writable = 1;
+    hasciicam_gui_state_set_capture_controls(&state, controls, 1);
+    if (!expect_true(state.capture_control_count == 1, "capture control count failed")) return 1;
+    if (!expect_true(state.capture_controls[0].id == CAPTURE_CONTROL_BRIGHTNESS, "capture control id failed")) return 1;
+    if (!expect_true(state.capture_controls[0].current_value == 100, "capture control copy failed")) return 1;
 
     if (!expect_true(hasciicam_gui_state_update_preview(&state, sample, 3, 2) == 1,
                      "preview update failed")) return 1;

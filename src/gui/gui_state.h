@@ -27,6 +27,12 @@ typedef struct hasciicam_gui_state {
     int capture_height;
     int capture_stride_bytes;
     capture_pixel_format capture_pixel_format;
+    capture_control_desc capture_controls[CAPTURE_MAX_CONTROLS];
+    int capture_control_count;
+    int capture_control_change_requested;
+    int capture_control_change_is_auto;
+    capture_control_id capture_control_change_id;
+    int capture_control_change_value;
     unsigned char *preview_gray;
     int preview_capacity;
     int preview_width;
@@ -58,6 +64,9 @@ void hasciicam_gui_state_copy_to_config(const hasciicam_gui_state *state, hascii
  * Set capture info fields shown in the GUI panel.
  */
 void hasciicam_gui_state_set_capture_info(hasciicam_gui_state *state, const capture_info *info);
+void hasciicam_gui_state_set_capture_controls(hasciicam_gui_state *state,
+                                              const capture_control_desc *controls,
+                                              int control_count);
 int hasciicam_gui_state_update_preview(hasciicam_gui_state *state,
                                        const unsigned char *gray_frame,
                                        int width,

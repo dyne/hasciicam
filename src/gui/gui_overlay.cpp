@@ -193,6 +193,42 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
     ImGui::Text("Size: %dx%d", state->capture_width, state->capture_height);
     ImGui::Text("Stride: %d bytes", state->capture_stride_bytes);
     ImGui::Text("Pixel format: %d", (int)state->capture_pixel_format);
+    ImGui::Separator();
+    ImGui::Text("Camera Controls");
+    if (state->capture_control_count <= 0) {
+        ImGui::TextDisabled("No camera controls");
+    } else {
+        int i;
+        for (i = 0; i < state->capture_control_count; ++i) {
+            capture_control_desc *c = &state->capture_controls[i];
+            int value = c->current_value;
+            if (c->auto_supported) {
+                bool is_auto = c->auto_enabled ? true : false;
+                char auto_label[80];
+                snprintf(auto_label, sizeof(auto_label), "%s auto", c->label ? c->label : c->name);
+                if (ImGui::Checkbox(auto_label, &is_auto)) {
+                    c->auto_enabled = is_auto ? 1 : 0;
+                    state->capture_control_change_requested = 1;
+                    state->capture_control_change_is_auto = 1;
+                    state->capture_control_change_id = c->id;
+                    state->capture_control_change_value = c->auto_enabled;
+                }
+            }
+            if (c->writable && !c->auto_enabled) {
+                char slider_label[80];
+                snprintf(slider_label, sizeof(slider_label), "%s", c->label ? c->label : c->name);
+                if (ImGui::SliderInt(slider_label, &value, c->min_value, c->max_value)) {
+                    c->current_value = value;
+                    state->capture_control_change_requested = 1;
+                    state->capture_control_change_is_auto = 0;
+                    state->capture_control_change_id = c->id;
+                    state->capture_control_change_value = value;
+                }
+            } else {
+                ImGui::Text("%s: %d", c->label ? c->label : c->name, c->current_value);
+            }
+        }
+    }
 
     ImGui::Separator();
     ImGui::Text("Pre-AA Preview");

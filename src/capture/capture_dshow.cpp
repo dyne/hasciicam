@@ -41,6 +41,8 @@ struct capture_device {
     IBaseFilter *null_renderer;
     ISampleGrabber *grabber;
     IMediaControl *media_control;
+    IAMVideoProcAmp *video_proc_amp;
+    IAMCameraControl *camera_control;
     int com_initialized;
     capture_info info;
     std::vector<unsigned char> buffer;
@@ -84,6 +86,35 @@ static int subtype_to_format(const GUID &subtype, capture_pixel_format *fmt) {
         return 1;
     }
     return 0;
+}
+
+typedef struct dshow_control_map {
+    capture_control_id id;
+    int proc_id;
+    int cam_id;
+    const char *name;
+    const char *label;
+} dshow_control_map;
+
+static const dshow_control_map g_control_map[] = {
+    {CAPTURE_CONTROL_BRIGHTNESS, VideoProcAmp_Brightness, -1, "brightness", "Brightness"},
+    {CAPTURE_CONTROL_CONTRAST, VideoProcAmp_Contrast, -1, "contrast", "Contrast"},
+    {CAPTURE_CONTROL_GAMMA, VideoProcAmp_Gamma, -1, "gamma", "Gamma"},
+    {CAPTURE_CONTROL_GAIN, VideoProcAmp_Gain, -1, "gain", "Gain"},
+    {CAPTURE_CONTROL_SATURATION, VideoProcAmp_Saturation, -1, "saturation", "Saturation"},
+    {CAPTURE_CONTROL_SHARPNESS, VideoProcAmp_Sharpness, -1, "sharpness", "Sharpness"},
+    {CAPTURE_CONTROL_EXPOSURE, -1, CameraControl_Exposure, "exposure", "Exposure"},
+    {CAPTURE_CONTROL_WHITE_BALANCE, VideoProcAmp_WhiteBalance, -1, "white_balance", "White Balance"},
+    {CAPTURE_CONTROL_FOCUS, -1, CameraControl_Focus, "focus", "Focus"}
+};
+
+static const dshow_control_map *find_control_map(capture_control_id id) {
+    size_t i;
+    for (i = 0; i < sizeof(g_control_map) / sizeof(g_control_map[0]); ++i) {
+        if (g_control_map[i].id == id)
+            return &g_control_map[i];
+    }
+    return NULL;
 }
 
 static HRESULT configure_capture_size(struct capture_device *dev, const capture_request *req) {
@@ -276,6 +307,10 @@ static HRESULT build_graph(struct capture_device *dev, IMoniker *chosen, const c
     release_media_type(&mt);
 
     hr = dev->graph->QueryInterface(IID_IMediaControl, (void **)&dev->media_control);
+    if (SUCCEEDED(hr)) {
+        dev->source_filter->QueryInterface(IID_IAMVideoProcAmp, (void **)&dev->video_proc_amp);
+        dev->source_filter->QueryInterface(IID_IAMCameraControl, (void **)&dev->camera_control);
+    }
     return hr;
 }
 
@@ -392,6 +427,8 @@ static void dshow_close(capture_device *dev) {
     if (dev == NULL)
         return;
     dshow_stop(dev);
+    if (dev->video_proc_amp) dev->video_proc_amp->Release();
+    if (dev->camera_control) dev->camera_control->Release();
     if (dev->media_control) dev->media_control->Release();
     if (dev->grabber) dev->grabber->Release();
     release_filter(dev->null_renderer);
@@ -401,6 +438,79 @@ static void dshow_close(capture_device *dev) {
     if (dev->graph) dev->graph->Release();
     if (dev->com_initialized) CoUninitialize();
     delete dev;
+}
+
+static int dshow_list_controls(capture_device *dev, capture_control_desc *out, int max_controls) {
+    int count = 0;
+    size_t i;
+    if (dev == NULL || out == NULL || max_controls <= 0)
+        return 0;
+    for (i = 0; i < sizeof(g_control_map) / sizeof(g_control_map[0]) && count < max_controls; ++i) {
+        long minv = 0;
+        long maxv = 0;
+        long step = 0;
+        long defv = 0;
+        long caps = 0;
+        long cur = 0;
+        long flags = 0;
+        HRESULT hr = E_FAIL;
+        if (g_control_map[i].proc_id >= 0 && dev->video_proc_amp != NULL) {
+            hr = dev->video_proc_amp->GetRange(g_control_map[i].proc_id, &minv, &maxv, &step, &defv, &caps);
+            if (SUCCEEDED(hr))
+                hr = dev->video_proc_amp->Get(g_control_map[i].proc_id, &cur, &flags);
+        } else if (g_control_map[i].cam_id >= 0 && dev->camera_control != NULL) {
+            hr = dev->camera_control->GetRange(g_control_map[i].cam_id, &minv, &maxv, &step, &defv, &caps);
+            if (SUCCEEDED(hr))
+                hr = dev->camera_control->Get(g_control_map[i].cam_id, &cur, &flags);
+        }
+        if (FAILED(hr))
+            continue;
+        out[count].id = g_control_map[i].id;
+        out[count].name = g_control_map[i].name;
+        out[count].label = g_control_map[i].label;
+        out[count].min_value = (int)minv;
+        out[count].max_value = (int)maxv;
+        out[count].step = (int)(step > 0 ? step : 1);
+        out[count].default_value = (int)defv;
+        out[count].current_value = (int)cur;
+        out[count].writable = 1;
+        out[count].auto_supported = (caps & VideoProcAmp_Flags_Auto) || (caps & CameraControl_Flags_Auto) ? 1 : 0;
+        out[count].auto_enabled = ((flags & VideoProcAmp_Flags_Auto) || (flags & CameraControl_Flags_Auto)) ? 1 : 0;
+        count++;
+    }
+    return count;
+}
+
+static int dshow_set_control(capture_device *dev, capture_control_id id, int value) {
+    const dshow_control_map *map = find_control_map(id);
+    if (dev == NULL || map == NULL)
+        return 0;
+    if (map->proc_id >= 0 && dev->video_proc_amp != NULL)
+        return SUCCEEDED(dev->video_proc_amp->Set(map->proc_id, value, VideoProcAmp_Flags_Manual)) ? 1 : 0;
+    if (map->cam_id >= 0 && dev->camera_control != NULL)
+        return SUCCEEDED(dev->camera_control->Set(map->cam_id, value, CameraControl_Flags_Manual)) ? 1 : 0;
+    return 0;
+}
+
+static int dshow_set_control_auto(capture_device *dev, capture_control_id id, int enabled) {
+    const dshow_control_map *map = find_control_map(id);
+    long current = 0;
+    long flags = 0;
+    if (dev == NULL || map == NULL)
+        return 0;
+    if (map->proc_id >= 0 && dev->video_proc_amp != NULL) {
+        if (FAILED(dev->video_proc_amp->Get(map->proc_id, &current, &flags)))
+            return 0;
+        return SUCCEEDED(dev->video_proc_amp->Set(map->proc_id, current,
+                                                  enabled ? VideoProcAmp_Flags_Auto : VideoProcAmp_Flags_Manual)) ? 1 : 0;
+    }
+    if (map->cam_id >= 0 && dev->camera_control != NULL) {
+        if (FAILED(dev->camera_control->Get(map->cam_id, &current, &flags)))
+            return 0;
+        return SUCCEEDED(dev->camera_control->Set(map->cam_id, current,
+                                                  enabled ? CameraControl_Flags_Auto : CameraControl_Flags_Manual)) ? 1 : 0;
+    }
+    return 0;
 }
 
 #else
@@ -460,9 +570,9 @@ static const capture_ops ops = {
     dshow_stop,
     dshow_close,
     dshow_name,
-    NULL,
-    NULL,
-    NULL
+    dshow_list_controls,
+    dshow_set_control,
+    dshow_set_control_auto
 };
 
 const capture_ops *capture_dshow_ops(void) {

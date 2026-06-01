@@ -129,6 +129,8 @@ main (int argc, char **argv) {
   hasciicam_render_session render_session;
   hasciicam_gui_state gui_state;
   hasciicam_output output;
+  capture_control_desc control_descs[CAPTURE_MAX_CONTROLS];
+  int control_count = 0;
   struct geometry aa_geo;
   struct geometry vid_geo;
   int mode;
@@ -363,6 +365,8 @@ main (int argc, char **argv) {
   render_session.render_params->inversion = appcfg.invert ? 1 : 0;
   hasciicam_gui_state_init(&gui_state, &appcfg);
   hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
+  control_count = hasciicam_session_list_controls(&session, control_descs, CAPTURE_MAX_CONTROLS);
+  hasciicam_gui_state_set_capture_controls(&gui_state, control_descs, control_count);
   hasciicam_sdl_set_runtime_colors(render_session.context,
                                    gui_state.foreground_rgb,
                                    gui_state.background_rgb);
@@ -449,6 +453,8 @@ main (int argc, char **argv) {
         strncpy(gui_state.save_path, saved_path, sizeof(gui_state.save_path) - 1);
         gui_state.save_path[sizeof(gui_state.save_path) - 1] = '\0';
         hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
+        control_count = hasciicam_session_list_controls(&session, control_descs, CAPTURE_MAX_CONTROLS);
+        hasciicam_gui_state_set_capture_controls(&gui_state, control_descs, control_count);
         if (strcmp(previous_font, gui_state.font) != 0)
           gui_state.font_change_requested = 1;
         strncpy(gui_state.active_font, previous_font, sizeof(gui_state.active_font) - 1);
@@ -464,6 +470,28 @@ main (int argc, char **argv) {
     }
 
     hasciicam_live_controls_apply(&render_session, &session, &appcfg, &gui_state);
+    if (gui_state.capture_control_change_requested) {
+      gui_state.capture_control_change_requested = 0;
+      if (gui_state.capture_control_change_is_auto) {
+        if (!hasciicam_session_set_control_auto(&session,
+                                                gui_state.capture_control_change_id,
+                                                gui_state.capture_control_change_value)) {
+          snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                   "camera auto change failed");
+          gui_state.status_is_error = 1;
+        }
+      } else {
+        if (!hasciicam_session_set_control(&session,
+                                           gui_state.capture_control_change_id,
+                                           gui_state.capture_control_change_value)) {
+          snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                   "camera control change failed");
+          gui_state.status_is_error = 1;
+        }
+      }
+      control_count = hasciicam_session_list_controls(&session, control_descs, CAPTURE_MAX_CONTROLS);
+      hasciicam_gui_state_set_capture_controls(&gui_state, control_descs, control_count);
+    }
     if (gui_state.font_change_requested) {
       gui_state.font_change_requested = 0;
       if (hasciicam_sdl_set_runtime_font(render_session.context, gui_state.font)) {
