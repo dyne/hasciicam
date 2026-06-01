@@ -282,6 +282,15 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME app_size COMMAND test_app_size)
   set_tests_properties(app_size PROPERTIES LABELS "unit;core")
 
+  add_executable(test_render_font
+    tests/test_render_font.c
+    src/render/render_font.c
+  )
+  target_include_directories(test_render_font PRIVATE src/render src/aalib)
+  target_link_libraries(test_render_font PRIVATE aalib)
+  add_test(NAME render_font COMMAND test_render_font)
+  set_tests_properties(render_font PROPERTIES LABELS "unit;core")
+
   add_executable(test_app_config
     tests/test_app_config.c
     src/app/app_config.c
