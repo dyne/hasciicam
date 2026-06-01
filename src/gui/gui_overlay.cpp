@@ -217,11 +217,9 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
         ImGui::SameLine();
         ImGui::TextDisabled("No preview yet");
     }
-    ImGui::Separator();
-    ImGui::Text("Camera Controls");
-    if (state->capture_control_count <= 0) {
-        ImGui::TextDisabled("No camera controls");
-    } else {
+    if (state->capture_control_count > 0) {
+        ImGui::Separator();
+        ImGui::Text("Camera Controls");
         int i;
         for (i = 0; i < state->capture_control_count; ++i) {
             capture_control_desc *c = &state->capture_controls[i];
