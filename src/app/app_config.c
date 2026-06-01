@@ -1,4 +1,5 @@
 #include "app_config.h"
+#include "../render/render_font.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -51,6 +52,7 @@ static const struct option long_options[] = {
     {"fullscreen", no_argument, NULL, 1005},
     {"mirror", required_argument, NULL, 1006},
     {"config", required_argument, NULL, 1007},
+    {"font", required_argument, NULL, 1008},
     {"help", no_argument, NULL, 'h'},
     {"aahelp", no_argument, NULL, 'H'},
     {"version", no_argument, NULL, 'v'},
@@ -105,6 +107,7 @@ static const char *help_text =
     "rendering options:\n"
     " -S --font-size    html font size (1-4)      - default 1\n"
     " -a --font-face    html font to use          - default courier\n"
+    "    --font         AA bitmap font name|list  - default vga16\n"
     " -r --refresh      refresh delay             - default 2\n"
     " -b --aabright     ascii brightness          - default 60\n"
     " -c --aacontrast   ascii contrast            - default 4\n"
@@ -129,6 +132,7 @@ static const config_key_desc config_keys[] = {
     {"daemon", CONFIG_VALUE_BOOL, 1, 1},
     {"font_size", CONFIG_VALUE_INT, 1, 1},
     {"font_face", CONFIG_VALUE_STRING, 1, 1},
+    {"font", CONFIG_VALUE_STRING, 1, 1},
     {"refresh", CONFIG_VALUE_INT, 1, 1},
     {"aa_bright", CONFIG_VALUE_INT, 1, 1},
     {"aa_contrast", CONFIG_VALUE_INT, 1, 1},
@@ -446,6 +450,16 @@ static int set_config_value(hasciicam_config *cfg,
         cfg->fontface[sizeof(cfg->fontface) - 1] = '\0';
         return 1;
     }
+    if (strcmp(key, "font") == 0) {
+        hasciicam_font_desc font_desc = hasciicam_font_find(value);
+        if (font_desc.font == 0) {
+            set_error(err, err_size, "invalid value for font: run --font list");
+            return 0;
+        }
+        strncpy(cfg->font, font_desc.short_name, sizeof(cfg->font) - 1);
+        cfg->font[sizeof(cfg->font) - 1] = '\0';
+        return 1;
+    }
     if (strcmp(key, "refresh") == 0) {
         if (!parse_int_value(value, &cfg->refresh)) {
             set_errorf(err, err_size, "invalid value for %s", key);
@@ -624,6 +638,11 @@ static int config_value_as_string(const hasciicam_config *cfg,
         *out_is_quoted = 1;
         return 1;
     }
+    if (strcmp(key, "font") == 0) {
+        snprintf(out, out_size, "%s", cfg->font);
+        *out_is_quoted = 1;
+        return 1;
+    }
     if (strcmp(key, "refresh") == 0) {
         snprintf(out, out_size, "%d", cfg->refresh);
         *out_is_quoted = 0;
@@ -755,6 +774,7 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     strcpy(cfg->background, "000000");
     strcpy(cfg->foreground, "00FF00");
     strcpy(cfg->fontface, "courier");
+    strcpy(cfg->font, hasciicam_font_default_name());
     strcpy(cfg->aadriver, "");
     strcpy(cfg->sdl_renderer, "");
     strcpy(cfg->aafile, "");
@@ -1063,6 +1083,19 @@ void hasciicam_config_parse(hasciicam_config *cfg,
             }
             break;
         case 1007:
+            break;
+        case 1008:
+            if (strcasecmp(optarg, "list") == 0) {
+                if (!hasciicam_font_write_list(stdout)) {
+                    fprintf(stderr, "!! cannot write font list\n");
+                    exit(1);
+                }
+                exit(0);
+            }
+            if (!set_config_value(cfg, "font", optarg, env_err, sizeof(env_err))) {
+                fprintf(stderr, "!! %s\n", env_err);
+                exit(1);
+            }
             break;
         case 'S':
             if (!set_config_value(cfg, "font_size", optarg, env_err, sizeof(env_err))) {

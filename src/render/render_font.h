@@ -5,6 +5,10 @@
 
 #include "../aalib/aalib.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct hasciicam_font_desc {
     const char *short_name;
     const char *name;
@@ -29,5 +33,9 @@ hasciicam_font_desc hasciicam_font_find(const char *name_or_short_name);
 
 /* Writes a stable font list to stream, one font per line; returns nonzero on success. */
 int hasciicam_font_write_list(FILE *stream);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

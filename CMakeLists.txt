@@ -288,15 +288,20 @@ if(HASCIICAM_ENABLE_TESTS)
   )
   target_include_directories(test_render_font PRIVATE src/render src/aalib)
   target_link_libraries(test_render_font PRIVATE aalib)
+  if(WIN32)
+    target_compile_definitions(test_render_font PRIVATE _CRT_SECURE_NO_WARNINGS)
+  endif()
   add_test(NAME render_font COMMAND test_render_font)
   set_tests_properties(render_font PROPERTIES LABELS "unit;core")
 
   add_executable(test_app_config
     tests/test_app_config.c
     src/app/app_config.c
+    src/render/render_font.c
     src/app/tomlc17/tomlc17.c
   )
-  target_include_directories(test_app_config PRIVATE src/app)
+  target_include_directories(test_app_config PRIVATE src/app src/render src/aalib)
+  target_link_libraries(test_app_config PRIVATE aalib)
   if(WIN32)
     target_sources(test_app_config PRIVATE src/compat/getopt.c)
     target_include_directories(test_app_config PRIVATE src/compat)
@@ -394,6 +399,15 @@ if(HASCIICAM_ENABLE_TESTS)
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_config_startup.cmake
     )
     set_tests_properties(cli_config_startup PROPERTIES LABELS "cli")
+
+    add_test(
+      NAME cli_font_options
+      COMMAND ${CMAKE_COMMAND}
+        -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+        -DHASCIICAM_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_font_options.cmake
+    )
+    set_tests_properties(cli_font_options PROPERTIES LABELS "cli")
 
     add_test(
       NAME cli_size_pixel

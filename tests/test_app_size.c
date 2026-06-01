@@ -83,6 +83,26 @@ static int test_default_live_size_plan_small_display(void) {
            plan.requested_capture_height == 264;
 }
 
+static int test_pixel_size_plan_respects_font_height(void) {
+    hasciicam_config cfg;
+    hasciicam_size_metrics m;
+    hasciicam_size_plan plan_16;
+    hasciicam_size_plan plan_8;
+    memset(&cfg, 0, sizeof(cfg));
+    memset(&plan_16, 0, sizeof(plan_16));
+    memset(&plan_8, 0, sizeof(plan_8));
+    hasciicam_size_metrics_init(&m);
+    cfg.mode = LIVE;
+    cfg.size_intent = HASCIICAM_SIZE_PIXELS;
+    cfg.size_w = 1280;
+    cfg.size_h = 720;
+    hasciicam_size_build_plan(&cfg, &m, &plan_16);
+    m.display_pixels_per_char_y = 8;
+    hasciicam_size_build_plan(&cfg, &m, &plan_8);
+    return plan_8.preferred_ascii_height > plan_16.preferred_ascii_height &&
+           plan_8.requested_capture_height > plan_16.requested_capture_height;
+}
+
 int main(void) {
     if (!test_metrics_defaults()) return 1;
     if (!test_pixel_size_plan()) return 1;
@@ -90,6 +110,7 @@ int main(void) {
     if (!test_compute_ascii_from_capture()) return 1;
     if (!test_default_live_size_plan_hd()) return 1;
     if (!test_default_live_size_plan_small_display()) return 1;
+    if (!test_pixel_size_plan_respects_font_height()) return 1;
     printf("app_size tests passed\n");
     return 0;
 }

@@ -15,4 +15,10 @@ int hasciicam_sdl_set_runtime_colors(aa_context *context, unsigned int foregroun
     return 0;
 }
 
+int hasciicam_sdl_set_runtime_font(aa_context *context, const char *font_short_name) {
+    (void)context;
+    (void)font_short_name;
+    return 0;
+}
+
 #endif
