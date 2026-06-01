@@ -39,7 +39,7 @@ HasciiCam can show an optional on-screen control panel in live SDL mode.
 
 - Build toggle: `HASCIICAM_ENABLE_GUI` (requires SDL and vendored Dear ImGui under `third_party/imgui/`)
 - Activation: right mouse click in the SDL window
-- Live controls: AA brightness/contrast/gamma, invert, mirror, foreground/background colors
+- Live controls: AA brightness/contrast/gamma, invert, mirror, foreground/background colors, AA font
 - Config actions: `Save` writes TOML, `Load` reads TOML
 
 File chooser behavior:
@@ -59,6 +59,13 @@ Configuration precedence is:
 2. Startup TOML (`hasciicam.toml` or `--config`)
 3. Lowercase environment variables using canonical config-key names
 4. Command-line options
+
+Font selection:
+
+- `--font list` prints all bundled AA bitmap fonts (short names)
+- `--font <name>` selects one startup AA font (for example `vga16`, `vga8`, `courier`)
+- `font = "vga16"` in TOML/env sets the same AA bitmap font
+- `--font-face` remains HTML CSS font face (different from AA bitmap `font`)
 
 ## Runtime Pipeline (2.0)
 

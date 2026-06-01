@@ -84,6 +84,10 @@ Use \fB--mirror -x\fP to disable horizontal mirroring, and \fB--mirror y\fP to a
 Loads startup configuration from the given TOML file.
 If omitted, HasciiCam checks for \fBhasciicam.toml\fP in the current working directory and loads it when present.
 .B
+.IP "--font"
+Selects the bundled AA-lib bitmap font by short name, or prints available fonts with \fB--font list\fP.
+Example names include \fBvga16\fP, \fBvga8\fP, and \fBcourier\fP.
+.B
 .IP "-o --aafile"
 Defines the file where to save rendered ascii, overwrited every \fIrefresh\fP seconds. Default is \fBhasciicam.html\fP when in \fBhtml\fP mode, \fBhasciicam.asc\fP when in \fBtext\fP mode (useless when in \fBlive\fP mode).
 .B
@@ -158,7 +162,7 @@ Canonical keys:
 .br
 \fBfont_size font_face refresh aa_bright aa_contrast aa_gamma invert\fP
 .br
-\fBbackground foreground uid gid frames sdl_renderer sdl_vsync fullscreen mirror\fP
+\fBbackground foreground font uid gid frames sdl_renderer sdl_vsync fullscreen mirror\fP
 .SH CONFIG FILES
 HasciiCam loads \fBhasciicam.toml\fP from the current working directory at
 startup when it exists. Use \fB--config path/to/file.toml\fP to load a specific
