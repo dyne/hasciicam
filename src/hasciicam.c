@@ -56,6 +56,7 @@
 #include "output/output.h"
 #include "output/output_file.h"
 #include "render/render_session.h"
+#include "render/render_font.h"
 
 /* hasciicam modes */
 #define LIVE 0
@@ -145,6 +146,7 @@ main (int argc, char **argv) {
   int detected_screen_w = 0;
   int detected_screen_h = 0;
   int auto_live_size_applied = 0;
+  hasciicam_font_desc selected_font;
   char *device;
   char *aafile;
   char *background;
@@ -201,12 +203,19 @@ main (int argc, char **argv) {
   foreground = appcfg.foreground;
   fontface = appcfg.fontface;
   aadriver = appcfg.aadriver;
+  selected_font = hasciicam_font_find(appcfg.font);
+  if (selected_font.font == 0) {
+    fprintf(stderr, "!! unknown font '%s'\n", appcfg.font);
+    exit(1);
+  }
+  render_session.hwparams.font = selected_font.font;
   aa_geo.w = 80;
   aa_geo.h = 40;
   aa_geo.bright = appcfg.aa_bright;
   aa_geo.contrast = appcfg.aa_contrast;
   aa_geo.gamma = appcfg.aa_gamma;
   hasciicam_size_metrics_init(&size_metrics);
+  size_metrics.display_pixels_per_char_y = selected_font.height;
   hasciicam_size_build_plan(&appcfg, &size_metrics, &size_plan);
 
   if (mode == LIVE && !appcfg.explicit_size && !appcfg.explicit_aadriver) {
@@ -430,12 +439,19 @@ main (int argc, char **argv) {
       saved_path[sizeof(saved_path) - 1] = '\0';
       cfg_err[0] = '\0';
       if (hasciicam_config_load_toml(&appcfg, gui_state.load_path, cfg_err, sizeof(cfg_err))) {
+        char previous_font[64];
+        strncpy(previous_font, gui_state.active_font, sizeof(previous_font) - 1);
+        previous_font[sizeof(previous_font) - 1] = '\0';
         hasciicam_gui_state_init(&gui_state, &appcfg);
         strncpy(gui_state.load_path, loaded_path, sizeof(gui_state.load_path) - 1);
         gui_state.load_path[sizeof(gui_state.load_path) - 1] = '\0';
         strncpy(gui_state.save_path, saved_path, sizeof(gui_state.save_path) - 1);
         gui_state.save_path[sizeof(gui_state.save_path) - 1] = '\0';
         hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
+        if (strcmp(previous_font, gui_state.font) != 0)
+          gui_state.font_change_requested = 1;
+        strncpy(gui_state.active_font, previous_font, sizeof(gui_state.active_font) - 1);
+        gui_state.active_font[sizeof(gui_state.active_font) - 1] = '\0';
         snprintf(gui_state.status_message, sizeof(gui_state.status_message),
                  "loaded: %s", loaded_path);
         gui_state.status_is_error = 0;
@@ -447,6 +463,17 @@ main (int argc, char **argv) {
     }
 
     hasciicam_live_controls_apply(&render_session, &session, &appcfg, &gui_state);
+    if (gui_state.font_change_requested) {
+      gui_state.font_change_requested = 0;
+      if (hasciicam_sdl_set_runtime_font(render_session.context, gui_state.font)) {
+        strncpy(gui_state.active_font, gui_state.font, sizeof(gui_state.active_font) - 1);
+        gui_state.active_font[sizeof(gui_state.active_font) - 1] = '\0';
+      } else {
+        snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                 "font change failed: %s", gui_state.font);
+        gui_state.status_is_error = 1;
+      }
+    }
     hasciicam_sdl_set_runtime_colors(render_session.context,
                                      gui_state.foreground_rgb,
                                      gui_state.background_rgb);

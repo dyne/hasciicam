@@ -64,6 +64,8 @@ void hasciicam_gui_state_init(hasciicam_gui_state *state, const hasciicam_config
         state->background_rgb = bg;
     else
         state->background_rgb = 0x000000u;
+    strncpy(state->font, cfg->font, sizeof(state->font) - 1);
+    strncpy(state->active_font, cfg->font, sizeof(state->active_font) - 1);
 
     strncpy(state->save_path, "hasciicam.toml", sizeof(state->save_path) - 1);
     strncpy(state->load_path, "hasciicam.toml", sizeof(state->load_path) - 1);
@@ -78,6 +80,8 @@ void hasciicam_gui_state_copy_to_config(const hasciicam_gui_state *state, hascii
     cfg->invert = state->invert ? 1 : 0;
     cfg->mirror_x = state->mirror_x ? 1 : 0;
     cfg->mirror_y = state->mirror_y ? 1 : 0;
+    strncpy(cfg->font, state->font, sizeof(cfg->font) - 1);
+    cfg->font[sizeof(cfg->font) - 1] = '\0';
     hasciicam_gui_format_rgb_hex(state->background_rgb, cfg->background, sizeof(cfg->background));
     hasciicam_gui_format_rgb_hex(state->foreground_rgb, cfg->foreground, sizeof(cfg->foreground));
 }

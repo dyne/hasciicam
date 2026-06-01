@@ -9,6 +9,7 @@
 #include "aaint.h"
 #include "aasdlint.h"
 #include "../gui/gui_bridge.h"
+#include "../render/render_font.h"
 #if defined(HASCIICAM_ENABLE_GUI)
 #include "../gui/gui_overlay.h"
 #endif
@@ -309,7 +310,7 @@ static void SDL_render_char(struct sdldriverdata *d, unsigned char ch, int x, in
 static void SDL_create_font_texture(struct sdldriverdata *d)
 {
     const int FONT_WIDTH = 8;
-    const int FONT_HEIGHT = 16;
+    const int FONT_HEIGHT = d->font ? d->font->height : 16;
     const int FONT_COLS = 16;
     const int FONT_ROWS = 16;
     
@@ -411,7 +412,7 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     dest->font = d->font;
     
     d->char_width = 8;
-    d->char_height = 16;
+    d->char_height = d->font->height;
     
     int win_width = d->width * d->char_width;
     int win_height = d->height * d->char_height;
@@ -811,6 +812,52 @@ int hasciicam_sdl_set_runtime_colors(aa_context *context, unsigned int foregroun
         return 0;
     d = (struct sdldriverdata *)context->driverdata;
     SDL_apply_runtime_colors(d, foreground_rgb, background_rgb);
+    return 1;
+}
+
+int hasciicam_sdl_set_runtime_font(aa_context *context, const char *font_short_name) {
+    struct sdldriverdata *d;
+    hasciicam_font_desc desc;
+    int win_width;
+    int win_height;
+    if (context == NULL || context->driverdata == NULL || font_short_name == NULL)
+        return 0;
+    if (context->driver != &SDL_d)
+        return 0;
+    desc = hasciicam_font_find(font_short_name);
+    if (desc.font == NULL)
+        return 0;
+    d = (struct sdldriverdata *)context->driverdata;
+    if (d->font == desc.font)
+        return 1;
+
+    aa_setfont(context, desc.font);
+    d->font = desc.font;
+    d->char_width = 8;
+    d->char_height = desc.height;
+    if (d->font_texture != NULL) {
+        SDL_DestroyTexture(d->font_texture);
+        d->font_texture = NULL;
+    }
+    SDL_create_font_texture(d);
+    SDL_destroy_stream_texture(d);
+    if (d->previoust != NULL) {
+        free(d->previoust);
+        d->previoust = NULL;
+    }
+    if (d->previousa != NULL) {
+        free(d->previousa);
+        d->previousa = NULL;
+    }
+    SDL_GetWindowSize(d->window, &win_width, &win_height);
+    d->width = win_width / d->char_width;
+    d->height = win_height / d->char_height;
+    if (d->width < 1)
+        d->width = 1;
+    if (d->height < 1)
+        d->height = 1;
+    aa_resize(context);
+    d->force_clear = 1;
     return 1;
 }
 

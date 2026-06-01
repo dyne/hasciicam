@@ -10,6 +10,7 @@ extern "C" {
 
 int hasciicam_sdl_set_gui_state(aa_context *context, hasciicam_gui_state *state);
 int hasciicam_sdl_set_runtime_colors(aa_context *context, unsigned int foreground_rgb, unsigned int background_rgb);
+int hasciicam_sdl_set_runtime_font(aa_context *context, const char *font_short_name);
 
 #ifdef __cplusplus
 }
