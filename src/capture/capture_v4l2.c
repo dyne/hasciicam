@@ -32,6 +32,35 @@ struct capture_device {
     struct v4l2_buffer_map *buffers;
 };
 
+typedef struct v4l2_control_map {
+    capture_control_id id;
+    unsigned int cid;
+    unsigned int cid_auto;
+    const char *name;
+    const char *label;
+} v4l2_control_map;
+
+static const v4l2_control_map g_v4l2_controls[] = {
+    {CAPTURE_CONTROL_BRIGHTNESS, V4L2_CID_BRIGHTNESS, 0, "brightness", "Brightness"},
+    {CAPTURE_CONTROL_CONTRAST, V4L2_CID_CONTRAST, 0, "contrast", "Contrast"},
+    {CAPTURE_CONTROL_GAMMA, V4L2_CID_GAMMA, 0, "gamma", "Gamma"},
+    {CAPTURE_CONTROL_GAIN, V4L2_CID_GAIN, 0, "gain", "Gain"},
+    {CAPTURE_CONTROL_SATURATION, V4L2_CID_SATURATION, 0, "saturation", "Saturation"},
+    {CAPTURE_CONTROL_SHARPNESS, V4L2_CID_SHARPNESS, 0, "sharpness", "Sharpness"},
+    {CAPTURE_CONTROL_EXPOSURE, V4L2_CID_EXPOSURE_ABSOLUTE, V4L2_CID_EXPOSURE_AUTO, "exposure", "Exposure"},
+    {CAPTURE_CONTROL_WHITE_BALANCE, V4L2_CID_WHITE_BALANCE_TEMPERATURE, V4L2_CID_AUTO_WHITE_BALANCE, "white_balance", "White Balance"},
+    {CAPTURE_CONTROL_FOCUS, V4L2_CID_FOCUS_ABSOLUTE, V4L2_CID_FOCUS_AUTO, "focus", "Focus"}
+};
+
+static const v4l2_control_map *find_v4l2_control(capture_control_id id) {
+    size_t i;
+    for (i = 0; i < sizeof(g_v4l2_controls) / sizeof(g_v4l2_controls[0]); ++i) {
+        if (g_v4l2_controls[i].id == id)
+            return &g_v4l2_controls[i];
+    }
+    return NULL;
+}
+
 static void v4l2_stop(capture_device *dev);
 
 static int clamp_to_step(int value, int min_v, int max_v, int step_v) {
@@ -390,6 +419,77 @@ static void v4l2_close(capture_device *dev) {
     free(dev);
 }
 
+static int v4l2_list_controls(capture_device *dev, capture_control_desc *out, int max_controls) {
+    int count = 0;
+    size_t i;
+    if (dev == NULL || out == NULL || max_controls <= 0)
+        return 0;
+    for (i = 0; i < sizeof(g_v4l2_controls) / sizeof(g_v4l2_controls[0]) && count < max_controls; ++i) {
+        struct v4l2_queryctrl q;
+        struct v4l2_control c;
+        struct v4l2_control a;
+        memset(&q, 0, sizeof(q));
+        q.id = g_v4l2_controls[i].cid;
+        if (ioctl(dev->fd, VIDIOC_QUERYCTRL, &q) == -1)
+            continue;
+        if (q.flags & (V4L2_CTRL_FLAG_DISABLED | V4L2_CTRL_FLAG_INACTIVE))
+            continue;
+        memset(&c, 0, sizeof(c));
+        c.id = g_v4l2_controls[i].cid;
+        if (ioctl(dev->fd, VIDIOC_G_CTRL, &c) == -1)
+            continue;
+        out[count].id = g_v4l2_controls[i].id;
+        out[count].name = g_v4l2_controls[i].name;
+        out[count].label = g_v4l2_controls[i].label;
+        out[count].min_value = q.minimum;
+        out[count].max_value = q.maximum;
+        out[count].step = q.step > 0 ? q.step : 1;
+        out[count].default_value = q.default_value;
+        out[count].current_value = c.value;
+        out[count].writable = 1;
+        out[count].auto_supported = 0;
+        out[count].auto_enabled = 0;
+        if (g_v4l2_controls[i].cid_auto != 0) {
+            struct v4l2_queryctrl qa;
+            memset(&qa, 0, sizeof(qa));
+            qa.id = g_v4l2_controls[i].cid_auto;
+            if (ioctl(dev->fd, VIDIOC_QUERYCTRL, &qa) != -1 &&
+                !(qa.flags & (V4L2_CTRL_FLAG_DISABLED | V4L2_CTRL_FLAG_INACTIVE))) {
+                memset(&a, 0, sizeof(a));
+                a.id = g_v4l2_controls[i].cid_auto;
+                if (ioctl(dev->fd, VIDIOC_G_CTRL, &a) != -1) {
+                    out[count].auto_supported = 1;
+                    out[count].auto_enabled = a.value ? 1 : 0;
+                }
+            }
+        }
+        count++;
+    }
+    return count;
+}
+
+static int v4l2_set_control(capture_device *dev, capture_control_id id, int value) {
+    const v4l2_control_map *map = find_v4l2_control(id);
+    struct v4l2_control c;
+    if (dev == NULL || map == NULL)
+        return 0;
+    memset(&c, 0, sizeof(c));
+    c.id = map->cid;
+    c.value = value;
+    return ioctl(dev->fd, VIDIOC_S_CTRL, &c) == -1 ? 0 : 1;
+}
+
+static int v4l2_set_control_auto(capture_device *dev, capture_control_id id, int enabled) {
+    const v4l2_control_map *map = find_v4l2_control(id);
+    struct v4l2_control c;
+    if (dev == NULL || map == NULL || map->cid_auto == 0)
+        return 0;
+    memset(&c, 0, sizeof(c));
+    c.id = map->cid_auto;
+    c.value = enabled ? 1 : 0;
+    return ioctl(dev->fd, VIDIOC_S_CTRL, &c) == -1 ? 0 : 1;
+}
+
 static const char *v4l2_name(void) {
     return "v4l2";
 }
@@ -403,9 +503,9 @@ static const capture_ops ops = {
     v4l2_stop,
     v4l2_close,
     v4l2_name,
-    NULL,
-    NULL,
-    NULL
+    v4l2_list_controls,
+    v4l2_set_control,
+    v4l2_set_control_auto
 };
 
 const capture_ops *capture_v4l2_ops(void) {

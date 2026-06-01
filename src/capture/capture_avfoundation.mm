@@ -211,6 +211,27 @@ static void avf_close(capture_device *dev) {
     free(dev);
 }
 
+static int avf_list_controls(capture_device *dev, capture_control_desc *out, int max_controls) {
+    (void)dev;
+    (void)out;
+    (void)max_controls;
+    return 0;
+}
+
+static int avf_set_control(capture_device *dev, capture_control_id id, int value) {
+    (void)dev;
+    (void)id;
+    (void)value;
+    return 0;
+}
+
+static int avf_set_control_auto(capture_device *dev, capture_control_id id, int enabled) {
+    (void)dev;
+    (void)id;
+    (void)enabled;
+    return 0;
+}
+
 static const char *avf_name(void) {
     return "avfoundation";
 }
@@ -224,9 +245,9 @@ static const capture_ops ops = {
     avf_stop,
     avf_close,
     avf_name,
-    NULL,
-    NULL,
-    NULL
+    avf_list_controls,
+    avf_set_control,
+    avf_set_control_auto
 };
 
 const capture_ops *capture_avfoundation_ops(void) {
