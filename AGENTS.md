@@ -162,6 +162,7 @@ Rendering options:
 
 - `-S`, `--font-size`: HTML font size.
 - `-a`, `--font-face`: HTML font face.
+- `--font`: AA bitmap font selection (`--font list` to enumerate).
 - `-r`, `--refresh`: HTML refresh interval.
 - `-b`, `--aabright`: AA brightness.
 - `-c`, `--aacontrast`: AA contrast.
@@ -196,6 +197,7 @@ Canonical config keys:
 - `daemon`
 - `font_size`
 - `font_face`
+- `font`
 - `refresh`
 - `aa_bright`
 - `aa_contrast`
