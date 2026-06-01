@@ -326,6 +326,14 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME capture_size COMMAND test_capture_size)
   set_tests_properties(capture_size PROPERTIES LABELS "unit;core")
 
+  add_executable(test_capture_control
+    tests/test_capture_control.c
+    src/capture/capture_control.c
+  )
+  target_include_directories(test_capture_control PRIVATE src/capture)
+  add_test(NAME capture_control COMMAND test_capture_control)
+  set_tests_properties(capture_control PROPERTIES LABELS "unit;core")
+
   add_executable(test_core_link tests/test_core_link.c)
   target_include_directories(test_core_link PRIVATE include)
   target_link_libraries(test_core_link PRIVATE hasciicam_core)

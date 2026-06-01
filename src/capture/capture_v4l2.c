@@ -402,7 +402,10 @@ static const capture_ops ops = {
     v4l2_release,
     v4l2_stop,
     v4l2_close,
-    v4l2_name
+    v4l2_name,
+    NULL,
+    NULL,
+    NULL
 };
 
 const capture_ops *capture_v4l2_ops(void) {
@@ -464,7 +467,10 @@ static const capture_ops ops = {
     unsupported_release,
     unsupported_stop,
     unsupported_close,
-    unsupported_name
+    unsupported_name,
+    NULL,
+    NULL,
+    NULL
 };
 
 const capture_ops *capture_v4l2_ops(void) {

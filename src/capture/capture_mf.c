@@ -496,7 +496,10 @@ static const capture_ops ops = {
     mf_release,
     mf_stop,
     mf_close,
-    mf_name
+    mf_name,
+    NULL,
+    NULL,
+    NULL
 };
 
 const capture_ops *capture_mf_ops(void) {

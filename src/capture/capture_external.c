@@ -98,7 +98,10 @@ static const capture_ops ops = {
     external_release,
     external_stop,
     external_close,
-    external_name
+    external_name,
+    NULL,
+    NULL,
+    NULL
 };
 
 const capture_ops *capture_external_ops(void) {
