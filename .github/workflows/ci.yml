@@ -44,11 +44,11 @@ jobs:
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DHASCIICAM_ENABLE_TESTS=ON
-          -DHASCIICAM_ENABLE_SDL=OFF
+          -DHASCIICAM_ENABLE_SDL=ON
           -DHASCIICAM_ENABLE_X11=OFF
           -DHASCIICAM_ENABLE_CURSES=OFF
-          -DHASCIICAM_ENABLE_VISUAL_TESTS=OFF
-          -DHASCIICAM_ENABLE_CAMERA_TESTS=OFF
+          -DHASCIICAM_ENABLE_VISUAL_TESTS=ON
+          -DHASCIICAM_ENABLE_CAMERA_TESTS=ON
 
       - name: Build
         run: cmake --build build
