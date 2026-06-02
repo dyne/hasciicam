@@ -193,7 +193,7 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
         state->mirror_y = mirror_y ? 1 : 0;
     ImGui::Text("Size: %dx%d", state->capture_width, state->capture_height);
     ImGui::Text("Stride: %d bytes", state->capture_stride_bytes);
-    ImGui::Text("Pixel format: %d", (int)state->capture_pixel_format);
+    ImGui::Text("Pixel format: %d", (int)state->pixel_format);
     ImGui::EndGroup();
     if (g_preview_texture != NULL && state->preview_width > 0 && state->preview_height > 0) {
         float aspect_w = (float)state->preview_width;

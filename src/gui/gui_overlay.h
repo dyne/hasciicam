@@ -1,7 +1,7 @@
 #ifndef HASCIICAM_GUI_OVERLAY_H
 #define HASCIICAM_GUI_OVERLAY_H
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include "gui_state.h"
 
 #ifdef __cplusplus

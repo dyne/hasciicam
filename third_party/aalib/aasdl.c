@@ -4,11 +4,11 @@
 #include <signal.h>
 
 #ifdef SDL_DRIVER
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include "aalib.h"
 #include "aaint.h"
 #include "aasdlint.h"
-#include "../gui/gui_bridge.h"
+#include "gui_bridge.h"
 #include "../render/render_font.h"
 #if defined(HASCIICAM_ENABLE_GUI)
 #include "../gui/gui_overlay.h"

@@ -26,7 +26,7 @@ typedef struct hasciicam_gui_state {
     int capture_width;
     int capture_height;
     int capture_stride_bytes;
-    capture_pixel_format capture_pixel_format;
+    capture_pixel_format pixel_format;
     capture_control_desc capture_controls[CAPTURE_MAX_CONTROLS];
     int capture_control_count;
     int capture_control_change_requested;
