@@ -47,6 +47,7 @@ set(HASCIICAM_AALIB_SOURCES
     third_party/aalib/fontx13b.c
     third_party/aalib/fontx13.c
     third_party/aalib/fontx16.c
+    src/render/render_font.c
 )
 
 set(HASCIICAM_APP_SOURCES
@@ -67,7 +68,6 @@ set(HASCIICAM_OUTPUT_SOURCES
 )
 
 set(HASCIICAM_RENDER_SOURCES
-    src/render/render_font.c
     src/render/render_session.c
 )
 
