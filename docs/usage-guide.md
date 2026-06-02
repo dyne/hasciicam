@@ -45,7 +45,7 @@ rendering options:
  -g --aagamma      ascii gamma               - default 3
  -I --invert       invert colors             - default off
  -B --background   background color (hex)    - default 000000
- -F --foreground   foreground color (hex)    - default 00FF00
+ -F --foreground   foreground color (hex)    - default FFFFFF
  ```
 
 ## Build From Source

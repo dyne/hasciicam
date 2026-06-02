@@ -80,6 +80,14 @@ static void test_env_load(void) {
     clear_test_env();
 }
 
+static void test_defaults(void) {
+    hasciicam_config cfg;
+
+    hasciicam_config_init_defaults(&cfg);
+    expect_true(strcmp(cfg.background, "000000") == 0, "default background should be black");
+    expect_true(strcmp(cfg.foreground, "FFFFFF") == 0, "default foreground should be white");
+}
+
 static void test_cli_overrides_env(void) {
     hasciicam_config cfg;
     char *argv[] = {
@@ -288,6 +296,7 @@ static void test_env_size_key_ignored(void) {
 }
 
 int main(void) {
+    test_defaults();
     test_env_load();
     test_cli_overrides_env();
     test_default_toml_load();
