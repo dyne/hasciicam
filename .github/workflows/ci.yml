@@ -80,6 +80,7 @@ jobs:
         run: |
           set -euo pipefail
           package_dir="dist/hasciicam-${{ matrix.package }}"
+          archive="$GITHUB_WORKSPACE/hasciicam-${{ matrix.package }}.zip"
           mkdir -p "${package_dir}/bin" "${package_dir}/share/man/man1" "${package_dir}/share/hasciicam"
           cp "build/hasciicam${{ matrix.exe_suffix }}" "${package_dir}/bin/"
           cp docs/hasciicam.1 "${package_dir}/share/man/man1/"
@@ -88,7 +89,11 @@ jobs:
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             find build -maxdepth 1 -name '*.dll' -exec cp '{}' "${package_dir}/bin/" ';'
           fi
-          cmake -E tar cf "hasciicam-${{ matrix.package }}.zip" --format=zip "${package_dir}"
+          cmake -E chdir "${package_dir}" cmake -E tar cf "${archive}" --format=zip .
+          if cmake -E tar tf "${archive}" | grep -Eq '^(dist/|hasciicam-${{ matrix.package }}/)'; then
+            echo "release archive still contains a top-level staging directory" >&2
+            exit 1
+          fi
 
       - name: Upload release zip
         if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
