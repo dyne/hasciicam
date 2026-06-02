@@ -1,6 +1,7 @@
-/*  HasciiCam 1.3
+/*  HasciiCam
  *
- *  (c) 2000-2014 Denis Roio <jaromil@dyne.org>
+ *  (c) 2000-2026 Dyne.org foundation
+ *  designed, written and maintained by Denis Roio <jaromil@dyne.org>
  *
  * This source code is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Public License as published
