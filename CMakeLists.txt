@@ -172,14 +172,12 @@ if(HASCIICAM_ENABLE_GUI AND HASCIICAM_WITH_SDL)
       third_party/imgui/backends/imgui_impl_sdlrenderer2.cpp
     )
     list(APPEND HASCIICAM_GUI_SOURCES src/gui/gui_overlay.cpp)
-    target_sources(hasciicam_core PRIVATE ${HASCIICAM_GUI_SOURCES} ${HASCIICAM_IMGUI_SOURCES})
-    target_include_directories(hasciicam_core PRIVATE
+    target_sources(aalib PRIVATE ${HASCIICAM_GUI_SOURCES} ${HASCIICAM_IMGUI_SOURCES})
+    target_include_directories(aalib PRIVATE
       third_party/imgui
       third_party/imgui/backends
       src/gui
     )
-    target_include_directories(aalib PRIVATE src/gui)
-    target_compile_definitions(hasciicam_core PRIVATE HASCIICAM_ENABLE_GUI=1)
     target_compile_definitions(aalib PRIVATE HASCIICAM_ENABLE_GUI=1)
   else()
     message(STATUS "HASCIICAM_ENABLE_GUI requested but third_party/imgui not found; GUI disabled")
@@ -291,7 +289,6 @@ if(HASCIICAM_ENABLE_TESTS)
 
   add_executable(test_render_font
     tests/test_render_font.c
-    src/render/render_font.c
   )
   target_include_directories(test_render_font PRIVATE src/render third_party/aalib)
   target_link_libraries(test_render_font PRIVATE aalib)
@@ -304,7 +301,6 @@ if(HASCIICAM_ENABLE_TESTS)
   add_executable(test_app_config
     tests/test_app_config.c
     src/app/app_config.c
-    src/render/render_font.c
     src/app/tomlc17/tomlc17.c
   )
   target_include_directories(test_app_config PRIVATE src/app src/render third_party/aalib)
