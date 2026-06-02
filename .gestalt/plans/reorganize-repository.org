@@ -1,0 +1,136 @@
+#+TITLE: Reorganize Repository
+#+SUBTITLE: Move bundled AA-lib to third_party, flatten release zip roots, and add REUSE licensing metadata
+#+DATE: 2026-06-02
+#+KEYWORDS: repository third-party aalib release zip reuse licensing
+
+* DONE [#A] Move bundled AA-lib under third_party
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Treat AA-lib like a vendored component by moving it from `src/aalib` to `third_party/aalib` while preserving current build, includes, tests, and runtime behavior.
+:Notes: Challenge the first idea of adding a wrapper library or public include reshuffle. This is a repository organization change, not an AA-lib refactor. Keep the static target name `aalib`, keep source contents unchanged except path-sensitive references if necessary, and do not change AA-lib APIs.
+:END:
+
+** DONE [#A] Move the AA-lib source tree
+:PROPERTIES:
+:Why: `src/aalib` is a vendored renderer and should live beside `third_party/imgui` so first-party application code under `src/` is easier to scan.
+:Change: Create `third_party/aalib/` and move every file currently under `src/aalib/` there, preserving filenames and internal relative layout. Do not rename AA-lib files. Prefer `git mv src/aalib third_party/aalib` so history is traceable. Keep `src/` for HasciiCam application, capture, render, GUI, output, compatibility, and public API code only.
+:Tests: No touched tests are required before the move itself because this L2 is file movement only, but after changing build paths in the next L2 the moved tree must compile through existing tests.
+:Done when: `src/aalib` no longer exists, `third_party/aalib/aalib.h` exists, and `git status` shows the move without unrelated local artifacts.
+:END:
+
+** DONE [#A] Update build and include paths
+:PROPERTIES:
+:Why: CMake, tests, and source includes currently refer to `src/aalib`; the build must continue to expose `<aalib.h>` to first-party code without broad source edits.
+:Change: Update `cmake/HasciiCamSources.cmake` so every AA-lib source path points at `third_party/aalib/...`. Update `CMakeLists.txt` optional driver additions (`aasdl.c`, `aax.c`, `aaxkbd.c`, `aaxmouse.c`) and `target_include_directories(aalib PUBLIC ...)` to use `third_party/aalib`. Update test include directories that mention `src/aalib`. Search with `rg -n "src/aalib|aalib/"` and fix remaining path references in build files and docs. Prefer keeping code includes as `#include <aalib.h>` or `#include "aalib.h"` and letting target include directories do the work.
+:Tests: Configure and build the current default test build: `cmake -S . -B build -G Ninja -DHASCIICAM_ENABLE_TESTS=ON`, then `cmake --build build`. Run touched tests that link AA-lib, at minimum `ctest --output-on-failure --test-dir build -R "render_font|app_config|core_link|pipeline_smoke"`.
+:Done when: The build succeeds, AA-lib-linked touched tests pass, and `rg -n "src/aalib" CMakeLists.txt cmake src tests include docs README.md AGENTS.md` returns only intentionally retained historical text or no matches.
+:END:
+
+** DONE [#B] Update repository documentation references
+:PROPERTIES:
+:Why: Developer documentation describes AA-lib as living under `src/aalib`, and future contributors will follow those references.
+:Change: Update `AGENTS.md`, `docs/architecture.md`, and any README text found by search to describe AA-lib as `third_party/aalib`. Keep the architecture statement clear: AA-lib remains bundled and built as the `aalib` static library; it is just stored with other vendored components. Do not rewrite unrelated architecture prose.
+:Tests: Documentation-only changes do not need test execution for this L2. If this L2 is committed together with the build-path L2 because paths and docs changed in one edit, reuse that L2's build verification before committing.
+:Done when: Documentation consistently calls AA-lib a vendored third-party component under `third_party/aalib`, and no stale contributor-facing `src/aalib` path remains except where explicitly discussing history.
+:END:
+
+* DONE [#A] Flatten released zip files
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Make release zip archives extract files directly at the archive root instead of under `dist/hasciicam-<platform>/`.
+:Notes: The current release examples in `releases/` show entries like `dist/hasciicam-linux/bin/...`. The minimal fix is to keep the staging directory shape but invoke the archive command from inside that staging directory, or package `.` with the staging directory as working directory. Do not replace semantic-release or CMake packaging unless the existing workflow cannot support this.
+:END:
+
+** DONE [#A] Change CI release archive creation
+:PROPERTIES:
+:Why: `.github/workflows/ci.yml` currently runs `cmake -E tar ... "${package_dir}"`, which stores the staging directory itself inside the zip.
+:Change: In the `Package release zip` step, keep staging into `dist/hasciicam-${{ matrix.package }}` with `bin/`, `share/man/man1/`, `share/hasciicam/website`, and `README.md`. Change only the final archive command so zip entries are rooted at `bin/`, `share/`, and `README.md`. A simple pattern is `cmake -E chdir "${package_dir}" cmake -E tar cf "$OLDPWD/hasciicam-${{ matrix.package }}.zip" --format=zip .`, or `pushd "${package_dir}"` then write the zip to the repository workspace. Ensure the output path is still exactly `hasciicam-${{ matrix.package }}.zip` for the upload artifact step.
+:Tests: No C code tests are needed. Run a local packaging simulation with a temporary staging directory using the same shell commands, then inspect with `tar -tf` or `cmake -E tar tf`. The first entries must be `bin/`, `share/`, and `README.md`, not `dist/`.
+:Done when: The workflow still uploads `hasciicam-linux.zip`, `hasciicam-mac.zip`, and `hasciicam-win.zip`, and archive contents no longer include `dist/hasciicam-*` as a parent directory.
+:END:
+
+** DONE [#B] Add a deterministic archive-shape check
+:PROPERTIES:
+:Why: A zip root regression is easy to reintroduce because packaging still uses a staging directory.
+:Change: Add a small CI check immediately after packaging that lists the archive and fails if any entry begins with `dist/` or `hasciicam-${{ matrix.package }}/`. Keep it inline in `.github/workflows/ci.yml` rather than adding a separate script unless the command becomes unreadable. Use tools already present in GitHub Actions, such as `cmake -E tar tf` or `tar -tf`.
+:Tests: Validate the check locally against the existing `releases/hasciicam-*.zip` examples to confirm it would fail the current shape, then against a simulated flattened zip to confirm it passes.
+:Done when: CI has an explicit guard for flat archive roots, and the check would catch the current release examples' nested `dist/hasciicam-*` layout.
+:END:
+
+** DONE [#C] Document the release zip layout
+:PROPERTIES:
+:Why: Reviewers and future release changes need to know that the archive root is intentional.
+:Change: Add a concise note to release/package documentation if such a section exists; otherwise add a short paragraph in `README.md` or `AGENTS.md` under build/release notes. State that published zip archives extract `bin/`, `share/`, and `README.md` at the root, with no platform-named parent directory.
+:Tests: Documentation-only changes do not need test execution for this L2.
+:Done when: The intended zip shape is documented in one contributor-facing place without creating a new release policy document.
+:END:
+
+* DONE [#A] Add REUSE licensing metadata
+:PROPERTIES:
+:Effort: 1 day
+:Goal: Add a repository-level `REUSE.toml` that accounts for first-party code and bundled components, then validate the repository with `reuse lint`.
+:Notes: Challenge the first idea of adding SPDX headers to every file. `REUSE.toml` is the requested mechanism and is better for old vendored code, generated docs, binary assets, and broad directory-level licensing. Use SPDX identifiers, preserve existing license texts, and add only minimal missing license files under `LICENSES/` if `reuse lint` requires them.
+:END:
+
+** DONE [#A] Inventory copyright and license groups
+:PROPERTIES:
+:Why: REUSE metadata should reflect the components actually present rather than assigning one blanket license to everything.
+:Change: Build an inventory from local evidence. Expected groups are: HasciiCam first-party source/docs/assets under GPL-2.0-or-later; bundled AA-lib under LGPL-2.0-or-later based on AA-lib headers; Dear ImGui under MIT using `third_party/imgui/LICENSE.txt`; tomlc17 under MIT using `src/app/tomlc17/LICENSE`; generated or vendored documentation website dependencies under their package licenses as represented by `docs/package-lock.json`; image/font/site assets under the license/copyright found in existing files or upstream references. Search for existing copyright notices with `rg -n "Copyright|license|GPL|LGPL|MIT|SPDX"`. For files without clear evidence, list them explicitly and decide whether they are first-party GPL-2.0-or-later or need a maintainer question.
+:Tests: No automated tests yet. The output of this L2 is a short implementation note or comments in the plan commit message identifying each group and any uncertainty.
+:Done when: Every tracked path class has an intended SPDX license expression and copyright owner, and unresolved files are named before writing `REUSE.toml`.
+:END:
+
+** DONE [#A] Create REUSE.toml and required LICENSES files
+:PROPERTIES:
+:Why: `reuse lint` needs machine-readable file-to-license mappings and local canonical license text files for declared licenses.
+:Change: Add `REUSE.toml` at the repository root. Use `[[annotations]]` entries with `path = [...]`, `SPDX-FileCopyrightText = ...`, and `SPDX-License-Identifier = ...`. Keep annotations broad but precise: first-party root files, `src/**` excluding vendored subtrees, `include/**`, `tests/**`, `examples/**`, `docs/**`, `share/**`, `.github/**`, `cmake/**`; AA-lib under `third_party/aalib/**`; Dear ImGui under `third_party/imgui/**`; tomlc17 under `src/app/tomlc17/**`; generated/local-only release examples if tracked. Add `LICENSES/GPL-2.0-or-later.txt`, `LICENSES/LGPL-2.0-or-later.txt`, and `LICENSES/MIT.txt` only if `reuse lint` cannot use existing `COPYING` and component license files. Prefer canonical SPDX license text names. Do not edit vendored source headers just to satisfy REUSE unless TOML annotations cannot cover them.
+:Tests: Run `reuse lint`. If the `reuse` command is missing, install it only through an accepted local developer path if already available, otherwise document the missing command and run the lint in the next available environment. Fix missing-license or unused-license findings by adjusting `REUSE.toml`, not by broad relicensing.
+:Done when: `REUSE.toml` exists, required license texts are present, and `reuse lint` reports compliance or the only blocker is a clearly documented missing local `reuse` executable.
+:END:
+
+** DONE [#B] Add REUSE validation to CI
+:PROPERTIES:
+:Why: Licensing metadata should stay valid as new files are added.
+:Change: Add a lightweight CI step that installs or runs the REUSE tool and executes `reuse lint`. Prefer the official `fsfe/reuse-action` if it avoids custom setup, or a minimal `pipx run reuse lint`/`python -m pip install reuse` approach if that is simpler in the existing GitHub Actions environment. Keep it separate from C build failures in naming, but within the existing CI workflow unless there is a strong reason for a new workflow.
+:Tests: Run the chosen lint command locally if possible. In CI syntax, ensure the step runs on pull requests and push, not only release packaging pushes.
+:Done when: Pull requests fail when REUSE metadata is incomplete, and the command used in CI matches the local validation path documented for contributors.
+:END:
+
+** DONE [#B] Document licensing workflow for contributors
+:PROPERTIES:
+:Why: New files will break REUSE unless contributors know how to annotate them.
+:Change: Update `AGENTS.md` and optionally `README.md` with a short licensing note: first-party code should be annotated by `REUSE.toml` or SPDX headers as appropriate; vendored components need their own license evidence; run `reuse lint` after adding files or third-party code. Keep this practical and avoid a long licensing tutorial.
+:Tests: Documentation-only changes do not need test execution for this L2.
+:Done when: Contributor docs tell maintainers where licensing metadata lives and how to validate it.
+:END:
+
+* DONE [#B] Final verification and reviewer handoff
+:PROPERTIES:
+:Effort: 0.5 day
+:Goal: Verify the repository reorganization end to end and leave a concise reviewer summary.
+:Notes: This L1 should be mostly checks and documentation. If any earlier L2 changed CMake or source paths, run the full default build/test suite before marking the work done.
+:END:
+
+** DONE [#A] Run full build and automated tests
+:PROPERTIES:
+:Why: Moving AA-lib changes build inputs across all platforms even though source content is intended to remain unchanged.
+:Change: Run the build system of record from a clean or current build directory: `cmake -S . -B build -G Ninja -DHASCIICAM_ENABLE_TESTS=ON`, `cmake --build build`, and `ctest --output-on-failure --test-dir build`. Run `build/hasciicam -h` after the build. Run `build/hasciicam -H` because AA-lib include/build paths changed and AA-help output depends on AA-lib option parsing.
+:Tests: This L2 is the full test pass. Fix any build or test regressions before continuing.
+:Done when: Configure, build, full CTest, `hasciicam -h`, and `hasciicam -H` pass locally, or any platform-specific inability to run them is documented exactly.
+:END:
+
+** DONE [#A] Validate release archive shape and REUSE lint
+:PROPERTIES:
+:Why: The two non-C goals are packaging shape and licensing compliance; they need explicit final checks.
+:Change: Create or simulate a release zip with the updated workflow command and inspect its entries. Run `reuse lint` from the repository root. If local GitHub Actions packaging cannot be fully reproduced, run the same shell body in a temporary directory with representative files and document the limitation.
+:Tests: `tar -tf` or equivalent must show no `dist/` parent in the zip. `reuse lint` must pass.
+:Done when: Both acceptance checks pass and their command outputs can be summarized for reviewers.
+:END:
+
+** DONE [#B] Update AGENTS.md and summarize for reviewers
+:PROPERTIES:
+:Why: The repository instructions should reflect the new locations and the completed licensing/release policies.
+:Change: Update `AGENTS.md` only where relevant: AA-lib path, release zip root shape, REUSE metadata, and the `reuse lint` validation command. Prepare a brief reviewer summary covering the AA-lib move, release zip flattening, REUSE annotations, tests run, and any known limitations.
+:Tests: Documentation-only changes do not need a separate test run after the final verification unless the edit changes commands or paths materially.
+:Done when: `AGENTS.md` is current and the final response gives reviewers a compact summary with verification results.
+:END:
