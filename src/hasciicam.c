@@ -522,7 +522,8 @@ main (int argc, char **argv) {
       int copy_size;
 
       framenum = 0;
-      hasciicam_gui_state_update_preview(&gui_state, gray_frame, ascii_width, ascii_height);
+      if (gui_state.visible)
+        hasciicam_gui_state_update_preview(&gui_state, gray_frame, ascii_width, ascii_height);
       dest_size = aa_imgwidth(render_session.context) * aa_imgheight(render_session.context);
       copy_size = (gray_size < dest_size) ? gray_size : dest_size;
       if (copy_size > 0) {

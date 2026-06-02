@@ -216,6 +216,8 @@ static void SDL_process_events(struct sdldriverdata *d)
             d != NULL && d->gui_ready) {
             if (!hasciicam_gui_overlay_wants_mouse()) {
                 d->gui_visible = d->gui_visible ? 0 : 1;
+                if (d->gui_state != NULL)
+                    d->gui_state->visible = d->gui_visible;
             }
             continue;
         }
@@ -794,6 +796,8 @@ int hasciicam_sdl_set_gui_state(aa_context *context, struct hasciicam_gui_state 
         return 0;
     d = (struct sdldriverdata *)context->driverdata;
     d->gui_state = state;
+    if (state != NULL)
+        state->visible = d->gui_visible;
 #if defined(HASCIICAM_ENABLE_GUI)
     if (!d->gui_ready) {
         d->gui_ready = hasciicam_gui_overlay_init(d->window, d->renderer) ? 1 : 0;
