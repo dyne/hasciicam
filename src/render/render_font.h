@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#include "../aalib/aalib.h"
+#include <aalib.h>
 
 #ifdef __cplusplus
 extern "C" {

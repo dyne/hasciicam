@@ -76,21 +76,21 @@ include(cmake/HasciiCamSources.cmake)
 
 # Conditionally add SDL driver
 if(HASCIICAM_WITH_SDL)
-    list(APPEND HASCIICAM_AALIB_SOURCES src/aalib/aasdl.c)
+    list(APPEND HASCIICAM_AALIB_SOURCES third_party/aalib/aasdl.c)
 endif()
 
 # Conditionally add X11 driver
 if(HASCIICAM_WITH_X11)
     list(APPEND HASCIICAM_AALIB_SOURCES
-        src/aalib/aax.c
-        src/aalib/aaxkbd.c
-        src/aalib/aaxmouse.c
+        third_party/aalib/aax.c
+        third_party/aalib/aaxkbd.c
+        third_party/aalib/aaxmouse.c
     )
 endif()
 
 # Create aalib static library
 add_library(aalib STATIC ${HASCIICAM_AALIB_SOURCES})
-target_include_directories(aalib PUBLIC src/aalib)
+target_include_directories(aalib PUBLIC third_party/aalib)
 target_compile_definitions(aalib PRIVATE HASCIICAM_APP_TITLE="hasciicam ${PROJECT_VERSION}")
 if(WIN32)
     target_include_directories(aalib PUBLIC src/compat)
@@ -286,7 +286,7 @@ if(HASCIICAM_ENABLE_TESTS)
     tests/test_render_font.c
     src/render/render_font.c
   )
-  target_include_directories(test_render_font PRIVATE src/render src/aalib)
+  target_include_directories(test_render_font PRIVATE src/render third_party/aalib)
   target_link_libraries(test_render_font PRIVATE aalib)
   if(WIN32)
     target_compile_definitions(test_render_font PRIVATE _CRT_SECURE_NO_WARNINGS)
@@ -300,7 +300,7 @@ if(HASCIICAM_ENABLE_TESTS)
     src/render/render_font.c
     src/app/tomlc17/tomlc17.c
   )
-  target_include_directories(test_app_config PRIVATE src/app src/render src/aalib)
+  target_include_directories(test_app_config PRIVATE src/app src/render third_party/aalib)
   target_link_libraries(test_app_config PRIVATE aalib)
   if(WIN32)
     target_sources(test_app_config PRIVATE src/compat/getopt.c)
