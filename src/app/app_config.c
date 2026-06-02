@@ -114,7 +114,7 @@ static const char *help_text =
     " -g --aagamma      ascii gamma               - default 3\n"
     " -I --invert       invert colors             - default off\n"
     " -B --background   background color (hex)    - default 000000\n"
-    " -F --foreground   foreground color (hex)    - default 00FF00\n";
+    " -F --foreground   foreground color (hex)    - default FFFFFF\n";
 
 static const config_key_desc config_keys[] = {
     {"show_help", CONFIG_VALUE_BOOL, 0, 0},
@@ -772,7 +772,7 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
 #endif
 
     strcpy(cfg->background, "000000");
-    strcpy(cfg->foreground, "00FF00");
+    strcpy(cfg->foreground, "FFFFFF");
     strcpy(cfg->fontface, "courier");
     strcpy(cfg->font, hasciicam_font_default_name());
     strcpy(cfg->aadriver, "");
