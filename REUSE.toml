@@ -1,0 +1,53 @@
+version = 1
+SPDX-PackageName = "hasciicam"
+SPDX-PackageDownloadLocation = "NOASSERTION"
+
+[[annotations]]
+path = [
+  ".github/**",
+  ".gestalt/**",
+  ".gitignore",
+  ".releaserc.json",
+  "AGENTS.md",
+  "AUTHORS",
+  "ChangeLog",
+  "CMakeLists.txt",
+  "CMakePresets.json",
+  "GNUmakefile",
+  "INSTALL",
+  "NEWS",
+  "README.md",
+  "TODO",
+  "docs/**",
+  "examples/**",
+  "hasciicam.toml",
+  "imgui.ini",
+  "include/**",
+  "releases/**",
+  "share/**",
+  "src/**",
+  "tests/**",
+  "cmake/**"
+]
+SPDX-FileCopyrightText = "2026 HasciiCam contributors"
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
+[[annotations]]
+path = "third_party/aalib/**"
+SPDX-FileCopyrightText = "1998-2001 Jan Hubicka and Kamil Toman"
+SPDX-License-Identifier = "LGPL-2.0-or-later"
+
+[[annotations]]
+path = "third_party/imgui/**"
+SPDX-FileCopyrightText = "2014-2026 Omar Cornut"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "imgui/**"
+SPDX-FileCopyrightText = "2014-2026 Omar Cornut"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "src/app/tomlc17/**"
+SPDX-FileCopyrightText = "2024-2026 CK Tan"
+SPDX-License-Identifier = "MIT"
