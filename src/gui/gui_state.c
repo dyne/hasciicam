@@ -43,7 +43,7 @@ void hasciicam_gui_format_rgb_hex(unsigned int rgb, char *out, size_t out_size) 
 }
 
 void hasciicam_gui_state_init(hasciicam_gui_state *state, const hasciicam_config *cfg) {
-    unsigned int fg = 0x00FF00u;
+    unsigned int fg = 0xFFFFFFu;
     unsigned int bg = 0x000000u;
 
     if (state == NULL || cfg == NULL)
@@ -60,7 +60,7 @@ void hasciicam_gui_state_init(hasciicam_gui_state *state, const hasciicam_config
     if (hasciicam_gui_parse_rgb_hex(cfg->foreground, &fg))
         state->foreground_rgb = fg;
     else
-        state->foreground_rgb = 0x00FF00u;
+        state->foreground_rgb = 0xFFFFFFu;
     if (hasciicam_gui_parse_rgb_hex(cfg->background, &bg))
         state->background_rgb = bg;
     else
