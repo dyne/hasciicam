@@ -43,6 +43,7 @@ rendering options:
  -b --aabright     ascii brightness          - default 60
  -c --aacontrast   ascii contrast            - default 4
  -g --aagamma      ascii gamma               - default 3
+    --aa-dimmer    on|off                    - default on
  -I --invert       invert colors             - default off
  -B --background   background color (hex)    - default 000000
  -F --foreground   foreground color (hex)    - default FFFFFF

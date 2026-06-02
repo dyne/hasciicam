@@ -19,6 +19,7 @@ typedef struct hasciicam_config {
     int aa_bright;
     int aa_contrast;
     int aa_gamma;
+    int aa_dimmer;
     int fontsize;
     int linespace;
     int size_w;

@@ -43,7 +43,7 @@ static void clear_test_env(void) {
         "show_help", "show_aahelp", "show_version",
         "quiet", "mode", "device", "input", "size", "pixel_size", "char_size",
         "output_file", "aa_driver", "daemon", "font_size", "font_face", "font",
-        "refresh", "aa_bright", "aa_contrast", "aa_gamma", "invert",
+        "refresh", "aa_bright", "aa_contrast", "aa_gamma", "aa_dimmer", "invert",
         "background", "foreground", "uid", "gid", "frames",
         "sdl_renderer", "sdl_vsync", "fullscreen", "mirror"
     };
@@ -63,6 +63,7 @@ static void test_env_load(void) {
     set_env_var("font_size", "3");
     set_env_var("font", "vga8");
     set_env_var("invert", "true");
+    set_env_var("aa_dimmer", "off");
     set_env_var("sdl_vsync", "off");
     set_env_var("char_size", "80x25");
 
@@ -73,6 +74,7 @@ static void test_env_load(void) {
     expect_true(cfg.fontsize == 3, "font_size should be 3");
     expect_true(strcmp(cfg.font, "vga8") == 0, "font should be vga8");
     expect_true(cfg.invert == 1, "invert should be true");
+    expect_true(cfg.aa_dimmer == 0, "aa_dimmer should be off");
     expect_true(cfg.sdl_vsync == 0, "sdl_vsync should be off");
     expect_true(cfg.size_intent == HASCIICAM_SIZE_CHARS, "char_size should set char intent");
     expect_true(cfg.size_w == 80 && cfg.size_h == 25, "char_size should parse 80x25");
@@ -86,6 +88,7 @@ static void test_defaults(void) {
     hasciicam_config_init_defaults(&cfg);
     expect_true(strcmp(cfg.background, "000000") == 0, "default background should be black");
     expect_true(strcmp(cfg.foreground, "FFFFFF") == 0, "default foreground should be white");
+    expect_true(cfg.aa_dimmer == 1, "default aa_dimmer should be on");
 }
 
 static void test_cli_overrides_env(void) {
@@ -195,6 +198,7 @@ static void test_toml_roundtrip(void) {
     strcpy(cfg.aafile, "roundtrip.asc");
     cfg.sdl_vsync = 1;
     cfg.invert = 1;
+    cfg.aa_dimmer = 0;
     cfg.size_intent = HASCIICAM_SIZE_CHARS;
     cfg.size_w = 90;
     cfg.size_h = 30;
@@ -209,6 +213,7 @@ static void test_toml_roundtrip(void) {
     expect_true(strcmp(loaded.aafile, "roundtrip.asc") == 0, "roundtrip output_file should match");
     expect_true(loaded.sdl_vsync == 1, "roundtrip sdl_vsync should be on");
     expect_true(loaded.invert == 1, "roundtrip invert should match");
+    expect_true(loaded.aa_dimmer == 0, "roundtrip aa_dimmer should match");
     expect_true(loaded.size_intent == HASCIICAM_SIZE_CHARS, "roundtrip size intent should be chars");
     expect_true(loaded.size_w == 90 && loaded.size_h == 30, "roundtrip size should match");
     expect_true(strcmp(loaded.font, "vga8") == 0, "roundtrip font should match");

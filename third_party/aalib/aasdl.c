@@ -26,7 +26,8 @@ static void SDL_process_events(struct sdldriverdata *d);
 static void SDL_set_fullscreen(struct sdldriverdata *d, int enable);
 static void SDL_apply_runtime_colors(struct sdldriverdata *d,
                                      unsigned int foreground_rgb,
-                                     unsigned int background_rgb);
+                                     unsigned int background_rgb,
+                                     int aa_dimmer);
 
 static int SDL_env_is(const char *value, const char *expected)
 {
@@ -703,6 +704,25 @@ static void SDL_flush(aa_context *c)
             
             int fg_color = d->normal_color;
             int bg_color = d->black_color;
+            switch (attr) {
+            case AA_DIM:
+                fg_color = d->dim_color;
+                break;
+            case AA_BOLD:
+            case AA_BOLDFONT:
+                fg_color = d->bold_color;
+                break;
+            case AA_SPECIAL:
+                fg_color = d->special_color;
+                break;
+            case AA_REVERSE:
+                fg_color = d->black_color;
+                bg_color = d->normal_color;
+                break;
+            default:
+                fg_color = d->normal_color;
+                break;
+            }
             
             if (ch != d->previoust[pos] || attr != d->previousa[pos]) {
                 SDL_stream_draw_char(d, ch, x, y, fg_color, bg_color);
@@ -773,18 +793,52 @@ static unsigned int clamp_rgb24(unsigned int rgb) {
     return rgb & 0x00FFFFFFu;
 }
 
+static unsigned int scale_rgb24(unsigned int rgb, unsigned int numerator, unsigned int denominator) {
+    unsigned int r;
+    unsigned int g;
+    unsigned int b;
+    if (denominator == 0)
+        return clamp_rgb24(rgb);
+    rgb = clamp_rgb24(rgb);
+    r = (((rgb >> 16) & 0xFFu) * numerator) / denominator;
+    g = (((rgb >> 8) & 0xFFu) * numerator) / denominator;
+    b = ((rgb & 0xFFu) * numerator) / denominator;
+    if (r > 255u) r = 255u;
+    if (g > 255u) g = 255u;
+    if (b > 255u) b = 255u;
+    return (r << 16) | (g << 8) | b;
+}
+
 static void SDL_apply_runtime_colors(struct sdldriverdata *d,
                                      unsigned int foreground_rgb,
-                                     unsigned int background_rgb) {
+                                     unsigned int background_rgb,
+                                     int aa_dimmer) {
     if (d == NULL)
         return;
     foreground_rgb = clamp_rgb24(foreground_rgb);
     background_rgb = clamp_rgb24(background_rgb);
+    aa_dimmer = aa_dimmer ? 1 : 0;
+    if (d->runtime_colors_initialized &&
+        d->runtime_foreground_color == (int)foreground_rgb &&
+        d->runtime_background_color == (int)background_rgb &&
+        d->runtime_aa_dimmer == aa_dimmer) {
+        return;
+    }
+    d->runtime_foreground_color = (int)foreground_rgb;
+    d->runtime_background_color = (int)background_rgb;
+    d->runtime_aa_dimmer = aa_dimmer;
+    d->runtime_colors_initialized = 1;
     d->normal_color = (int)foreground_rgb;
     d->black_color = (int)background_rgb;
-    d->dim_color = d->normal_color;
-    d->bold_color = d->normal_color;
-    d->special_color = d->normal_color;
+    if (aa_dimmer) {
+        d->dim_color = (int)scale_rgb24(foreground_rgb, 58u, 100u);
+        d->bold_color = (int)foreground_rgb;
+        d->special_color = (int)foreground_rgb;
+    } else {
+        d->dim_color = d->normal_color;
+        d->bold_color = d->normal_color;
+        d->special_color = d->normal_color;
+    }
     d->force_clear = 1;
 }
 
@@ -808,14 +862,17 @@ int hasciicam_sdl_set_gui_state(aa_context *context, struct hasciicam_gui_state 
     return d->gui_ready;
 }
 
-int hasciicam_sdl_set_runtime_colors(aa_context *context, unsigned int foreground_rgb, unsigned int background_rgb) {
+int hasciicam_sdl_set_runtime_colors(aa_context *context,
+                                     unsigned int foreground_rgb,
+                                     unsigned int background_rgb,
+                                     int aa_dimmer) {
     struct sdldriverdata *d;
     if (context == NULL || context->driverdata == NULL)
         return 0;
     if (context->driver != &SDL_d)
         return 0;
     d = (struct sdldriverdata *)context->driverdata;
-    SDL_apply_runtime_colors(d, foreground_rgb, background_rgb);
+    SDL_apply_runtime_colors(d, foreground_rgb, background_rgb, aa_dimmer);
     return 1;
 }
 

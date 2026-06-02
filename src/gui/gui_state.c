@@ -53,6 +53,7 @@ void hasciicam_gui_state_init(hasciicam_gui_state *state, const hasciicam_config
     state->aa_bright = cfg->aa_bright;
     state->aa_contrast = cfg->aa_contrast;
     state->aa_gamma = (float)cfg->aa_gamma;
+    state->aa_dimmer = cfg->aa_dimmer ? 1 : 0;
     state->invert = cfg->invert ? 1 : 0;
     state->mirror_x = cfg->mirror_x ? 1 : 0;
     state->mirror_y = cfg->mirror_y ? 1 : 0;
@@ -78,6 +79,7 @@ void hasciicam_gui_state_copy_to_config(const hasciicam_gui_state *state, hascii
     cfg->aa_bright = state->aa_bright;
     cfg->aa_contrast = state->aa_contrast;
     cfg->aa_gamma = (int)(state->aa_gamma + 0.5f);
+    cfg->aa_dimmer = state->aa_dimmer ? 1 : 0;
     cfg->invert = state->invert ? 1 : 0;
     cfg->mirror_x = state->mirror_x ? 1 : 0;
     cfg->mirror_y = state->mirror_y ? 1 : 0;

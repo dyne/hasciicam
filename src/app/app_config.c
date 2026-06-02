@@ -53,6 +53,7 @@ static const struct option long_options[] = {
     {"mirror", required_argument, NULL, 1006},
     {"config", required_argument, NULL, 1007},
     {"font", required_argument, NULL, 1008},
+    {"aa-dimmer", required_argument, NULL, 1009},
     {"help", no_argument, NULL, 'h'},
     {"aahelp", no_argument, NULL, 'H'},
     {"version", no_argument, NULL, 'v'},
@@ -112,6 +113,7 @@ static const char *help_text =
     " -b --aabright     ascii brightness          - default 60\n"
     " -c --aacontrast   ascii contrast            - default 4\n"
     " -g --aagamma      ascii gamma               - default 3\n"
+    "    --aa-dimmer    on|off                    - default on\n"
     " -I --invert       invert colors             - default off\n"
     " -B --background   background color (hex)    - default 000000\n"
     " -F --foreground   foreground color (hex)    - default FFFFFF\n";
@@ -137,6 +139,7 @@ static const config_key_desc config_keys[] = {
     {"aa_bright", CONFIG_VALUE_INT, 1, 1},
     {"aa_contrast", CONFIG_VALUE_INT, 1, 1},
     {"aa_gamma", CONFIG_VALUE_INT, 1, 1},
+    {"aa_dimmer", CONFIG_VALUE_BOOL, 1, 1},
     {"invert", CONFIG_VALUE_BOOL, 1, 1},
     {"background", CONFIG_VALUE_STRING, 1, 1},
     {"foreground", CONFIG_VALUE_STRING, 1, 1},
@@ -488,6 +491,13 @@ static int set_config_value(hasciicam_config *cfg,
         }
         return 1;
     }
+    if (strcmp(key, "aa_dimmer") == 0) {
+        if (!parse_bool_value(value, &cfg->aa_dimmer)) {
+            set_errorf(err, err_size, "invalid value for %s", key);
+            return 0;
+        }
+        return 1;
+    }
     if (strcmp(key, "invert") == 0) {
         if (!parse_bool_value(value, &cfg->invert)) {
             set_errorf(err, err_size, "invalid value for %s", key);
@@ -663,6 +673,11 @@ static int config_value_as_string(const hasciicam_config *cfg,
         *out_is_quoted = 0;
         return 1;
     }
+    if (strcmp(key, "aa_dimmer") == 0) {
+        snprintf(out, out_size, "%s", cfg->aa_dimmer ? "true" : "false");
+        *out_is_quoted = 0;
+        return 1;
+    }
     if (strcmp(key, "invert") == 0) {
         snprintf(out, out_size, "%s", cfg->invert ? "true" : "false");
         *out_is_quoted = 0;
@@ -785,6 +800,7 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     cfg->aa_bright = 60;
     cfg->aa_contrast = 4;
     cfg->aa_gamma = 3;
+    cfg->aa_dimmer = 1;
     cfg->fontsize = 1;
     cfg->linespace = 5;
     cfg->uid = -1;
@@ -1093,6 +1109,12 @@ void hasciicam_config_parse(hasciicam_config *cfg,
                 exit(0);
             }
             if (!set_config_value(cfg, "font", optarg, env_err, sizeof(env_err))) {
+                fprintf(stderr, "!! %s\n", env_err);
+                exit(1);
+            }
+            break;
+        case 1009:
+            if (!set_config_value(cfg, "aa_dimmer", optarg, env_err, sizeof(env_err))) {
                 fprintf(stderr, "!! %s\n", env_err);
                 exit(1);
             }

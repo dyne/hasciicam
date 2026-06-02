@@ -124,6 +124,7 @@ int hasciicam_gui_overlay_process_event(const SDL_Event *event) {
 void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
     float fg[3];
     float bg[3];
+    bool dimmer;
     bool invert;
     bool mirror_x;
     bool mirror_y;
@@ -140,6 +141,9 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
     ImGui::SliderInt("Brightness", &state->aa_bright, 0, 255);
     ImGui::SliderInt("Contrast", &state->aa_contrast, 0, 127);
     ImGui::SliderFloat("Gamma", &state->aa_gamma, 0.5f, 4.0f, "%.2f");
+    dimmer = state->aa_dimmer != 0;
+    if (ImGui::Checkbox("Dim attributes", &dimmer))
+        state->aa_dimmer = dimmer ? 1 : 0;
     invert = state->invert != 0;
     if (ImGui::Checkbox("Invert", &invert))
         state->invert = invert ? 1 : 0;
