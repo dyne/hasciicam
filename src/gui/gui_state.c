@@ -93,7 +93,7 @@ void hasciicam_gui_state_set_capture_info(hasciicam_gui_state *state, const capt
     state->capture_width = info->width;
     state->capture_height = info->height;
     state->capture_stride_bytes = info->stride_bytes;
-    state->capture_pixel_format = info->pixel_format;
+    state->pixel_format = info->pixel_format;
 }
 
 void hasciicam_gui_state_set_capture_controls(hasciicam_gui_state *state,

@@ -178,6 +178,7 @@ if(HASCIICAM_ENABLE_GUI AND HASCIICAM_WITH_SDL)
       third_party/imgui/backends
       src/gui
     )
+    target_include_directories(aalib PRIVATE src/gui)
     target_compile_definitions(hasciicam_core PRIVATE HASCIICAM_ENABLE_GUI=1)
     target_compile_definitions(aalib PRIVATE HASCIICAM_ENABLE_GUI=1)
   else()

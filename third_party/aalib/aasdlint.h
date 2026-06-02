@@ -1,7 +1,7 @@
 #ifndef __AASDLINT_H__
 #define __AASDLINT_H__
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 struct hasciicam_gui_state;
 

@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #if defined(SDL_DRIVER)
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #endif
 
 int hasciicam_display_size_detect_primary(int *width, int *height) {
