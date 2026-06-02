@@ -46,6 +46,12 @@ if(HASCIICAM_ENABLE_SDL)
   if(TARGET SDL2::SDL2)
     set(HASCIICAM_WITH_SDL ON)
     add_compile_definitions(SDL_DRIVER)
+  else()
+    message(FATAL_ERROR
+      "HASCIICAM_ENABLE_SDL is ON, but CMake could not find SDL2. "
+      "Install SDL2 or pass -DHASCIICAM_ENABLE_SDL=OFF. "
+      "On Windows with vcpkg, configure with "
+      "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake.")
   endif()
 endif()
 
@@ -454,6 +460,9 @@ if(HASCIICAM_ENABLE_TESTS)
     set_tests_properties(cli_size_html_pixel_reject PROPERTIES LABELS "cli")
 
     if(HASCIICAM_ENABLE_VISUAL_TESTS)
+      if(NOT HASCIICAM_WITH_SDL)
+        message(FATAL_ERROR "HASCIICAM_ENABLE_VISUAL_TESTS requires SDL support.")
+      endif()
       add_test(
         NAME visual_sdl
         COMMAND ${CMAKE_COMMAND}

@@ -60,6 +60,11 @@ if(NOT _rc EQUAL 0)
 endif()
 
 if(HASCIICAM_MODE STREQUAL "sdl")
+  file(READ "${_stderr_file}" _stderr_content)
+  string(FIND "${_stderr_content}" "Using driver: SDL" _has_sdl_driver)
+  if(_has_sdl_driver EQUAL -1)
+    message(FATAL_ERROR "SDL smoke test did not select the SDL driver. See ${_stderr_file}")
+  endif()
   return()
 endif()
 

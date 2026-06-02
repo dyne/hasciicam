@@ -20,16 +20,19 @@ jobs:
             os: ubuntu-latest
             package: linux
             exe_suffix: ""
+            cmake_extra: ""
             allow_failure: false
           - name: macOS
             os: macos-latest
             package: mac
             exe_suffix: ""
+            cmake_extra: ""
             allow_failure: true
           - name: Windows
             os: windows-latest
             package: win
             exe_suffix: ".exe"
+            cmake_extra: "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
             allow_failure: false
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow_failure }}
@@ -39,9 +42,22 @@ jobs:
       - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
 
+      - name: Install SDL2 on Linux
+        if: ${{ runner.os == 'Linux' }}
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+
+      - name: Install SDL2 on macOS
+        if: ${{ runner.os == 'macOS' }}
+        run: brew install sdl2
+
+      - name: Install SDL2 on Windows
+        if: ${{ runner.os == 'Windows' }}
+        run: C:/vcpkg/vcpkg.exe install sdl2:x64-windows
+
       - name: Configure
         run: >
           cmake -S . -B build -G Ninja
+          ${{ matrix.cmake_extra }}
           -DCMAKE_BUILD_TYPE=Release
           -DHASCIICAM_ENABLE_TESTS=ON
           -DHASCIICAM_ENABLE_SDL=ON
@@ -55,6 +71,10 @@ jobs:
 
       - name: Test
         run: ctest --output-on-failure --test-dir build
+        env:
+          SDL_VIDEODRIVER: dummy
+          HASCIICAM_SDL_RENDERER: software
+          HASCIICAM_SDL_VSYNC: off
 
       - name: Setup Node for website package
         if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
