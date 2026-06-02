@@ -8,7 +8,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Usage guide', link: '/usage-guide' },
-      { text: 'Downloads', link: 'https://files.dyne.org/hasciicam' },
+      { text: 'Downloads', link: 'https://github.com/dyne/hasciicam/releases' },
       { text: 'About Dyne.org', link: 'https://dyne.org' }
     ],
     socialLinks: [

@@ -14,7 +14,7 @@ hero:
       link: /usage-guide
     - theme: alt
       text: Downloads
-      link: https://files.dyne.org/hasciicam
+      link: https://github.com/dyne/hasciicam/releases
 
 features:
   - title: "Live ASCII video"
