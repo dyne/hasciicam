@@ -29,7 +29,7 @@ path = [
   "tests/**",
   "cmake/**"
 ]
-SPDX-FileCopyrightText = "2026 HasciiCam contributors"
+SPDX-FileCopyrightText = "2001-2026 Dyne.org foundation"
 SPDX-License-Identifier = "GPL-2.0-or-later"
 
 [[annotations]]
