@@ -1,4 +1,4 @@
-version = 1
+version = 2
 SPDX-PackageName = "hasciicam"
 SPDX-PackageDownloadLocation = "NOASSERTION"
 
@@ -29,8 +29,8 @@ path = [
   "tests/**",
   "cmake/**"
 ]
-SPDX-FileCopyrightText = "2001-2026 Dyne.org foundation"
-SPDX-License-Identifier = "GPL-2.0-or-later"
+SPDX-FileCopyrightText = "2000-2026 Dyne.org foundation"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
 
 [[annotations]]
 path = "third_party/aalib/**"
