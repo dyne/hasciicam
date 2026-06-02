@@ -38,7 +38,7 @@ headers such as `stdio.h` because `INCLUDE` and `LIB` are not set.
 
 `CMakeLists.txt` builds:
 
-- `aalib`: a static library from `src/aalib/*.c`.
+- `aalib`: a static library from `third_party/aalib/*.c`.
 - `hasciicam`: the application in `src/hasciicam.c`, linked with `aalib`.
 
 CMake optionally enables display backends when development packages are found:
@@ -97,7 +97,7 @@ The program is intentionally compact:
 
 - `src/hasciicam.c` is the application: CLI parsing, configuration, video
   capture, frame conversion, AA-lib setup, rendering loop, and cleanup.
-- `src/aalib/` is a vendored AA-lib-style ASCII rendering library plus display,
+- `third_party/aalib/` is a vendored AA-lib-style ASCII rendering library plus display,
   keyboard, mouse, save, font, and format drivers.
 - `doc/` contains the man page and historical web documentation.
 - `share/` contains desktop/shareable assets.
@@ -289,7 +289,7 @@ plain and testable.
 
 ## AA-lib Rendering
 
-AA-lib is bundled in `src/aalib`.
+AA-lib is bundled in `third_party/aalib`.
 
 Important public types in `aalib.h`:
 
@@ -313,7 +313,7 @@ contains the faster renderer used by the current capture loop.
 ## AA Drivers
 
 Display drivers are selected from the compile-time `aa_drivers[]` table in
-`src/aalib/aaregist.c`.
+`third_party/aalib/aaregist.c`.
 
 Current driver order is:
 
@@ -345,7 +345,7 @@ or mouse input, so keep portability work focused on display and capture first.
 
 ## Save/Text/HTML Output
 
-File output uses AA-lib's `save_d` driver in `src/aalib/aasave.c`.
+File output uses AA-lib's `save_d` driver in `third_party/aalib/aasave.c`.
 
 In `HTML` mode:
 

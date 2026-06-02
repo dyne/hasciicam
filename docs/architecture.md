@@ -39,7 +39,7 @@ Capture ports and adapters:
 
 Rendering/output:
 
-- `src/aalib/*`: vendored AA-lib renderer and output drivers.
+- `third_party/aalib/*`: vendored AA-lib renderer and output drivers.
 - Render source buffer: `aa_image(context)`.
 - Render outputs: live drivers (`SDL`, `stdout`, others) and save driver
   (`save_d`) for HTML/text.
@@ -123,7 +123,7 @@ Planned output adapters:
 
 - Keep AA-lib as the canonical ASCII renderer.
 - Add a memory output path for embedded hosts and deterministic tests.
-- Keep AA-lib SDL (`src/aalib/aasdl.c`) as the active desktop SDL path for now.
+- Keep AA-lib SDL (`third_party/aalib/aasdl.c`) as the active desktop SDL path for now.
   A separate `output_sdl` adapter remains deferred until a concrete mobile SDL
   lifecycle gap appears.
 
