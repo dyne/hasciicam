@@ -28,6 +28,10 @@ struct sdldriverdata {
     int normal_color;
     int bold_color;
     int special_color;
+    int runtime_foreground_color;
+    int runtime_background_color;
+    int runtime_aa_dimmer;
+    int runtime_colors_initialized;
     
     int current_attr;
     int inverted;

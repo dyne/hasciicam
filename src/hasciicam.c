@@ -370,7 +370,8 @@ main (int argc, char **argv) {
   hasciicam_gui_state_set_capture_controls(&gui_state, control_descs, control_count);
   hasciicam_sdl_set_runtime_colors(render_session.context,
                                    gui_state.foreground_rgb,
-                                   gui_state.background_rgb);
+                                   gui_state.background_rgb,
+                                   gui_state.aa_dimmer);
   hasciicam_sdl_set_gui_state(render_session.context, &gui_state);
   // those are left to be setted by aalib options
   //  ascii_rndparms->dither = AA_FLOYD_S;
@@ -506,7 +507,8 @@ main (int argc, char **argv) {
     }
     hasciicam_sdl_set_runtime_colors(render_session.context,
                                      gui_state.foreground_rgb,
-                                     gui_state.background_rgb);
+                                     gui_state.background_rgb,
+                                     gui_state.aa_dimmer);
 
     if (!hasciicam_session_step(&session, aa_imgwidth(render_session.context),
                                 aa_imgheight(render_session.context),

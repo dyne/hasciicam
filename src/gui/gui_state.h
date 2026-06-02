@@ -12,6 +12,7 @@ typedef struct hasciicam_gui_state {
     int aa_bright;
     int aa_contrast;
     float aa_gamma;
+    int aa_dimmer;
     int invert;
 
     int mirror_x;
