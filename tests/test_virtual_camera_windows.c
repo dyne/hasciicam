@@ -278,6 +278,35 @@ cleanup_message:
                     "sample timestamps should advance monotonically");
     }
 
+    {
+        hasciicam_virtual_camera_request request;
+        hasciicam_virtual_camera_source_config config;
+        hasciicam_virtual_camera_source_lifecycle lifecycle;
+        char err[128];
+
+        hasciicam_virtual_camera_request_init(&request);
+        request.enabled = 1;
+        expect_true(hasciicam_virtual_camera_source_config_prepare(&request, &config, err, sizeof(err)),
+                    "config should prepare for lifecycle test");
+        hasciicam_virtual_camera_source_lifecycle_init(&lifecycle, &config);
+        expect_true(lifecycle.state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_CREATED,
+                    "lifecycle should start in created state");
+        expect_true(hasciicam_virtual_camera_source_lifecycle_start(&lifecycle, err, sizeof(err)),
+                    "lifecycle should start");
+        expect_true(lifecycle.state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STARTED,
+                    "lifecycle should move to started");
+        expect_true(hasciicam_virtual_camera_source_lifecycle_stop(&lifecycle, err, sizeof(err)),
+                    "lifecycle should stop");
+        expect_true(lifecycle.state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STOPPED,
+                    "lifecycle should move to stopped");
+        expect_true(hasciicam_virtual_camera_source_lifecycle_shutdown(&lifecycle, err, sizeof(err)),
+                    "lifecycle should shutdown");
+        expect_true(lifecycle.state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_SHUTDOWN,
+                    "lifecycle should move to shutdown");
+        expect_true(!hasciicam_virtual_camera_source_lifecycle_start(&lifecycle, err, sizeof(err)),
+                    "shutdown lifecycle should not restart");
+    }
+
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);
         return 1;

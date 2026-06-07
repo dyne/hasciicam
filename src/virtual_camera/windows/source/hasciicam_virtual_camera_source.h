@@ -38,6 +38,20 @@ typedef struct hasciicam_virtual_camera_source_config {
     size_t media_type_count;
 } hasciicam_virtual_camera_source_config;
 
+typedef enum hasciicam_virtual_camera_source_state {
+    HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_CREATED = 0,
+    HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STARTED,
+    HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STOPPED,
+    HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_SHUTDOWN
+} hasciicam_virtual_camera_source_state;
+
+typedef struct hasciicam_virtual_camera_source_lifecycle {
+    hasciicam_virtual_camera_source_state state;
+    hasciicam_virtual_camera_source_config config;
+    unsigned long long last_sequence;
+    unsigned long long last_timestamp_100ns;
+} hasciicam_virtual_camera_source_lifecycle;
+
 /**
  * Return the CLSID used to register the HasciiCam virtual camera source.
  */
@@ -95,6 +109,33 @@ int hasciicam_virtual_camera_source_config_prepare(const hasciicam_virtual_camer
                                                    hasciicam_virtual_camera_source_config *out,
                                                    char *err,
                                                    size_t err_size);
+
+/**
+ * Initialize a source lifecycle object from a prepared config.
+ */
+void hasciicam_virtual_camera_source_lifecycle_init(hasciicam_virtual_camera_source_lifecycle *lifecycle,
+                                                    const hasciicam_virtual_camera_source_config *config);
+
+/**
+ * Transition the source to started.
+ */
+int hasciicam_virtual_camera_source_lifecycle_start(hasciicam_virtual_camera_source_lifecycle *lifecycle,
+                                                    char *err,
+                                                    size_t err_size);
+
+/**
+ * Transition the source to stopped.
+ */
+int hasciicam_virtual_camera_source_lifecycle_stop(hasciicam_virtual_camera_source_lifecycle *lifecycle,
+                                                   char *err,
+                                                   size_t err_size);
+
+/**
+ * Transition the source to shutdown.
+ */
+int hasciicam_virtual_camera_source_lifecycle_shutdown(hasciicam_virtual_camera_source_lifecycle *lifecycle,
+                                                       char *err,
+                                                       size_t err_size);
 
 /**
  * Return the sample duration for the requested frame rate in 100 ns units.

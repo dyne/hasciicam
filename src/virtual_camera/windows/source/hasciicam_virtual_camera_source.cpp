@@ -209,6 +209,87 @@ int hasciicam_virtual_camera_source_config_prepare(const hasciicam_virtual_camer
     return 1;
 }
 
+static int hasciicam_virtual_camera_source_lifecycle_state_transition(hasciicam_virtual_camera_source_lifecycle *lifecycle,
+                                                                       hasciicam_virtual_camera_source_state next_state,
+                                                                       char *err,
+                                                                       size_t err_size) {
+    if (lifecycle == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "source lifecycle is required");
+        return 0;
+    }
+    if (lifecycle->state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_SHUTDOWN) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "source lifecycle is already shut down");
+        return 0;
+    }
+    if (lifecycle->state == next_state)
+        return 1;
+    if (next_state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STARTED) {
+        if (lifecycle->state != HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_CREATED &&
+            lifecycle->state != HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STOPPED) {
+            if (err != NULL && err_size > 0)
+                snprintf(err, err_size, "source can only start from created or stopped");
+            return 0;
+        }
+        lifecycle->state = next_state;
+        return 1;
+    }
+    if (next_state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STOPPED) {
+        if (lifecycle->state != HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STARTED) {
+            if (err != NULL && err_size > 0)
+                snprintf(err, err_size, "source can only stop from started");
+            return 0;
+        }
+        lifecycle->state = next_state;
+        return 1;
+    }
+    if (next_state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_SHUTDOWN) {
+        lifecycle->state = next_state;
+        return 1;
+    }
+    if (err != NULL && err_size > 0)
+        snprintf(err, err_size, "invalid source lifecycle transition");
+    return 0;
+}
+
+void hasciicam_virtual_camera_source_lifecycle_init(hasciicam_virtual_camera_source_lifecycle *lifecycle,
+                                                    const hasciicam_virtual_camera_source_config *config) {
+    if (lifecycle == NULL)
+        return;
+    memset(lifecycle, 0, sizeof(*lifecycle));
+    lifecycle->state = HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_CREATED;
+    if (config != NULL)
+        lifecycle->config = *config;
+}
+
+int hasciicam_virtual_camera_source_lifecycle_start(hasciicam_virtual_camera_source_lifecycle *lifecycle,
+                                                    char *err,
+                                                    size_t err_size) {
+    return hasciicam_virtual_camera_source_lifecycle_state_transition(lifecycle,
+                                                                      HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STARTED,
+                                                                      err,
+                                                                      err_size);
+}
+
+int hasciicam_virtual_camera_source_lifecycle_stop(hasciicam_virtual_camera_source_lifecycle *lifecycle,
+                                                   char *err,
+                                                   size_t err_size) {
+    return hasciicam_virtual_camera_source_lifecycle_state_transition(lifecycle,
+                                                                      HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STOPPED,
+                                                                      err,
+                                                                      err_size);
+}
+
+int hasciicam_virtual_camera_source_lifecycle_shutdown(hasciicam_virtual_camera_source_lifecycle *lifecycle,
+                                                       char *err,
+                                                       size_t err_size) {
+    return hasciicam_virtual_camera_source_lifecycle_state_transition(lifecycle,
+                                                                      HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_SHUTDOWN,
+                                                                      err,
+                                                                      err_size);
+}
+
 unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps) {
     return hasciicam_virtual_camera_media_type_duration_100ns(fps);
 }
