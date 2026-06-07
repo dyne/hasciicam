@@ -9,7 +9,9 @@ extern "C" {
 
 typedef enum hasciicam_virtual_camera_pixel_format {
     HASCIICAM_VIRTUAL_CAMERA_PIXFMT_UNKNOWN = 0,
-    HASCIICAM_VIRTUAL_CAMERA_PIXFMT_BGRA32
+    HASCIICAM_VIRTUAL_CAMERA_PIXFMT_BGRA32,
+    HASCIICAM_VIRTUAL_CAMERA_PIXFMT_YUY2,
+    HASCIICAM_VIRTUAL_CAMERA_PIXFMT_NV12
 } hasciicam_virtual_camera_pixel_format;
 
 typedef struct hasciicam_virtual_camera_request {
@@ -54,6 +56,45 @@ int hasciicam_virtual_camera_parse_size(const char *text, int *out_w, int *out_h
 int hasciicam_virtual_camera_request_validate(const hasciicam_virtual_camera_request *request,
                                               char *err,
                                               size_t err_size);
+
+/**
+ * Return the number of bytes needed for a packed YUY2 frame.
+ */
+size_t hasciicam_virtual_camera_yuy2_size(int width, int height, int stride_bytes);
+
+/**
+ * Return the number of bytes needed for an NV12 frame.
+ */
+size_t hasciicam_virtual_camera_nv12_size(int width, int height, int y_stride_bytes, int uv_stride_bytes);
+
+/**
+ * Scale a BGRA32 frame into a YUY2 output buffer using nearest-neighbor sampling and letterboxing.
+ */
+int hasciicam_virtual_camera_scale_bgra32_to_yuy2(const unsigned char *src,
+                                                  int src_width,
+                                                  int src_height,
+                                                  int src_stride_bytes,
+                                                  unsigned char *dst,
+                                                  int dst_width,
+                                                  int dst_height,
+                                                  int dst_stride_bytes,
+                                                  int mirror_x,
+                                                  int mirror_y);
+
+/**
+ * Scale a BGRA32 frame into an NV12 output buffer using nearest-neighbor sampling and letterboxing.
+ */
+int hasciicam_virtual_camera_scale_bgra32_to_nv12(const unsigned char *src,
+                                                  int src_width,
+                                                  int src_height,
+                                                  int src_stride_bytes,
+                                                  unsigned char *dst,
+                                                  int dst_width,
+                                                  int dst_height,
+                                                  int y_stride_bytes,
+                                                  int uv_stride_bytes,
+                                                  int mirror_x,
+                                                  int mirror_y);
 
 /**
  * Open the default virtual-camera backend or a no-op fallback.

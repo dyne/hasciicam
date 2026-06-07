@@ -60,6 +60,7 @@ set(HASCIICAM_APP_SOURCES
     src/gui/gui_state.c
     src/public/hasciicam_api.c
     src/virtual_camera/virtual_camera.c
+    src/virtual_camera/virtual_camera_convert.c
 )
 
 set(HASCIICAM_OUTPUT_SOURCES
