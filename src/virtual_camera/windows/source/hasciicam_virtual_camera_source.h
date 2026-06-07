@@ -72,6 +72,14 @@ int hasciicam_virtual_camera_source_registration_payload(const hasciicam_virtual
                                                          size_t err_size);
 
 /**
+ * Build the named-pipe security descriptor in SDDL form.
+ */
+int hasciicam_virtual_camera_source_pipe_sddl(char *out,
+                                              size_t out_size,
+                                              char *err,
+                                              size_t err_size);
+
+/**
  * Return the sample duration for the requested frame rate in 100 ns units.
  */
 unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps);

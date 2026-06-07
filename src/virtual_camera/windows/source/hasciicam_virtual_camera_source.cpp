@@ -161,6 +161,13 @@ int hasciicam_virtual_camera_source_registration_payload(const hasciicam_virtual
     return hasciicam_virtual_camera_pipe_build_registration_payload(request, out, out_size, err, err_size);
 }
 
+int hasciicam_virtual_camera_source_pipe_sddl(char *out,
+                                              size_t out_size,
+                                              char *err,
+                                              size_t err_size) {
+    return hasciicam_virtual_camera_pipe_build_sddl(out, out_size, err, err_size);
+}
+
 unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps) {
     return hasciicam_virtual_camera_media_type_duration_100ns(fps);
 }

@@ -68,6 +68,14 @@ int hasciicam_virtual_camera_pipe_build_registration_payload(const hasciicam_vir
                                                              char *err,
                                                              size_t err_size);
 
+/**
+ * Build the SDDL used to restrict access to the named pipe.
+ */
+int hasciicam_virtual_camera_pipe_build_sddl(char *out,
+                                             size_t out_size,
+                                             char *err,
+                                             size_t err_size);
+
 #ifdef __cplusplus
 }
 #endif

@@ -125,6 +125,24 @@ int main(void) {
                                                                          err,
                                                                          sizeof(err)),
                     "source payload wrapper should succeed");
+        expect_true(hasciicam_virtual_camera_source_pipe_sddl(payload,
+                                                              sizeof(payload),
+                                                              err,
+                                                              sizeof(err)),
+                    "source SDDL wrapper should succeed");
+        if (hasciicam_virtual_camera_source_pipe_sddl(payload,
+                                                      sizeof(payload),
+                                                      err,
+                                                      sizeof(err))) {
+            expect_true(strstr(payload, "D:P(") == payload,
+                        "security descriptor should start with a protected DACL");
+            expect_true(strstr(payload, "SY") != NULL,
+                        "security descriptor should allow SYSTEM");
+            expect_true(strstr(payload, "LS") != NULL,
+                        "security descriptor should allow Local Service");
+            expect_true(strstr(payload, "S-1-5-") != NULL,
+                        "security descriptor should include the current user SID");
+        }
     }
 
     {

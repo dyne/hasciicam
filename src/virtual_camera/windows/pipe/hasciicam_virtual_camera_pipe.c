@@ -4,10 +4,12 @@
 
 #include <windows.h>
 #include <lmcons.h>
+#include <sddl.h>
 #endif
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void set_error(char *err, size_t err_size, const char *msg) {
@@ -92,6 +94,61 @@ static const char *current_username(void) {
         return username;
 #endif
     return "current-user";
+}
+
+static int current_user_sid_string(char *out, size_t out_size, char *err, size_t err_size) {
+#if defined(_WIN32)
+    HANDLE token = NULL;
+    DWORD needed = 0;
+    TOKEN_USER *user = NULL;
+    char *sid_string = NULL;
+    int ok = 0;
+
+    if (out == NULL || out_size == 0) {
+        set_error(err, err_size, "SID buffer is required");
+        return 0;
+    }
+    out[0] = '\0';
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+        set_error(err, err_size, "unable to open process token");
+        return 0;
+    }
+    if (!GetTokenInformation(token, TokenUser, NULL, 0, &needed) && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+        set_error(err, err_size, "unable to query token size");
+        goto cleanup;
+    }
+    user = (TOKEN_USER *)malloc(needed);
+    if (user == NULL) {
+        set_error(err, err_size, "unable to allocate token buffer");
+        goto cleanup;
+    }
+    if (!GetTokenInformation(token, TokenUser, user, needed, &needed)) {
+        set_error(err, err_size, "unable to query token user");
+        goto cleanup;
+    }
+    if (!ConvertSidToStringSidA(user->User.Sid, &sid_string)) {
+        set_error(err, err_size, "unable to convert SID");
+        goto cleanup;
+    }
+    if (snprintf(out, out_size, "%s", sid_string) < 0 || out[0] == '\0') {
+        set_error(err, err_size, "SID buffer too small");
+        goto cleanup;
+    }
+    ok = 1;
+
+cleanup:
+    if (sid_string != NULL)
+        LocalFree(sid_string);
+    free(user);
+    if (token != NULL)
+        CloseHandle(token);
+    return ok;
+#else
+    (void)out;
+    (void)out_size;
+    set_error(err, err_size, "current user SID is only available on Windows");
+    return 0;
+#endif
 }
 
 void hasciicam_virtual_camera_pipe_frame_init(hasciicam_virtual_camera_pipe_frame *frame,
@@ -269,5 +326,39 @@ int hasciicam_virtual_camera_pipe_build_registration_payload(const hasciicam_vir
 
 fail:
     set_error(err, err_size, "registration payload buffer too small");
+    return 0;
+}
+
+int hasciicam_virtual_camera_pipe_build_sddl(char *out,
+                                             size_t out_size,
+                                             char *err,
+                                             size_t err_size) {
+    char sid[128];
+    char *cursor;
+    size_t remaining;
+
+    if (out == NULL || out_size == 0) {
+        set_error(err, err_size, "security descriptor buffer is required");
+        return 0;
+    }
+    out[0] = '\0';
+    clear_error(err, err_size);
+    if (!current_user_sid_string(sid, sizeof(sid), err, err_size))
+        return 0;
+
+    cursor = out;
+    remaining = out_size;
+    if (!append_text(&cursor, &remaining, "D:P("))
+        goto fail;
+    if (!append_text(&cursor, &remaining, "A;;GA;;;SY)"))
+        goto fail;
+    if (!append_text(&cursor, &remaining, "(A;;GA;;;LS)"))
+        goto fail;
+    if (!append_formatted(&cursor, &remaining, "(A;;GA;;;%s)", sid))
+        goto fail;
+    return 1;
+
+fail:
+    set_error(err, err_size, "security descriptor buffer too small");
     return 0;
 }
