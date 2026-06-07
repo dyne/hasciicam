@@ -302,6 +302,7 @@ if(HASCIICAM_ENABLE_TESTS)
     tests/test_app_config.c
     src/app/app_config.c
     src/app/tomlc17/tomlc17.c
+    src/virtual_camera/virtual_camera.c
   )
   target_include_directories(test_app_config PRIVATE src/app src/render third_party/aalib)
   target_link_libraries(test_app_config PRIVATE aalib)
@@ -328,6 +329,14 @@ if(HASCIICAM_ENABLE_TESTS)
   target_include_directories(test_capture_size PRIVATE src/capture)
   add_test(NAME capture_size COMMAND test_capture_size)
   set_tests_properties(capture_size PROPERTIES LABELS "unit;core")
+
+  add_executable(test_virtual_camera
+    tests/test_virtual_camera.c
+    src/virtual_camera/virtual_camera.c
+  )
+  target_include_directories(test_virtual_camera PRIVATE src/virtual_camera)
+  add_test(NAME virtual_camera COMMAND test_virtual_camera)
+  set_tests_properties(virtual_camera PROPERTIES LABELS "unit;core")
 
   add_executable(test_capture_control
     tests/test_capture_control.c

@@ -32,6 +32,10 @@ typedef struct hasciicam_config {
     int sdl_fullscreen;
     int mirror_x;
     int mirror_y;
+    int virtual_camera;
+    int virtual_camera_width;
+    int virtual_camera_height;
+    int virtual_camera_fps;
     int max_frames;
     int show_help;
     int show_aahelp;
@@ -46,6 +50,7 @@ typedef struct hasciicam_config {
     char fontface[256];
     char aadriver[64];
     char sdl_renderer[32];
+    char virtual_camera_device[256];
 } hasciicam_config;
 
 void hasciicam_config_init_defaults(hasciicam_config *cfg);
