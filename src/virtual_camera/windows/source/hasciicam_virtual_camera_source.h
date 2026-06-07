@@ -52,6 +52,14 @@ typedef struct hasciicam_virtual_camera_source_lifecycle {
     unsigned long long last_timestamp_100ns;
 } hasciicam_virtual_camera_source_lifecycle;
 
+typedef struct hasciicam_virtual_camera_source_frame_slot {
+    unsigned char *bytes;
+    size_t bytes_size;
+    size_t capacity;
+    unsigned long long sequence;
+    unsigned long long timestamp_100ns;
+} hasciicam_virtual_camera_source_frame_slot;
+
 /**
  * Return the CLSID used to register the HasciiCam virtual camera source.
  */
@@ -136,6 +144,30 @@ int hasciicam_virtual_camera_source_lifecycle_stop(hasciicam_virtual_camera_sour
 int hasciicam_virtual_camera_source_lifecycle_shutdown(hasciicam_virtual_camera_source_lifecycle *lifecycle,
                                                        char *err,
                                                        size_t err_size);
+
+/**
+ * Initialize a frame slot that retains only the newest complete pipe message.
+ */
+void hasciicam_virtual_camera_source_frame_slot_init(hasciicam_virtual_camera_source_frame_slot *slot);
+
+/**
+ * Release a frame slot and its buffered message.
+ */
+void hasciicam_virtual_camera_source_frame_slot_close(hasciicam_virtual_camera_source_frame_slot *slot);
+
+/**
+ * Replace the buffered message with the newest validated message.
+ */
+int hasciicam_virtual_camera_source_frame_slot_store(hasciicam_virtual_camera_source_frame_slot *slot,
+                                                     const void *message,
+                                                     size_t message_size,
+                                                     char *err,
+                                                     size_t err_size);
+
+/**
+ * Return whether the slot currently holds a complete message.
+ */
+int hasciicam_virtual_camera_source_frame_slot_has_message(const hasciicam_virtual_camera_source_frame_slot *slot);
 
 /**
  * Return the sample duration for the requested frame rate in 100 ns units.

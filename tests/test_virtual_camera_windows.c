@@ -267,6 +267,61 @@ cleanup_message:
     }
 
     {
+        hasciicam_virtual_camera_source_frame_slot slot;
+        hasciicam_virtual_camera_pipe_frame frame;
+        unsigned char *message = NULL;
+        char err[128];
+        size_t message_size = sizeof(frame) + 1843200U;
+        unsigned long long first_sequence;
+
+        hasciicam_virtual_camera_source_frame_slot_init(&slot);
+        hasciicam_virtual_camera_pipe_frame_init(&frame,
+                                                 HASCIICAM_VIRTUAL_CAMERA_PIXFMT_YUY2,
+                                                 1280,
+                                                 720,
+                                                 2560,
+                                                 11ULL,
+                                                 222222222ULL);
+        message = (unsigned char *)malloc(message_size);
+        expect_true(message != NULL, "slot test message should allocate");
+        if (message != NULL) {
+            memcpy(message, &frame, sizeof(frame));
+            memset(message + sizeof(frame), 0x7f, 1843200U);
+            expect_true(hasciicam_virtual_camera_source_frame_slot_store(&slot,
+                                                                         message,
+                                                                         message_size,
+                                                                         err,
+                                                                         sizeof(err)),
+                        "slot should store the newest complete message");
+            expect_true(hasciicam_virtual_camera_source_frame_slot_has_message(&slot),
+                        "slot should report a buffered message");
+            first_sequence = slot.sequence;
+            frame.sequence = 12ULL;
+            frame.timestamp_100ns = 333333333ULL;
+            memcpy(message, &frame, sizeof(frame));
+            expect_true(hasciicam_virtual_camera_source_frame_slot_store(&slot,
+                                                                         message,
+                                                                         message_size,
+                                                                         err,
+                                                                         sizeof(err)),
+                        "slot should replace the older message");
+            expect_true(slot.sequence == 12ULL && slot.timestamp_100ns == 333333333ULL,
+                        "slot should retain the newest message metadata");
+            expect_true(slot.sequence != first_sequence, "slot should replace the previous sequence");
+            expect_true(!hasciicam_virtual_camera_source_frame_slot_store(&slot,
+                                                                         message,
+                                                                         message_size - 1U,
+                                                                         err,
+                                                                         sizeof(err)),
+                        "slot should reject truncated messages");
+            hasciicam_virtual_camera_source_frame_slot_close(&slot);
+            expect_true(!hasciicam_virtual_camera_source_frame_slot_has_message(&slot),
+                        "closed slot should be empty");
+            free(message);
+        }
+    }
+
+    {
         unsigned long long duration = hasciicam_virtual_camera_source_sample_duration_100ns(30);
         unsigned long long start = 987654321ULL;
         expect_true(duration == 333333ULL, "sample duration should match 30 fps");

@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <mfapi.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unknwn.h>
 #include <new>
@@ -288,6 +289,66 @@ int hasciicam_virtual_camera_source_lifecycle_shutdown(hasciicam_virtual_camera_
                                                                       HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_SHUTDOWN,
                                                                       err,
                                                                       err_size);
+}
+
+void hasciicam_virtual_camera_source_frame_slot_init(hasciicam_virtual_camera_source_frame_slot *slot) {
+    if (slot == NULL)
+        return;
+    memset(slot, 0, sizeof(*slot));
+}
+
+void hasciicam_virtual_camera_source_frame_slot_close(hasciicam_virtual_camera_source_frame_slot *slot) {
+    if (slot == NULL)
+        return;
+    free(slot->bytes);
+    slot->bytes = NULL;
+    slot->bytes_size = 0;
+    slot->capacity = 0;
+    slot->sequence = 0;
+    slot->timestamp_100ns = 0;
+}
+
+int hasciicam_virtual_camera_source_frame_slot_has_message(const hasciicam_virtual_camera_source_frame_slot *slot) {
+    return slot != NULL && slot->bytes != NULL && slot->bytes_size > 0;
+}
+
+int hasciicam_virtual_camera_source_frame_slot_store(hasciicam_virtual_camera_source_frame_slot *slot,
+                                                     const void *message,
+                                                     size_t message_size,
+                                                     char *err,
+                                                     size_t err_size) {
+    hasciicam_virtual_camera_pipe_frame header;
+    const unsigned char *payload = NULL;
+    size_t payload_size = 0;
+    unsigned char *copy = NULL;
+
+    if (slot == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "source frame slot is required");
+        return 0;
+    }
+    if (!hasciicam_virtual_camera_pipe_decode_message(message,
+                                                      message_size,
+                                                      &header,
+                                                      &payload,
+                                                      &payload_size,
+                                                      err,
+                                                      err_size))
+        return 0;
+    copy = (unsigned char *)malloc(message_size);
+    if (copy == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "unable to allocate source frame buffer");
+        return 0;
+    }
+    memcpy(copy, message, message_size);
+    free(slot->bytes);
+    slot->bytes = copy;
+    slot->bytes_size = message_size;
+    slot->capacity = message_size;
+    slot->sequence = header.sequence;
+    slot->timestamp_100ns = header.timestamp_100ns;
+    return 1;
 }
 
 unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps) {
