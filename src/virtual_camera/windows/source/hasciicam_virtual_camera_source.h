@@ -54,6 +54,24 @@ int hasciicam_virtual_camera_source_media_type_get(size_t index,
                                                    hasciicam_virtual_camera_source_media_type *out);
 
 /**
+ * Build the stable named-pipe path used to bridge frames from HasciiCam.
+ */
+int hasciicam_virtual_camera_source_pipe_name(const hasciicam_virtual_camera_request *request,
+                                              char *out,
+                                              size_t out_size,
+                                              char *err,
+                                              size_t err_size);
+
+/**
+ * Build the compact registration payload consumed by the source DLL.
+ */
+int hasciicam_virtual_camera_source_registration_payload(const hasciicam_virtual_camera_request *request,
+                                                         char *out,
+                                                         size_t out_size,
+                                                         char *err,
+                                                         size_t err_size);
+
+/**
  * Return the sample duration for the requested frame rate in 100 ns units.
  */
 unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps);

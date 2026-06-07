@@ -8,6 +8,8 @@
 #include <unknwn.h>
 #include <new>
 
+#include "../pipe/hasciicam_virtual_camera_pipe.h"
+
 static const GUID kHasciiCamVirtualCameraSourceClsid =
 { 0x29e1d0b1, 0x0af8, 0x4d6f, { 0x9d, 0x5e, 0x0f, 0x9a, 0x0f, 0x0d, 0x4f, 0x58 } };
 
@@ -141,6 +143,22 @@ int hasciicam_virtual_camera_source_media_type_get(size_t index,
     out->sample_duration_100ns = hasciicam_virtual_camera_media_type_duration_100ns(fps);
     out->average_bitrate = hasciicam_virtual_camera_media_type_bitrate(width, height, fps, out->pixel_format);
     return 1;
+}
+
+int hasciicam_virtual_camera_source_pipe_name(const hasciicam_virtual_camera_request *request,
+                                              char *out,
+                                              size_t out_size,
+                                              char *err,
+                                              size_t err_size) {
+    return hasciicam_virtual_camera_pipe_build_name(request, out, out_size, err, err_size);
+}
+
+int hasciicam_virtual_camera_source_registration_payload(const hasciicam_virtual_camera_request *request,
+                                                         char *out,
+                                                         size_t out_size,
+                                                         char *err,
+                                                         size_t err_size) {
+    return hasciicam_virtual_camera_pipe_build_registration_payload(request, out, out_size, err, err_size);
 }
 
 unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps) {

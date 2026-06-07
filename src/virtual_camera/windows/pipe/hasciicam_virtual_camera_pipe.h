@@ -50,6 +50,24 @@ int hasciicam_virtual_camera_pipe_frame_validate(const hasciicam_virtual_camera_
                                                  char *err,
                                                  size_t err_size);
 
+/**
+ * Build a stable per-user/per-camera pipe name from the configured request.
+ */
+int hasciicam_virtual_camera_pipe_build_name(const hasciicam_virtual_camera_request *request,
+                                             char *out,
+                                             size_t out_size,
+                                             char *err,
+                                             size_t err_size);
+
+/**
+ * Build a compact registration payload for the source DLL to consume.
+ */
+int hasciicam_virtual_camera_pipe_build_registration_payload(const hasciicam_virtual_camera_request *request,
+                                                             char *out,
+                                                             size_t out_size,
+                                                             char *err,
+                                                             size_t err_size);
+
 #ifdef __cplusplus
 }
 #endif

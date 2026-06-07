@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <wchar.h>
 
 #include "../src/virtual_camera/windows/source/hasciicam_virtual_camera_source.h"
@@ -67,6 +68,63 @@ int main(void) {
             expect_true(media_type.average_bitrate == 331776000ULL,
                         "NV12 bitrate should match geometry and frame rate");
         }
+    }
+
+    {
+        hasciicam_virtual_camera_request request;
+        char pipe_name[256];
+        char payload[256];
+        char err[128];
+
+        hasciicam_virtual_camera_request_init(&request);
+        request.enabled = 1;
+        strncpy(request.device, "Device:One/Two", sizeof(request.device) - 1);
+        request.device[sizeof(request.device) - 1] = '\0';
+
+        expect_true(hasciicam_virtual_camera_pipe_build_name(&request, pipe_name, sizeof(pipe_name), err, sizeof(err)),
+                    "pipe name should be generated for an enabled request");
+        if (hasciicam_virtual_camera_pipe_build_name(&request, pipe_name, sizeof(pipe_name), err, sizeof(err))) {
+            expect_true(strstr(pipe_name, "\\\\.\\pipe\\HasciiCam\\") == pipe_name,
+                        "pipe name should use the expected prefix");
+            expect_true(strstr(pipe_name, "\\Device_One_Two\\") != NULL,
+                        "pipe name should sanitize device characters");
+            expect_true(strstr(pipe_name, "\\1280x720@30") != NULL,
+                        "pipe name should encode geometry and fps");
+        }
+
+        expect_true(hasciicam_virtual_camera_pipe_build_registration_payload(&request,
+                                                                             payload,
+                                                                             sizeof(payload),
+                                                                             err,
+                                                                             sizeof(err)),
+                    "registration payload should be generated");
+        if (hasciicam_virtual_camera_pipe_build_registration_payload(&request,
+                                                                     payload,
+                                                                     sizeof(payload),
+                                                                     err,
+                                                                     sizeof(err))) {
+            expect_true(strstr(payload, "v=1;") == payload,
+                        "payload should start with the version");
+            expect_true(strstr(payload, "pipe=\\\\.\\pipe\\HasciiCam\\") != NULL,
+                        "payload should include the pipe name");
+            expect_true(strstr(payload, "device=Device_One_Two;") != NULL,
+                        "payload should sanitize the device name");
+            expect_true(strstr(payload, "size=1280x720;") != NULL,
+                        "payload should include geometry");
+            expect_true(strstr(payload, "fps=30;") != NULL,
+                        "payload should include fps");
+            expect_true(strstr(payload, "fmt=yuy2;") != NULL,
+                        "payload should include the frame format");
+        }
+
+        expect_true(hasciicam_virtual_camera_source_pipe_name(&request, pipe_name, sizeof(pipe_name), err, sizeof(err)),
+                    "source pipe name wrapper should succeed");
+        expect_true(hasciicam_virtual_camera_source_registration_payload(&request,
+                                                                         payload,
+                                                                         sizeof(payload),
+                                                                         err,
+                                                                         sizeof(err)),
+                    "source payload wrapper should succeed");
     }
 
     {
