@@ -365,9 +365,15 @@ if(HASCIICAM_ENABLE_TESTS)
     add_executable(test_virtual_camera_windows
       tests/test_virtual_camera_windows.c
       src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp
+      src/virtual_camera/virtual_camera.c
+      src/virtual_camera/virtual_camera_convert.c
     )
-    target_include_directories(test_virtual_camera_windows PRIVATE src/virtual_camera/windows/source)
+    target_include_directories(test_virtual_camera_windows PRIVATE
+      src/virtual_camera/windows/source
+      src/virtual_camera)
     target_compile_definitions(test_virtual_camera_windows PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(test_virtual_camera_windows PRIVATE
+      mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
     add_test(NAME virtual_camera_windows COMMAND test_virtual_camera_windows)
     set_tests_properties(virtual_camera_windows PROPERTIES LABELS "unit;core")
   endif()
