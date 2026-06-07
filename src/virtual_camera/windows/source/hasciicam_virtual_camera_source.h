@@ -11,6 +11,10 @@ extern "C" {
 
 #include "../../../virtual_camera/virtual_camera.h"
 
+#if defined(_WIN32)
+typedef struct IMFSample IMFSample;
+#endif
+
 typedef struct hasciicam_virtual_camera_source_media_type {
     hasciicam_virtual_camera_pixel_format pixel_format;
     const wchar_t *subtype_name;
@@ -189,6 +193,17 @@ int hasciicam_virtual_camera_source_make_black_message(const hasciicam_virtual_c
                                                        size_t bytes_size,
                                                        char *err,
                                                        size_t err_size);
+
+/**
+ * Build a timed Media Foundation sample from the newest buffered frame or a black fallback.
+ */
+int hasciicam_virtual_camera_source_make_sample(const hasciicam_virtual_camera_source_config *config,
+                                                const hasciicam_virtual_camera_source_frame_slot *slot,
+                                                unsigned long long start_100ns,
+                                                unsigned long long sequence,
+                                                IMFSample **sample_out,
+                                                char *err,
+                                                size_t err_size);
 
 /**
  * Return the sample duration for the requested frame rate in 100 ns units.

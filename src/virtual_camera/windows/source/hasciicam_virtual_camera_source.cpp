@@ -492,6 +492,132 @@ int hasciicam_virtual_camera_source_make_black_message(const hasciicam_virtual_c
     return 1;
 }
 
+int hasciicam_virtual_camera_source_make_sample(const hasciicam_virtual_camera_source_config *config,
+                                                const hasciicam_virtual_camera_source_frame_slot *slot,
+                                                unsigned long long start_100ns,
+                                                unsigned long long sequence,
+                                                IMFSample **sample_out,
+                                                char *err,
+                                                size_t err_size) {
+    hasciicam_virtual_camera_pipe_frame header;
+    const unsigned char *payload = NULL;
+    size_t payload_size = 0;
+    size_t message_size = 0;
+    unsigned char *message = NULL;
+    IMFSample *sample = NULL;
+    IMFMediaBuffer *buffer = NULL;
+    BYTE *buffer_data = NULL;
+    DWORD max_length = 0;
+    DWORD current_length = 0;
+    unsigned long long sample_time = 0;
+    unsigned long long sample_duration = 0;
+    HRESULT hr;
+
+    if (sample_out == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "sample output is required");
+        return 0;
+    }
+    *sample_out = NULL;
+    if (config == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "source config is required");
+        return 0;
+    }
+    if (config->media_type_count == 0) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "source config does not describe a media type");
+        return 0;
+    }
+
+    if (slot != NULL && hasciicam_virtual_camera_source_frame_slot_has_message(slot)) {
+        if (!hasciicam_virtual_camera_pipe_decode_message(slot->bytes,
+                                                          slot->bytes_size,
+                                                          &header,
+                                                          &payload,
+                                                          &payload_size,
+                                                          err,
+                                                          err_size))
+            return 0;
+        sample_time = slot->timestamp_100ns;
+    } else {
+        message_size = sizeof(hasciicam_virtual_camera_pipe_frame) + config->media_types[0].frame_bytes;
+        message = (unsigned char *)malloc(message_size);
+        if (message == NULL) {
+            if (err != NULL && err_size > 0)
+                snprintf(err, err_size, "unable to allocate black sample buffer");
+            return 0;
+        }
+        if (!hasciicam_virtual_camera_source_make_black_message(config,
+                                                                sequence,
+                                                                start_100ns,
+                                                                message,
+                                                                message_size,
+                                                                err,
+                                                                err_size)) {
+            free(message);
+            return 0;
+        }
+        if (!hasciicam_virtual_camera_pipe_decode_message(message,
+                                                          message_size,
+                                                          &header,
+                                                          &payload,
+                                                          &payload_size,
+                                                          err,
+                                                          err_size)) {
+            free(message);
+            return 0;
+        }
+        sample_time = hasciicam_virtual_camera_source_sample_time_100ns(start_100ns,
+                                                                         sequence,
+                                                                         config->request.fps);
+    }
+
+    hr = MFCreateSample(&sample);
+    if (FAILED(hr)) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "unable to allocate media sample");
+        free(message);
+        return 0;
+    }
+    hr = MFCreateMemoryBuffer((DWORD)payload_size, &buffer);
+    if (FAILED(hr) || buffer == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "unable to allocate media buffer");
+        if (sample != NULL)
+            sample->Release();
+        free(message);
+        return 0;
+    }
+    hr = buffer->Lock(&buffer_data, &max_length, &current_length);
+    if (SUCCEEDED(hr) && buffer_data != NULL && max_length >= payload_size) {
+        memcpy(buffer_data, payload, payload_size);
+        hr = buffer->Unlock();
+    }
+    if (SUCCEEDED(hr))
+        hr = buffer->SetCurrentLength((DWORD)payload_size);
+    if (SUCCEEDED(hr))
+        hr = sample->AddBuffer(buffer);
+    if (SUCCEEDED(hr))
+        hr = sample->SetSampleTime((LONGLONG)sample_time);
+    if (SUCCEEDED(hr)) {
+        sample_duration = hasciicam_virtual_camera_source_sample_duration_100ns(config->request.fps);
+        hr = sample->SetSampleDuration((LONGLONG)sample_duration);
+    }
+    buffer->Release();
+    if (FAILED(hr)) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "unable to build media sample");
+        sample->Release();
+        free(message);
+        return 0;
+    }
+
+    *sample_out = sample;
+    free(message);
+    return 1;
+}
+
 unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps) {
     return hasciicam_virtual_camera_media_type_duration_100ns(fps);
 }

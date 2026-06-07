@@ -270,6 +270,13 @@ static void run_windows_backend_roundtrip(void) {
         0, 0, 0, 255
     };
     char err[128];
+    IMFSample *sample = NULL;
+    IMFMediaBuffer *sample_buffer = NULL;
+    BYTE *sample_data = NULL;
+    DWORD sample_max = 0;
+    DWORD sample_len = 0;
+    LONGLONG sample_time = 0;
+    LONGLONG sample_duration = 0;
 
     hasciicam_virtual_camera_request_init(&request);
     request.enabled = 1;
@@ -320,6 +327,41 @@ static void run_windows_backend_roundtrip(void) {
                         "backend reader should receive a black YUY2 frame");
         } else {
             fprintf(stderr, "backend helper error: %s\n", reader.err);
+        }
+        expect_true(hasciicam_virtual_camera_source_make_sample(&reader.config,
+                                                                &reader.slot,
+                                                                888888888ULL,
+                                                                3ULL,
+                                                                &sample,
+                                                                err,
+                                                                sizeof(err)),
+                    "backend roundtrip should build a timed sample");
+        if (sample != NULL) {
+            expect_true(SUCCEEDED(sample->lpVtbl->GetSampleTime(sample, &sample_time)),
+                        "sample should expose a timestamp");
+            expect_true(SUCCEEDED(sample->lpVtbl->GetSampleDuration(sample, &sample_duration)),
+                        "sample should expose a duration");
+            expect_true(SUCCEEDED(sample->lpVtbl->ConvertToContiguousBuffer(sample, &sample_buffer)),
+                        "sample should expose a contiguous buffer");
+            if (sample_buffer != NULL) {
+                expect_true(SUCCEEDED(sample_buffer->lpVtbl->Lock(sample_buffer, &sample_data, &sample_max, &sample_len)),
+                            "sample buffer should lock");
+                if (sample_data != NULL) {
+                    expect_true(sample_time == 777777777ULL,
+                                "sample should preserve the frame timestamp");
+                    expect_true(sample_duration == 333333ULL,
+                                "sample should use the configured duration");
+                    expect_true(sample_len == 8U, "sample payload should be one YUY2 frame");
+                    expect_true(sample_data[0] == 0x10 && sample_data[1] == 0x80 &&
+                                sample_data[2] == 0x10 && sample_data[3] == 0x80,
+                                "sample payload should remain black");
+                }
+                sample_buffer->lpVtbl->Unlock(sample_buffer);
+                sample_buffer->lpVtbl->Release(sample_buffer);
+            }
+            sample->lpVtbl->Release(sample);
+            sample = NULL;
+            sample_buffer = NULL;
         }
         hasciicam_virtual_camera_source_frame_slot_close(&reader.slot);
         CloseHandle(reader_thread);
