@@ -14,9 +14,12 @@ static void expect_true(int cond, const char *msg) {
 
 int main(void) {
     hasciicam_virtual_camera_request request;
+    hasciicam_virtual_camera_device *device = NULL;
+    hasciicam_virtual_camera_frame frame;
     char err[128];
     int w = 0;
     int h = 0;
+    unsigned char pixel[4] = {1, 2, 3, 4};
 
     hasciicam_virtual_camera_request_init(&request);
     expect_true(request.enabled == 0, "default enabled should be off");
@@ -47,6 +50,26 @@ int main(void) {
     request.fps = 0;
     expect_true(!hasciicam_virtual_camera_request_validate(&request, err, sizeof(err)),
                 "validate should reject zero fps");
+
+    request.enabled = 0;
+    expect_true(hasciicam_virtual_camera_open_default(&device, &request),
+                "open_default should return a fallback device");
+    expect_true(device != NULL, "device should be allocated");
+    expect_true(hasciicam_virtual_camera_is_supported(device) == 0,
+                "fallback device should report unsupported");
+    expect_true(strcmp(hasciicam_virtual_camera_backend_name(device), "unsupported") == 0,
+                "backend name should be unsupported");
+
+    memset(&frame, 0, sizeof(frame));
+    frame.pixels = pixel;
+    frame.width = 1;
+    frame.height = 1;
+    frame.stride_bytes = 4;
+    frame.pixel_format = HASCIICAM_VIRTUAL_CAMERA_PIXFMT_BGRA32;
+    frame.timestamp_100ns = 123;
+    expect_true(hasciicam_virtual_camera_publish(device, &frame),
+                "fallback publish should succeed");
+    hasciicam_virtual_camera_close(device);
 
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);

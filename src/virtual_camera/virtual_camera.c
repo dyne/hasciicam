@@ -71,3 +71,82 @@ int hasciicam_virtual_camera_request_validate(const hasciicam_virtual_camera_req
 
     return 1;
 }
+
+struct hasciicam_virtual_camera_device {
+    const hasciicam_virtual_camera_ops *ops;
+    int supported;
+    char backend_name[32];
+};
+
+static int unsupported_publish(hasciicam_virtual_camera_device *device,
+                               const hasciicam_virtual_camera_frame *frame) {
+    (void)device;
+    (void)frame;
+    return 1;
+}
+
+static void unsupported_close(hasciicam_virtual_camera_device *device) {
+    free(device);
+}
+
+static const char *unsupported_name(void) {
+    return "unsupported";
+}
+
+static const hasciicam_virtual_camera_ops unsupported_ops = {
+    unsupported_publish,
+    unsupported_close,
+    unsupported_name
+};
+
+int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
+                                          const hasciicam_virtual_camera_request *request) {
+    hasciicam_virtual_camera_device *device = NULL;
+    char err[128];
+
+    if (out == NULL)
+        return 0;
+    *out = NULL;
+
+    if (!hasciicam_virtual_camera_request_validate(request, err, sizeof(err)))
+        return 0;
+
+    device = (hasciicam_virtual_camera_device *)calloc(1, sizeof(*device));
+    if (device == NULL)
+        return 0;
+
+    device->ops = &unsupported_ops;
+    device->supported = 0;
+    strncpy(device->backend_name, unsupported_name(), sizeof(device->backend_name) - 1);
+    *out = device;
+    return 1;
+}
+
+int hasciicam_virtual_camera_publish(hasciicam_virtual_camera_device *device,
+                                     const hasciicam_virtual_camera_frame *frame) {
+    if (device == NULL || device->ops == NULL || device->ops->publish == NULL)
+        return 0;
+    return device->ops->publish(device, frame);
+}
+
+void hasciicam_virtual_camera_close(hasciicam_virtual_camera_device *device) {
+    if (device == NULL)
+        return;
+    if (device->ops != NULL && device->ops->close != NULL) {
+        device->ops->close(device);
+        return;
+    }
+    free(device);
+}
+
+int hasciicam_virtual_camera_is_supported(const hasciicam_virtual_camera_device *device) {
+    if (device == NULL)
+        return 0;
+    return device->supported;
+}
+
+const char *hasciicam_virtual_camera_backend_name(const hasciicam_virtual_camera_device *device) {
+    if (device == NULL || device->backend_name[0] == '\0')
+        return "unknown";
+    return device->backend_name;
+}

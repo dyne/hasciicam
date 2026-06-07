@@ -29,6 +29,15 @@ typedef struct hasciicam_virtual_camera_frame {
     unsigned long long timestamp_100ns;
 } hasciicam_virtual_camera_frame;
 
+typedef struct hasciicam_virtual_camera_device hasciicam_virtual_camera_device;
+
+typedef struct hasciicam_virtual_camera_ops {
+    int (*publish)(hasciicam_virtual_camera_device *device,
+                   const hasciicam_virtual_camera_frame *frame);
+    void (*close)(hasciicam_virtual_camera_device *device);
+    const char *(*name)(void);
+} hasciicam_virtual_camera_ops;
+
 /**
  * Initialize a virtual-camera request with the project defaults.
  */
@@ -45,6 +54,33 @@ int hasciicam_virtual_camera_parse_size(const char *text, int *out_w, int *out_h
 int hasciicam_virtual_camera_request_validate(const hasciicam_virtual_camera_request *request,
                                               char *err,
                                               size_t err_size);
+
+/**
+ * Open the default virtual-camera backend or a no-op fallback.
+ */
+int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
+                                          const hasciicam_virtual_camera_request *request);
+
+/**
+ * Publish one frame to the active backend or discard it in the no-op fallback.
+ */
+int hasciicam_virtual_camera_publish(hasciicam_virtual_camera_device *device,
+                                     const hasciicam_virtual_camera_frame *frame);
+
+/**
+ * Close and free a device obtained from open_default().
+ */
+void hasciicam_virtual_camera_close(hasciicam_virtual_camera_device *device);
+
+/**
+ * Return whether the opened backend can actually publish frames.
+ */
+int hasciicam_virtual_camera_is_supported(const hasciicam_virtual_camera_device *device);
+
+/**
+ * Return the backend name for diagnostics.
+ */
+const char *hasciicam_virtual_camera_backend_name(const hasciicam_virtual_camera_device *device);
 
 #ifdef __cplusplus
 }
