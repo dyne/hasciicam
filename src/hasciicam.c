@@ -47,6 +47,7 @@
 #include <aalib.h>
 #include "app/app_config.h"
 #include "app/app_live_controls.h"
+#include "app/app_virtual_camera.h"
 #include "app/app_size.h"
 #include "app/app_session.h"
 #include "capture/capture_backend.h"
@@ -130,6 +131,7 @@ main (int argc, char **argv) {
   hasciicam_render_session render_session;
   hasciicam_gui_state gui_state;
   hasciicam_output output;
+  hasciicam_app_virtual_camera virtual_camera;
   capture_control_desc control_descs[CAPTURE_MAX_CONTROLS];
   int control_count = 0;
   struct geometry aa_geo;
@@ -170,6 +172,7 @@ main (int argc, char **argv) {
           PACKAGE, VERSION);
 
   hasciicam_config_init_defaults(&appcfg);
+  hasciicam_app_virtual_camera_init(&virtual_camera);
 
   /* default values */
 #if defined(_WIN32)
@@ -206,6 +209,11 @@ main (int argc, char **argv) {
   foreground = appcfg.foreground;
   fontface = appcfg.fontface;
   aadriver = appcfg.aadriver;
+
+  if (appcfg.virtual_camera && mode != LIVE) {
+    fprintf(stderr, "!! virtual camera is only available in live mode\n");
+    exit(-1);
+  }
   selected_font = hasciicam_font_find(appcfg.font);
   if (selected_font.font == 0) {
     fprintf(stderr, "!! unknown font '%s'\n", appcfg.font);
@@ -344,6 +352,30 @@ main (int argc, char **argv) {
       fprintf(stderr,"!! try: -O curses for terminal mode\n");
     }
     exit(-1);
+  }
+
+  if (mode == LIVE && appcfg.virtual_camera) {
+    char virtual_camera_err[256];
+    if (render_session.context == NULL || render_session.context->driver == NULL ||
+        strcmp(render_session.context->driver->shortname, "SDL") != 0) {
+      fprintf(stderr, "!! virtual camera requires the SDL live driver\n");
+      hasciicam_session_stop(&session);
+      hasciicam_render_session_close(&render_session);
+      exit(-1);
+    }
+    virtual_camera_err[0] = '\0';
+    if (!hasciicam_app_virtual_camera_start(&virtual_camera,
+                                            render_session.context,
+                                            &appcfg,
+                                            hasciicam_sdl_set_frame_callback,
+                                            virtual_camera_err,
+                                            sizeof(virtual_camera_err))) {
+      fprintf(stderr, "!! cannot initialize virtual camera: %s\n",
+              virtual_camera_err[0] ? virtual_camera_err : "unknown error");
+      hasciicam_session_stop(&session);
+      hasciicam_render_session_close(&render_session);
+      exit(-1);
+    }
   }
 
   /* report which driver was actually initialized */
@@ -558,6 +590,7 @@ main (int argc, char **argv) {
   hasciicam_session_stop(&session);
   hasciicam_gui_state_reset_preview(&gui_state);
   hasciicam_output_close(&output);
+  hasciicam_app_virtual_camera_stop(&virtual_camera, hasciicam_sdl_set_frame_callback);
   hasciicam_render_session_close(&render_session);
   fprintf (stderr, "cya!\n");
   exit (0);

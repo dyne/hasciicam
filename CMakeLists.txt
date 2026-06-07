@@ -315,6 +315,21 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME app_config COMMAND test_app_config)
   set_tests_properties(app_config PROPERTIES LABELS "unit;core")
 
+  add_executable(test_app_virtual_camera
+    tests/test_app_virtual_camera.c
+    src/app/app_virtual_camera.c
+    src/app/app_config.c
+    src/app/tomlc17/tomlc17.c
+    src/virtual_camera/virtual_camera.c
+  )
+  target_include_directories(test_app_virtual_camera PRIVATE src/app src/virtual_camera src/gui)
+  target_link_libraries(test_app_virtual_camera PRIVATE aalib)
+  if(WIN32)
+    target_compile_definitions(test_app_virtual_camera PRIVATE _CRT_SECURE_NO_WARNINGS)
+  endif()
+  add_test(NAME app_virtual_camera COMMAND test_app_virtual_camera)
+  set_tests_properties(app_virtual_camera PROPERTIES LABELS "unit;core")
+
   add_executable(test_gui_state
     tests/test_gui_state.c
     src/gui/gui_state.c
