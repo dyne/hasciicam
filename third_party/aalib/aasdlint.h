@@ -4,6 +4,7 @@
 #include <SDL.h>
 
 struct hasciicam_gui_state;
+struct hasciicam_virtual_camera_frame;
 
 struct sdldriverdata {
     SDL_Window *window;
@@ -39,6 +40,9 @@ struct sdldriverdata {
     int fullscreen;
     int gui_ready;
     int gui_visible;
+    void (*frame_callback)(void *user_data,
+                           const struct hasciicam_virtual_camera_frame *frame);
+    void *frame_callback_user_data;
     int Xpos;
     int Ypos;
     

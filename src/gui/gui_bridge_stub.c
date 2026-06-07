@@ -25,4 +25,13 @@ int hasciicam_sdl_set_runtime_font(aa_context *context, const char *font_short_n
     return 0;
 }
 
+int hasciicam_sdl_set_frame_callback(aa_context *context,
+                                     hasciicam_sdl_frame_callback callback,
+                                     void *user_data) {
+    (void)context;
+    (void)callback;
+    (void)user_data;
+    return 0;
+}
+
 #endif

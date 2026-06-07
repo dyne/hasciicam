@@ -177,6 +177,7 @@ if(HASCIICAM_ENABLE_GUI AND HASCIICAM_WITH_SDL)
       third_party/imgui
       third_party/imgui/backends
       src/gui
+      src/virtual_camera
     )
     target_compile_definitions(aalib PRIVATE HASCIICAM_ENABLE_GUI=1)
   else()
