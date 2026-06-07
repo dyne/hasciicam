@@ -80,6 +80,15 @@ int hasciicam_app_virtual_camera_start(hasciicam_app_virtual_camera *vc,
         set_error(err, err_size, "failed to register SDL frame callback");
         return 0;
     }
+#ifdef _WIN32
+    if (!hasciicam_app_virtual_camera_windows_start(vc, &request, err, err_size)) {
+        (void)set_callback(context, NULL, NULL);
+        hasciicam_virtual_camera_close(vc->device);
+        vc->device = NULL;
+        vc->context = NULL;
+        return 0;
+    }
+#endif
     vc->active = 1;
     return 1;
 }
@@ -91,6 +100,9 @@ void hasciicam_app_virtual_camera_stop(hasciicam_app_virtual_camera *vc,
     if (vc->active && set_callback != NULL && vc->context != NULL) {
         (void)set_callback(vc->context, NULL, NULL);
     }
+#ifdef _WIN32
+    hasciicam_app_virtual_camera_windows_stop(vc);
+#endif
     if (vc->device != NULL) {
         hasciicam_virtual_camera_close(vc->device);
         vc->device = NULL;

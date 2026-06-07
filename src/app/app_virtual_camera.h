@@ -10,6 +10,10 @@
 extern "C" {
 #endif
 
+#ifdef _WIN32
+typedef struct IMFVirtualCamera IMFVirtualCamera;
+#endif
+
 typedef int (*hasciicam_app_virtual_camera_set_callback_fn)(aa_context *context,
                                                             void (*callback)(void *user_data,
                                                                              const struct hasciicam_virtual_camera_frame *frame),
@@ -18,6 +22,11 @@ typedef int (*hasciicam_app_virtual_camera_set_callback_fn)(aa_context *context,
 typedef struct hasciicam_app_virtual_camera {
     aa_context *context;
     hasciicam_virtual_camera_device *device;
+#ifdef _WIN32
+    IMFVirtualCamera *virtual_camera;
+    int windows_com_initialized;
+    int windows_mf_initialized;
+#endif
     int active;
     unsigned long long min_publish_interval_100ns;
     unsigned long long last_publish_100ns;
@@ -55,6 +64,21 @@ unsigned long long hasciicam_app_virtual_camera_accepted_frames(const hasciicam_
  * Return the number of frames dropped by the current publish gate.
  */
 unsigned long long hasciicam_app_virtual_camera_dropped_frames(const hasciicam_app_virtual_camera *vc);
+
+#ifdef _WIN32
+/**
+ * Register and start the Windows session virtual camera.
+ */
+int hasciicam_app_virtual_camera_windows_start(hasciicam_app_virtual_camera *vc,
+                                               const hasciicam_virtual_camera_request *request,
+                                               char *err,
+                                               size_t err_size);
+
+/**
+ * Stop and release the Windows session virtual camera.
+ */
+void hasciicam_app_virtual_camera_windows_stop(hasciicam_app_virtual_camera *vc);
+#endif
 
 #ifdef __cplusplus
 }

@@ -210,8 +210,8 @@ if(HASCIICAM_WITH_CURSES)
   target_include_directories(hasciicam_core PUBLIC ${CURSES_INCLUDE_DIRS})
 endif()
 
-if(HASCIICAM_ENABLE_CAPTURE_MF OR HASCIICAM_ENABLE_CAPTURE_DSHOW)
-  target_link_libraries(hasciicam_core PUBLIC mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+if(WIN32)
+  target_link_libraries(hasciicam_core PUBLIC mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32 mfsensorgroup)
 endif()
 if(HASCIICAM_WITH_GUI AND WIN32)
   target_link_libraries(hasciicam_core PUBLIC comdlg32)
@@ -317,6 +317,7 @@ if(HASCIICAM_ENABLE_TESTS)
 
   add_executable(test_app_virtual_camera
     tests/test_app_virtual_camera.c
+    tests/test_app_virtual_camera_windows_stub.c
     src/app/app_virtual_camera.c
     src/app/app_config.c
     src/app/tomlc17/tomlc17.c
@@ -325,6 +326,8 @@ if(HASCIICAM_ENABLE_TESTS)
   target_include_directories(test_app_virtual_camera PRIVATE src/app src/virtual_camera src/gui)
   target_link_libraries(test_app_virtual_camera PRIVATE aalib)
   if(WIN32)
+    target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
+    target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/virtual_camera_convert.c)
     target_compile_definitions(test_app_virtual_camera PRIVATE _CRT_SECURE_NO_WARNINGS)
   endif()
   add_test(NAME app_virtual_camera COMMAND test_app_virtual_camera)
@@ -352,6 +355,9 @@ if(HASCIICAM_ENABLE_TESTS)
     src/virtual_camera/virtual_camera_convert.c
   )
   target_include_directories(test_virtual_camera PRIVATE src/virtual_camera)
+  if(WIN32)
+    target_sources(test_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
+  endif()
   add_test(NAME virtual_camera COMMAND test_virtual_camera)
   set_tests_properties(virtual_camera PROPERTIES LABELS "unit;core")
 
@@ -369,6 +375,20 @@ if(HASCIICAM_ENABLE_TESTS)
     target_compile_definitions(hasciicam_virtual_camera_source PRIVATE _CRT_SECURE_NO_WARNINGS)
     target_link_libraries(hasciicam_virtual_camera_source PRIVATE
       mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+
+    add_executable(test_app_virtual_camera_windows
+      tests/test_app_virtual_camera_windows.c
+      src/app/app_virtual_camera_windows.c
+    )
+    target_include_directories(test_app_virtual_camera_windows PRIVATE
+      src/app
+      src/virtual_camera/windows/source
+      src/virtual_camera)
+    target_compile_definitions(test_app_virtual_camera_windows PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(test_app_virtual_camera_windows PRIVATE
+      aalib mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+    add_test(NAME app_virtual_camera_windows COMMAND test_app_virtual_camera_windows)
+    set_tests_properties(app_virtual_camera_windows PROPERTIES LABELS "unit;core")
 
     add_executable(test_virtual_camera_windows
       tests/test_virtual_camera_windows.c

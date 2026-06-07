@@ -135,7 +135,7 @@
 :Done when: Consumers receive valid, regularly timed samples independent of SDL jitter.
 :END:
 
-** TODO [#A] Register and start the session virtual camera
+** DONE [#A] Register and start the session virtual camera
 :PROPERTIES:
 :Why: The app must create the enumerable camera instance and bind it to the installed custom source CLSID.
 :Change: Add a Windows publisher/registrar adapter that feature-detects `MFIsVirtualCameraTypeSupported`/`MFCreateVirtualCamera`, initializes Media Foundation, creates `MFVirtualCameraType_SoftwareCameraSource` with session lifetime and current-user access, stores the pipe/configuration attributes needed by the source, and calls `Start`. Capture the symbolic link for diagnostics. On close call `Stop`/`Shutdown` in the documented order and release COM/MF state. Treat webcam privacy denial distinctly. Link `mfsensorgroup.lib` only for the Windows virtual-camera option and retain existing capture libraries.
