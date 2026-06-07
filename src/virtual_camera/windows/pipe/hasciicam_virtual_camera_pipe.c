@@ -362,3 +362,44 @@ fail:
     set_error(err, err_size, "security descriptor buffer too small");
     return 0;
 }
+
+int hasciicam_virtual_camera_pipe_decode_message(const void *bytes,
+                                                 size_t bytes_size,
+                                                 hasciicam_virtual_camera_pipe_frame *header_out,
+                                                 const unsigned char **payload_out,
+                                                 size_t *payload_size_out,
+                                                 char *err,
+                                                 size_t err_size) {
+    const hasciicam_virtual_camera_pipe_frame *frame;
+    size_t payload_size;
+    size_t expected_size;
+
+    if (bytes == NULL) {
+        set_error(err, err_size, "pipe message is required");
+        return 0;
+    }
+    if (bytes_size < sizeof(hasciicam_virtual_camera_pipe_frame)) {
+        set_error(err, err_size, "pipe message is truncated");
+        return 0;
+    }
+
+    frame = (const hasciicam_virtual_camera_pipe_frame *)bytes;
+    if (!hasciicam_virtual_camera_pipe_frame_validate(frame, err, err_size))
+        return 0;
+
+    payload_size = (size_t)frame->payload_bytes;
+    expected_size = sizeof(*frame) + payload_size;
+    if (bytes_size != expected_size) {
+        set_error(err, err_size, bytes_size < expected_size ? "pipe message payload is truncated"
+                                                            : "pipe message has trailing bytes");
+        return 0;
+    }
+
+    if (header_out != NULL)
+        *header_out = *frame;
+    if (payload_out != NULL)
+        *payload_out = (const unsigned char *)bytes + sizeof(*frame);
+    if (payload_size_out != NULL)
+        *payload_size_out = payload_size;
+    return 1;
+}

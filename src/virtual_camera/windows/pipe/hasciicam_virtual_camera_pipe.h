@@ -76,6 +76,17 @@ int hasciicam_virtual_camera_pipe_build_sddl(char *out,
                                              char *err,
                                              size_t err_size);
 
+/**
+ * Decode one exact pipe message into a validated header and payload view.
+ */
+int hasciicam_virtual_camera_pipe_decode_message(const void *bytes,
+                                                 size_t bytes_size,
+                                                 hasciicam_virtual_camera_pipe_frame *header_out,
+                                                 const unsigned char **payload_out,
+                                                 size_t *payload_size_out,
+                                                 char *err,
+                                                 size_t err_size);
+
 #ifdef __cplusplus
 }
 #endif

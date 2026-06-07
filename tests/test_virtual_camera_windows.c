@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
 
@@ -148,6 +149,11 @@ int main(void) {
     {
         hasciicam_virtual_camera_pipe_frame frame;
         char err[128];
+        unsigned char *message = NULL;
+        hasciicam_virtual_camera_pipe_frame decoded;
+        const unsigned char *payload = NULL;
+        size_t payload_size = 0;
+        size_t message_size = sizeof(frame) + 1843200U;
 
         hasciicam_virtual_camera_pipe_frame_init(&frame,
                                                  HASCIICAM_VIRTUAL_CAMERA_PIXFMT_YUY2,
@@ -156,6 +162,12 @@ int main(void) {
                                                  2560,
                                                  7ULL,
                                                  123456789ULL);
+        message = (unsigned char *)malloc(message_size);
+        expect_true(message != NULL, "test message should allocate");
+        if (message == NULL)
+            goto cleanup_message;
+        memcpy(message, &frame, sizeof(frame));
+        memset(message + sizeof(frame), 0x80, 1843200U);
         expect_true(frame.magic == HASCIICAM_VIRTUAL_CAMERA_PIPE_MAGIC,
                     "pipe frame should be initialized with the project magic");
         expect_true(frame.version == HASCIICAM_VIRTUAL_CAMERA_PIPE_VERSION,
@@ -172,6 +184,48 @@ int main(void) {
         frame.payload_bytes -= 1U;
         expect_true(!hasciicam_virtual_camera_pipe_frame_validate(&frame, err, sizeof(err)),
                     "truncated pipe frame should be rejected");
+
+        expect_true(hasciicam_virtual_camera_pipe_decode_message(message,
+                                                                 message_size,
+                                                                 &decoded,
+                                                                 &payload,
+                                                                 &payload_size,
+                                                                 err,
+                                                                 sizeof(err)),
+                    "exact pipe message should decode");
+        if (hasciicam_virtual_camera_pipe_decode_message(message,
+                                                         sizeof(message),
+                                                         &decoded,
+                                                         &payload,
+                                                         &payload_size,
+                                                         err,
+                                                         sizeof(err))) {
+            expect_true(decoded.payload_bytes == 1843200U, "decoded header should preserve payload size");
+            expect_true(payload_size == 1843200U, "decoded payload size should match");
+            expect_true(payload == message + sizeof(frame), "decoded payload pointer should reference the message body");
+        }
+
+        expect_true(!hasciicam_virtual_camera_pipe_decode_message(message,
+                                                                  message_size - 1U,
+                                                                  &decoded,
+                                                                  &payload,
+                                                                  &payload_size,
+                                                                  err,
+                                                                  sizeof(err)),
+                    "truncated message should be rejected");
+
+        message[4] ^= 0x01;
+        expect_true(!hasciicam_virtual_camera_pipe_decode_message(message,
+                                                                  message_size,
+                                                                  &decoded,
+                                                                  &payload,
+                                                                  &payload_size,
+                                                                  err,
+                                                                  sizeof(err)),
+                    "malformed message version should be rejected");
+
+cleanup_message:
+        free(message);
     }
 
     {
