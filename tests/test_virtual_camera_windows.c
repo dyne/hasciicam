@@ -2,6 +2,7 @@
 #include <wchar.h>
 
 #include "../src/virtual_camera/windows/source/hasciicam_virtual_camera_source.h"
+#include "../src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.h"
 
 static int failures = 0;
 
@@ -66,6 +67,47 @@ int main(void) {
             expect_true(media_type.average_bitrate == 331776000ULL,
                         "NV12 bitrate should match geometry and frame rate");
         }
+    }
+
+    {
+        hasciicam_virtual_camera_pipe_frame frame;
+        char err[128];
+
+        hasciicam_virtual_camera_pipe_frame_init(&frame,
+                                                 HASCIICAM_VIRTUAL_CAMERA_PIXFMT_YUY2,
+                                                 1280,
+                                                 720,
+                                                 2560,
+                                                 7ULL,
+                                                 123456789ULL);
+        expect_true(frame.magic == HASCIICAM_VIRTUAL_CAMERA_PIPE_MAGIC,
+                    "pipe frame should be initialized with the project magic");
+        expect_true(frame.version == HASCIICAM_VIRTUAL_CAMERA_PIPE_VERSION,
+                    "pipe frame should be initialized with version 1");
+        expect_true(frame.header_size == sizeof(frame),
+                    "pipe frame should advertise the packed header size");
+        expect_true(frame.payload_bytes == 1843200U,
+                    "pipe frame payload should match YUY2 geometry");
+        expect_true(hasciicam_virtual_camera_pipe_frame_validate(&frame, err, sizeof(err)),
+                    "valid YUY2 pipe frame should pass validation");
+        if (!hasciicam_virtual_camera_pipe_frame_validate(&frame, err, sizeof(err)))
+            fprintf(stderr, "unexpected validation error: %s\n", err);
+
+        frame.payload_bytes -= 1U;
+        expect_true(!hasciicam_virtual_camera_pipe_frame_validate(&frame, err, sizeof(err)),
+                    "truncated pipe frame should be rejected");
+    }
+
+    {
+        unsigned long long duration = hasciicam_virtual_camera_source_sample_duration_100ns(30);
+        unsigned long long start = 987654321ULL;
+        expect_true(duration == 333333ULL, "sample duration should match 30 fps");
+        expect_true(hasciicam_virtual_camera_source_sample_time_100ns(start, 0ULL, 30) == start,
+                    "first sample should start at the provided timestamp");
+        expect_true(hasciicam_virtual_camera_source_sample_time_100ns(start, 1ULL, 30) == start + duration,
+                    "second sample should advance by one duration");
+        expect_true(hasciicam_virtual_camera_source_sample_time_100ns(start, 9ULL, 30) == start + duration * 9ULL,
+                    "sample timestamps should advance monotonically");
     }
 
     if (failures) {

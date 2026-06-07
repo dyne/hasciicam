@@ -364,11 +364,13 @@ if(HASCIICAM_ENABLE_TESTS)
 
     add_executable(test_virtual_camera_windows
       tests/test_virtual_camera_windows.c
+      src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c
       src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp
       src/virtual_camera/virtual_camera.c
       src/virtual_camera/virtual_camera_convert.c
     )
     target_include_directories(test_virtual_camera_windows PRIVATE
+      src/virtual_camera/windows/pipe
       src/virtual_camera/windows/source
       src/virtual_camera)
     target_compile_definitions(test_virtual_camera_windows PRIVATE _CRT_SECURE_NO_WARNINGS)

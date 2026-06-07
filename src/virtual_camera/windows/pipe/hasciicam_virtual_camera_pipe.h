@@ -1,0 +1,57 @@
+#ifndef HASCIICAM_VIRTUAL_CAMERA_PIPE_H
+#define HASCIICAM_VIRTUAL_CAMERA_PIPE_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+#include "../../../virtual_camera/virtual_camera.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define HASCIICAM_VIRTUAL_CAMERA_PIPE_MAGIC 0x31435648u /* HVC1 */
+#define HASCIICAM_VIRTUAL_CAMERA_PIPE_VERSION 1u
+
+typedef struct hasciicam_virtual_camera_pipe_frame {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t header_size;
+    uint32_t pixel_format;
+    int32_t width;
+    int32_t height;
+    int32_t stride_bytes;
+    uint64_t sequence;
+    uint64_t timestamp_100ns;
+    uint32_t payload_bytes;
+    uint32_t reserved;
+} hasciicam_virtual_camera_pipe_frame;
+
+/**
+ * Initialize a versioned pipe frame header.
+ */
+void hasciicam_virtual_camera_pipe_frame_init(hasciicam_virtual_camera_pipe_frame *frame,
+                                              hasciicam_virtual_camera_pixel_format pixel_format,
+                                              int width,
+                                              int height,
+                                              int stride_bytes,
+                                              uint64_t sequence,
+                                              uint64_t timestamp_100ns);
+
+/**
+ * Return the payload size implied by the frame header fields.
+ */
+size_t hasciicam_virtual_camera_pipe_frame_payload_size(const hasciicam_virtual_camera_pipe_frame *frame);
+
+/**
+ * Validate a versioned pipe frame header.
+ */
+int hasciicam_virtual_camera_pipe_frame_validate(const hasciicam_virtual_camera_pipe_frame *frame,
+                                                 char *err,
+                                                 size_t err_size);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

@@ -143,6 +143,17 @@ int hasciicam_virtual_camera_source_media_type_get(size_t index,
     return 1;
 }
 
+unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps) {
+    return hasciicam_virtual_camera_media_type_duration_100ns(fps);
+}
+
+unsigned long long hasciicam_virtual_camera_source_sample_time_100ns(unsigned long long start_100ns,
+                                                                     unsigned long long sequence,
+                                                                     int fps) {
+    unsigned long long duration = hasciicam_virtual_camera_source_sample_duration_100ns(fps);
+    return start_100ns + sequence * duration;
+}
+
 class HasciiCamVirtualCameraClassFactory : public IClassFactory {
 public:
     HasciiCamVirtualCameraClassFactory() : refcount_(1) {

@@ -53,6 +53,18 @@ int hasciicam_virtual_camera_source_media_type_get(size_t index,
                                                    int fps,
                                                    hasciicam_virtual_camera_source_media_type *out);
 
+/**
+ * Return the sample duration for the requested frame rate in 100 ns units.
+ */
+unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps);
+
+/**
+ * Return the sample timestamp for a zero-based frame sequence.
+ */
+unsigned long long hasciicam_virtual_camera_source_sample_time_100ns(unsigned long long start_100ns,
+                                                                     unsigned long long sequence,
+                                                                     int fps);
+
 #ifdef __cplusplus
 }
 #endif
