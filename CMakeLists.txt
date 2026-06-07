@@ -355,6 +355,23 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME virtual_camera COMMAND test_virtual_camera)
   set_tests_properties(virtual_camera PROPERTIES LABELS "unit;core")
 
+  if(WIN32)
+    add_library(hasciicam_virtual_camera_source SHARED
+      src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp
+    )
+    target_include_directories(hasciicam_virtual_camera_source PRIVATE src/virtual_camera/windows/source)
+    target_compile_definitions(hasciicam_virtual_camera_source PRIVATE _CRT_SECURE_NO_WARNINGS)
+
+    add_executable(test_virtual_camera_windows
+      tests/test_virtual_camera_windows.c
+      src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp
+    )
+    target_include_directories(test_virtual_camera_windows PRIVATE src/virtual_camera/windows/source)
+    target_compile_definitions(test_virtual_camera_windows PRIVATE _CRT_SECURE_NO_WARNINGS)
+    add_test(NAME virtual_camera_windows COMMAND test_virtual_camera_windows)
+    set_tests_properties(virtual_camera_windows PROPERTIES LABELS "unit;core")
+  endif()
+
   add_executable(test_capture_control
     tests/test_capture_control.c
     src/capture/capture_control.c
