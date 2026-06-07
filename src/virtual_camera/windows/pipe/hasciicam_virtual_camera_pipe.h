@@ -12,6 +12,8 @@ extern "C" {
 
 #define HASCIICAM_VIRTUAL_CAMERA_PIPE_MAGIC 0x31435648u /* HVC1 */
 #define HASCIICAM_VIRTUAL_CAMERA_PIPE_VERSION 1u
+#define HASCIICAM_VIRTUAL_CAMERA_PIPE_MAX_WIDTH 8192
+#define HASCIICAM_VIRTUAL_CAMERA_PIPE_MAX_HEIGHT 8192
 
 typedef struct hasciicam_virtual_camera_pipe_frame {
     uint32_t magic;
@@ -42,6 +44,11 @@ void hasciicam_virtual_camera_pipe_frame_init(hasciicam_virtual_camera_pipe_fram
  * Return the payload size implied by the frame header fields.
  */
 size_t hasciicam_virtual_camera_pipe_frame_payload_size(const hasciicam_virtual_camera_pipe_frame *frame);
+
+/**
+ * Return the exact serialized message size for a validated frame header.
+ */
+size_t hasciicam_virtual_camera_pipe_frame_message_size(const hasciicam_virtual_camera_pipe_frame *frame);
 
 /**
  * Validate a versioned pipe frame header.
@@ -84,6 +91,17 @@ int hasciicam_virtual_camera_pipe_decode_message(const void *bytes,
                                                  hasciicam_virtual_camera_pipe_frame *header_out,
                                                  const unsigned char **payload_out,
                                                  size_t *payload_size_out,
+                                                 char *err,
+                                                 size_t err_size);
+
+/**
+ * Encode a validated frame header and payload into one exact pipe message.
+ */
+int hasciicam_virtual_camera_pipe_encode_message(const hasciicam_virtual_camera_pipe_frame *frame,
+                                                 const void *payload,
+                                                 size_t payload_size,
+                                                 void *bytes,
+                                                 size_t bytes_size,
                                                  char *err,
                                                  size_t err_size);
 

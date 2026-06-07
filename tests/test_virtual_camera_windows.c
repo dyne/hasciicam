@@ -184,6 +184,7 @@ int main(void) {
         frame.payload_bytes -= 1U;
         expect_true(!hasciicam_virtual_camera_pipe_frame_validate(&frame, err, sizeof(err)),
                     "truncated pipe frame should be rejected");
+        frame.payload_bytes = 1843200U;
 
         expect_true(hasciicam_virtual_camera_pipe_decode_message(message,
                                                                  message_size,
@@ -223,6 +224,32 @@ int main(void) {
                                                                   err,
                                                                   sizeof(err)),
                     "malformed message version should be rejected");
+
+        message[4] ^= 0x01;
+        expect_true(hasciicam_virtual_camera_pipe_encode_message(&frame,
+                                                                 message + sizeof(frame),
+                                                                 1843200U,
+                                                                 message,
+                                                                 message_size,
+                                                                 err,
+                                                                 sizeof(err)),
+                    "exact pipe message should encode");
+        expect_true(hasciicam_virtual_camera_pipe_decode_message(message,
+                                                                 message_size,
+                                                                 &decoded,
+                                                                 &payload,
+                                                                 &payload_size,
+                                                                 err,
+                                                                 sizeof(err)),
+                    "encoded pipe message should decode");
+
+        {
+            hasciicam_virtual_camera_pipe_frame oversized = frame;
+            oversized.width = HASCIICAM_VIRTUAL_CAMERA_PIPE_MAX_WIDTH + 2;
+            oversized.payload_bytes = 0;
+            expect_true(!hasciicam_virtual_camera_pipe_frame_validate(&oversized, err, sizeof(err)),
+                        "oversized pipe frame should be rejected");
+        }
 
 cleanup_message:
         free(message);

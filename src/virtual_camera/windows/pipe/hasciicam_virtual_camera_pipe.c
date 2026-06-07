@@ -26,6 +26,12 @@ static int is_supported_format(hasciicam_virtual_camera_pixel_format pixel_forma
            pixel_format == HASCIICAM_VIRTUAL_CAMERA_PIXFMT_NV12;
 }
 
+static int is_supported_dimension(int width, int height) {
+    return width > 0 && height > 0 &&
+           width <= HASCIICAM_VIRTUAL_CAMERA_PIPE_MAX_WIDTH &&
+           height <= HASCIICAM_VIRTUAL_CAMERA_PIPE_MAX_HEIGHT;
+}
+
 static void clear_error(char *err, size_t err_size) {
     if (err != NULL && err_size > 0)
         err[0] = '\0';
@@ -187,6 +193,17 @@ size_t hasciicam_virtual_camera_pipe_frame_payload_size(const hasciicam_virtual_
                                               frame->stride_bytes);
 }
 
+size_t hasciicam_virtual_camera_pipe_frame_message_size(const hasciicam_virtual_camera_pipe_frame *frame) {
+    size_t payload_size;
+
+    payload_size = hasciicam_virtual_camera_pipe_frame_payload_size(frame);
+    if (payload_size == 0)
+        return 0;
+    if (payload_size > SIZE_MAX - sizeof(*frame))
+        return 0;
+    return sizeof(*frame) + payload_size;
+}
+
 int hasciicam_virtual_camera_pipe_frame_validate(const hasciicam_virtual_camera_pipe_frame *frame,
                                                  char *err,
                                                  size_t err_size) {
@@ -212,8 +229,8 @@ int hasciicam_virtual_camera_pipe_frame_validate(const hasciicam_virtual_camera_
         set_error(err, err_size, "unsupported pipe pixel format");
         return 0;
     }
-    if (frame->width <= 0 || frame->height <= 0) {
-        set_error(err, err_size, "pipe frame size must be positive");
+    if (!is_supported_dimension(frame->width, frame->height)) {
+        set_error(err, err_size, "pipe frame size must be within supported bounds");
         return 0;
     }
     if ((frame->width & 1) != 0 || (frame->height & 1) != 0) {
@@ -234,6 +251,35 @@ int hasciicam_virtual_camera_pipe_frame_validate(const hasciicam_virtual_camera_
         set_error(err, err_size, "pipe frame payload mismatch");
         return 0;
     }
+    return 1;
+}
+
+int hasciicam_virtual_camera_pipe_encode_message(const hasciicam_virtual_camera_pipe_frame *frame,
+                                                 const void *payload,
+                                                 size_t payload_size,
+                                                 void *bytes,
+                                                 size_t bytes_size,
+                                                 char *err,
+                                                 size_t err_size) {
+    size_t message_size;
+
+    if (frame == NULL || payload == NULL || bytes == NULL) {
+        set_error(err, err_size, "pipe message buffers are required");
+        return 0;
+    }
+    if (!hasciicam_virtual_camera_pipe_frame_validate(frame, err, err_size))
+        return 0;
+    message_size = hasciicam_virtual_camera_pipe_frame_message_size(frame);
+    if (message_size == 0 || message_size != sizeof(*frame) + payload_size) {
+        set_error(err, err_size, "pipe payload size mismatch");
+        return 0;
+    }
+    if (bytes_size < message_size) {
+        set_error(err, err_size, "pipe message buffer too small");
+        return 0;
+    }
+    memcpy(bytes, frame, sizeof(*frame));
+    memcpy((unsigned char *)bytes + sizeof(*frame), payload, payload_size);
     return 1;
 }
 
