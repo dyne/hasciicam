@@ -322,6 +322,49 @@ cleanup_message:
     }
 
     {
+        hasciicam_virtual_camera_request request;
+        hasciicam_virtual_camera_source_config config;
+        unsigned char *message = NULL;
+        size_t message_size;
+        char err[128];
+
+        hasciicam_virtual_camera_request_init(&request);
+        request.enabled = 1;
+        expect_true(hasciicam_virtual_camera_source_config_prepare(&request, &config, err, sizeof(err)),
+                    "black frame test should prepare config");
+        message_size = sizeof(hasciicam_virtual_camera_pipe_frame) + 1843200U;
+        message = (unsigned char *)malloc(message_size);
+        expect_true(message != NULL, "black message should allocate");
+        if (message != NULL) {
+            expect_true(hasciicam_virtual_camera_source_make_black_message(&config,
+                                                                           99ULL,
+                                                                           444444444ULL,
+                                                                           message,
+                                                                           message_size,
+                                                                           err,
+                                                                           sizeof(err)),
+                        "black frame should be generated");
+            if (hasciicam_virtual_camera_source_make_black_message(&config,
+                                                                   99ULL,
+                                                                   444444444ULL,
+                                                                   message,
+                                                                   message_size,
+                                                                   err,
+                                                                   sizeof(err))) {
+                expect_true(message[sizeof(hasciicam_virtual_camera_pipe_frame) + 0] == 0x10,
+                            "black frame should start with luma 16");
+                expect_true(message[sizeof(hasciicam_virtual_camera_pipe_frame) + 1] == 0x80,
+                            "black frame should use neutral chroma");
+                expect_true(message[sizeof(hasciicam_virtual_camera_pipe_frame) + 2] == 0x10,
+                            "black frame should repeat luma 16");
+                expect_true(message[sizeof(hasciicam_virtual_camera_pipe_frame) + 3] == 0x80,
+                            "black frame should repeat neutral chroma");
+            }
+            free(message);
+        }
+    }
+
+    {
         unsigned long long duration = hasciicam_virtual_camera_source_sample_duration_100ns(30);
         unsigned long long start = 987654321ULL;
         expect_true(duration == 333333ULL, "sample duration should match 30 fps");

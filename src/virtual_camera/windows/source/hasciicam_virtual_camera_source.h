@@ -170,6 +170,17 @@ int hasciicam_virtual_camera_source_frame_slot_store(hasciicam_virtual_camera_so
 int hasciicam_virtual_camera_source_frame_slot_has_message(const hasciicam_virtual_camera_source_frame_slot *slot);
 
 /**
+ * Build a deterministic black YUY2 message for the prepared source config.
+ */
+int hasciicam_virtual_camera_source_make_black_message(const hasciicam_virtual_camera_source_config *config,
+                                                       unsigned long long sequence,
+                                                       unsigned long long timestamp_100ns,
+                                                       void *bytes,
+                                                       size_t bytes_size,
+                                                       char *err,
+                                                       size_t err_size);
+
+/**
  * Return the sample duration for the requested frame rate in 100 ns units.
  */
 unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps);

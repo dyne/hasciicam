@@ -351,6 +351,53 @@ int hasciicam_virtual_camera_source_frame_slot_store(hasciicam_virtual_camera_so
     return 1;
 }
 
+int hasciicam_virtual_camera_source_make_black_message(const hasciicam_virtual_camera_source_config *config,
+                                                       unsigned long long sequence,
+                                                       unsigned long long timestamp_100ns,
+                                                       void *bytes,
+                                                       size_t bytes_size,
+                                                       char *err,
+                                                       size_t err_size) {
+    hasciicam_virtual_camera_pipe_frame frame;
+    unsigned char *payload;
+    size_t payload_size;
+    size_t i;
+
+    if (config == NULL || bytes == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "source config and output buffer are required");
+        return 0;
+    }
+    if (config->media_type_count == 0 ||
+        config->media_types[0].pixel_format != HASCIICAM_VIRTUAL_CAMERA_PIXFMT_YUY2) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "black frame helper expects YUY2 media type");
+        return 0;
+    }
+    hasciicam_virtual_camera_pipe_frame_init(&frame,
+                                             HASCIICAM_VIRTUAL_CAMERA_PIXFMT_YUY2,
+                                             config->request.width,
+                                             config->request.height,
+                                             config->media_types[0].stride_bytes,
+                                             sequence,
+                                             timestamp_100ns);
+    payload_size = hasciicam_virtual_camera_pipe_frame_payload_size(&frame);
+    if (payload_size == 0 || bytes_size < sizeof(frame) + payload_size) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "black frame buffer too small");
+        return 0;
+    }
+    memcpy(bytes, &frame, sizeof(frame));
+    payload = (unsigned char *)bytes + sizeof(frame);
+    for (i = 0; i < payload_size; i += 4) {
+        payload[i + 0] = 0x10;
+        payload[i + 1] = 0x80;
+        payload[i + 2] = 0x10;
+        payload[i + 3] = 0x80;
+    }
+    return 1;
+}
+
 unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps) {
     return hasciicam_virtual_camera_media_type_duration_100ns(fps);
 }
