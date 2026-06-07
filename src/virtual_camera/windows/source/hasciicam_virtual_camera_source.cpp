@@ -725,7 +725,9 @@ public:
         InterlockedDecrement(&g_module_refcount);
     }
 
-    HRESULT Init(const hasciicam_virtual_camera_source_config *config) {
+    HRESULT Init(const hasciicam_virtual_camera_source_config *config,
+                 const hasciicam_virtual_camera_source_frame_slot *frame_slot,
+                 const hasciicam_virtual_camera_source_lifecycle *lifecycle) {
         IMFMediaType *media_types[2] = { NULL, NULL };
         size_t media_type_count;
         HRESULT hr;
@@ -733,6 +735,8 @@ public:
         if (config == NULL)
             return E_POINTER;
         config_ = *config;
+        frame_slot_ = frame_slot;
+        lifecycle_ = lifecycle;
 
         hr = MFCreateAttributes(&attributes_, 8);
         if (FAILED(hr))
@@ -887,12 +891,36 @@ public:
     }
 
     HRESULT RequestSample(IUnknown *token) {
+        IMFSample *sample = NULL;
+        unsigned long long start_100ns = 0ULL;
+        unsigned long long sequence = 0ULL;
+        HRESULT hr;
+
         (void)token;
         if (shutdown_)
             return MF_E_SHUTDOWN;
         if (stream_state_ != MF_STREAM_STATE_RUNNING)
             return MF_E_INVALIDREQUEST;
-        return S_OK;
+        if (lifecycle_ != NULL) {
+            start_100ns = lifecycle_->last_timestamp_100ns;
+            sequence = lifecycle_->last_sequence;
+        }
+        if (frame_slot_ != NULL && hasciicam_virtual_camera_source_frame_slot_has_message(frame_slot_)) {
+            start_100ns = frame_slot_->timestamp_100ns;
+            sequence = frame_slot_->sequence;
+        }
+        hr = hasciicam_virtual_camera_source_make_sample(&config_,
+                                                         frame_slot_,
+                                                         start_100ns,
+                                                         sequence,
+                                                         &sample,
+                                                         NULL,
+                                                         0);
+        if (FAILED(hr) || sample == NULL)
+            return FAILED(hr) ? hr : E_FAIL;
+        hr = event_queue_->QueueEventParamUnk(MEMediaSample, GUID_NULL, S_OK, sample);
+        sample->Release();
+        return hr;
     }
 
     HRESULT GetMediaTypeHandler(IMFMediaTypeHandler **handler) {
@@ -992,6 +1020,8 @@ private:
     IMFAttributes *attributes_;
     IMFMediaType *current_media_type_;
     hasciicam_virtual_camera_source_config config_;
+    const hasciicam_virtual_camera_source_frame_slot *frame_slot_;
+    const hasciicam_virtual_camera_source_lifecycle *lifecycle_;
     BOOL shutdown_;
 };
 
@@ -1050,7 +1080,7 @@ public:
         stream_ = new (std::nothrow) HasciiCamVirtualCameraStream();
         if (stream_ == NULL)
             return E_OUTOFMEMORY;
-        hr = stream_->Init(&config_);
+        hr = stream_->Init(&config_, &frame_slot_, &lifecycle_);
         if (FAILED(hr))
             return hr;
 
