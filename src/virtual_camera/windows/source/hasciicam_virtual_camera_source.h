@@ -165,6 +165,16 @@ int hasciicam_virtual_camera_source_frame_slot_store(hasciicam_virtual_camera_so
                                                      size_t err_size);
 
 /**
+ * Read one exact pipe message into the newest-frame slot.
+ */
+int hasciicam_virtual_camera_source_read_pipe_message(const hasciicam_virtual_camera_source_config *config,
+                                                      const char *pipe_name,
+                                                      hasciicam_virtual_camera_source_frame_slot *slot,
+                                                      int timeout_ms,
+                                                      char *err,
+                                                      size_t err_size);
+
+/**
  * Return whether the slot currently holds a complete message.
  */
 int hasciicam_virtual_camera_source_frame_slot_has_message(const hasciicam_virtual_camera_source_frame_slot *slot);

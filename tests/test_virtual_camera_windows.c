@@ -15,6 +15,48 @@
 #ifdef _WIN32
 STDAPI DllGetClassObject(REFCLSID clsid, REFIID riid, LPVOID *ppv);
 STDAPI DllCanUnloadNow(void);
+
+typedef struct pipe_writer_context {
+    HANDLE pipe_handle;
+    const unsigned char *message;
+    DWORD message_size;
+} pipe_writer_context;
+
+typedef struct backend_reader_context {
+    hasciicam_virtual_camera_source_config config;
+    hasciicam_virtual_camera_source_frame_slot slot;
+    char err[128];
+    int ok;
+} backend_reader_context;
+
+static DWORD WINAPI pipe_writer_thread(LPVOID param) {
+    pipe_writer_context *ctx = (pipe_writer_context *)param;
+    DWORD bytes_written = 0;
+
+    if (ctx == NULL || ctx->pipe_handle == INVALID_HANDLE_VALUE)
+        return 0;
+    if (ConnectNamedPipe(ctx->pipe_handle, NULL) || GetLastError() == ERROR_PIPE_CONNECTED) {
+        (void)WriteFile(ctx->pipe_handle, ctx->message, ctx->message_size, &bytes_written, NULL);
+        FlushFileBuffers(ctx->pipe_handle);
+        DisconnectNamedPipe(ctx->pipe_handle);
+    }
+    return bytes_written == ctx->message_size ? 1 : 0;
+}
+
+static DWORD WINAPI backend_reader_thread(LPVOID param) {
+    backend_reader_context *ctx = (backend_reader_context *)param;
+
+    if (ctx == NULL)
+        return 0;
+    hasciicam_virtual_camera_source_frame_slot_init(&ctx->slot);
+    ctx->ok = hasciicam_virtual_camera_source_read_pipe_message(&ctx->config,
+                                                                ctx->config.pipe_name,
+                                                                &ctx->slot,
+                                                                2000,
+                                                                ctx->err,
+                                                                sizeof(ctx->err));
+    return ctx->ok ? 1 : 0;
+}
 #endif
 
 static int failures = 0;
@@ -121,6 +163,169 @@ static void run_windows_com_smoke(void) {
         MFShutdown();
     if (com_initialized)
         CoUninitialize();
+}
+
+static void run_windows_pipe_roundtrip(void) {
+    hasciicam_virtual_camera_request request;
+    hasciicam_virtual_camera_source_config config;
+    hasciicam_virtual_camera_source_frame_slot slot;
+    hasciicam_virtual_camera_pipe_frame frame;
+    unsigned char *message = NULL;
+    HANDLE pipe_handle = INVALID_HANDLE_VALUE;
+    HANDLE thread_handle = NULL;
+    pipe_writer_context writer;
+    DWORD thread_exit = 0;
+    char err[128];
+    size_t message_size;
+    const unsigned char *payload = NULL;
+    size_t payload_size = 0;
+
+    hasciicam_virtual_camera_request_init(&request);
+    request.enabled = 1;
+    request.width = 1280;
+    request.height = 720;
+    request.fps = 30;
+    request.device[0] = '\0';
+    expect_true(hasciicam_virtual_camera_source_config_prepare(&request, &config, err, sizeof(err)),
+                "pipe roundtrip should prepare source config");
+    hasciicam_virtual_camera_source_frame_slot_init(&slot);
+
+    hasciicam_virtual_camera_pipe_frame_init(&frame,
+                                             HASCIICAM_VIRTUAL_CAMERA_PIXFMT_YUY2,
+                                             1280,
+                                             720,
+                                             2560,
+                                             21ULL,
+                                             555555555ULL);
+    message_size = sizeof(frame) + 1843200U;
+    message = (unsigned char *)malloc(message_size);
+    expect_true(message != NULL, "pipe roundtrip message should allocate");
+    if (message == NULL)
+        return;
+    memcpy(message, &frame, sizeof(frame));
+    memset(message + sizeof(frame), 0x44, 1843200U);
+
+    pipe_handle = CreateNamedPipeA(config.pipe_name,
+                                   PIPE_ACCESS_OUTBOUND,
+                                   PIPE_TYPE_BYTE | PIPE_WAIT,
+                                   1,
+                                   (DWORD)message_size,
+                                   (DWORD)message_size,
+                                   0,
+                                   NULL);
+    expect_true(pipe_handle != INVALID_HANDLE_VALUE, "pipe server should create a named pipe");
+    if (pipe_handle == INVALID_HANDLE_VALUE) {
+        free(message);
+        return;
+    }
+
+    writer.pipe_handle = pipe_handle;
+    writer.message = message;
+    writer.message_size = (DWORD)message_size;
+    thread_handle = CreateThread(NULL, 0, pipe_writer_thread, &writer, 0, NULL);
+    expect_true(thread_handle != NULL, "pipe writer thread should start");
+    if (thread_handle != NULL) {
+        int read_ok = hasciicam_virtual_camera_source_read_pipe_message(&config,
+                                                                        config.pipe_name,
+                                                                        &slot,
+                                                                        1000,
+                                                                        err,
+                                                                        sizeof(err));
+        expect_true(read_ok, "pipe reader should decode one complete message");
+        if (!read_ok) {
+            fprintf(stderr, "pipe helper error: %s\n", err);
+        }
+        expect_true(hasciicam_virtual_camera_source_frame_slot_has_message(&slot),
+                    "pipe reader should store the newest message");
+        expect_true(slot.sequence == 21ULL, "pipe reader should preserve the frame sequence");
+        expect_true(slot.timestamp_100ns == 555555555ULL,
+                    "pipe reader should preserve the frame timestamp");
+        expect_true(slot.bytes_size == message_size,
+                    "pipe reader should retain the exact message size");
+        expect_true(slot.bytes != NULL && memcmp(slot.bytes, message, message_size) == 0,
+                    "pipe reader should copy the exact message bytes");
+        WaitForSingleObject(thread_handle, INFINITE);
+        GetExitCodeThread(thread_handle, &thread_exit);
+        expect_true(thread_exit == 1, "pipe writer should send the full message");
+        CloseHandle(thread_handle);
+    }
+
+    hasciicam_virtual_camera_source_frame_slot_close(&slot);
+    free(message);
+    if (pipe_handle != INVALID_HANDLE_VALUE)
+        CloseHandle(pipe_handle);
+}
+
+static void run_windows_backend_roundtrip(void) {
+    hasciicam_virtual_camera_request request;
+    hasciicam_virtual_camera_device *device = NULL;
+    hasciicam_virtual_camera_source_config config;
+    backend_reader_context reader;
+    HANDLE reader_thread = NULL;
+    hasciicam_virtual_camera_frame frame;
+    unsigned char pixels[16] = {
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255
+    };
+    char err[128];
+
+    hasciicam_virtual_camera_request_init(&request);
+    request.enabled = 1;
+    request.width = 2;
+    request.height = 2;
+    request.fps = 30;
+    expect_true(hasciicam_virtual_camera_open_default(&device, &request),
+                "windows backend should open");
+    expect_true(device != NULL, "windows backend should allocate");
+    expect_true(hasciicam_virtual_camera_is_supported(device) == 1,
+                "windows backend should report supported");
+    expect_true(strcmp(hasciicam_virtual_camera_backend_name(device), "windows-pipe") == 0,
+                "windows backend should name itself");
+
+    expect_true(hasciicam_virtual_camera_source_config_prepare(&request, &config, err, sizeof(err)),
+                "backend roundtrip should prepare source config");
+    memset(&reader, 0, sizeof(reader));
+    reader.config = config;
+    reader_thread = CreateThread(NULL, 0, backend_reader_thread, &reader, 0, NULL);
+    expect_true(reader_thread != NULL, "backend reader thread should start");
+    if (reader_thread != NULL) {
+        Sleep(50);
+        memset(&frame, 0, sizeof(frame));
+        frame.pixels = pixels;
+        frame.width = 2;
+        frame.height = 2;
+        frame.stride_bytes = 8;
+        frame.pixel_format = HASCIICAM_VIRTUAL_CAMERA_PIXFMT_BGRA32;
+        frame.timestamp_100ns = 777777777ULL;
+        expect_true(hasciicam_virtual_camera_publish(device, &frame),
+                    "windows backend should publish a frame");
+        WaitForSingleObject(reader_thread, INFINITE);
+        expect_true(reader.ok, "backend reader should decode the published message");
+        if (reader.ok) {
+            expect_true(hasciicam_virtual_camera_source_frame_slot_has_message(&reader.slot),
+                        "backend reader should retain a message");
+            expect_true(reader.slot.timestamp_100ns == 777777777ULL,
+                        "backend reader should preserve the timestamp");
+            expect_true(reader.slot.sequence == 0ULL,
+                        "backend reader should publish the first sequence");
+            expect_true(reader.slot.bytes_size == sizeof(hasciicam_virtual_camera_pipe_frame) + 8U,
+                        "backend reader should store the exact message size");
+            expect_true(reader.slot.bytes != NULL &&
+                        reader.slot.bytes[sizeof(hasciicam_virtual_camera_pipe_frame) + 0] == 0x10 &&
+                        reader.slot.bytes[sizeof(hasciicam_virtual_camera_pipe_frame) + 1] == 0x80 &&
+                        reader.slot.bytes[sizeof(hasciicam_virtual_camera_pipe_frame) + 2] == 0x10 &&
+                        reader.slot.bytes[sizeof(hasciicam_virtual_camera_pipe_frame) + 3] == 0x80,
+                        "backend reader should receive a black YUY2 frame");
+        } else {
+            fprintf(stderr, "backend helper error: %s\n", reader.err);
+        }
+        hasciicam_virtual_camera_source_frame_slot_close(&reader.slot);
+        CloseHandle(reader_thread);
+    }
+
+    hasciicam_virtual_camera_close(device);
 }
 #endif
 
@@ -516,6 +721,8 @@ cleanup_message:
 
 #ifdef _WIN32
     run_windows_com_smoke();
+    run_windows_pipe_roundtrip();
+    run_windows_backend_roundtrip();
 #endif
 
     if (failures) {

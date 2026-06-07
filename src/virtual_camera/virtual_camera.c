@@ -5,6 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(_WIN32)
+#include <windows.h>
+#include "windows/pipe/hasciicam_virtual_camera_pipe.h"
+#endif
+
 static void set_error(char *err, size_t err_size, const char *msg) {
     if (err == NULL || err_size == 0)
         return;
@@ -76,6 +81,18 @@ struct hasciicam_virtual_camera_device {
     const hasciicam_virtual_camera_ops *ops;
     int supported;
     char backend_name[32];
+#if defined(_WIN32)
+    HANDLE pipe_handle;
+    HANDLE accept_thread;
+    HANDLE stop_event;
+    LONG connected;
+    unsigned long long sequence;
+    hasciicam_virtual_camera_request request;
+    char pipe_name[256];
+    unsigned char *message_buffer;
+    size_t message_size;
+    size_t payload_size;
+#endif
 };
 
 static int unsupported_publish(hasciicam_virtual_camera_device *device,
@@ -99,6 +116,122 @@ static const hasciicam_virtual_camera_ops unsupported_ops = {
     unsupported_name
 };
 
+#if defined(_WIN32)
+static DWORD WINAPI windows_accept_thread(LPVOID param) {
+    hasciicam_virtual_camera_device *device = (hasciicam_virtual_camera_device *)param;
+
+    if (device == NULL || device->pipe_handle == INVALID_HANDLE_VALUE)
+        return 0;
+    while (WaitForSingleObject(device->stop_event, 0) != WAIT_OBJECT_0) {
+        BOOL connected = ConnectNamedPipe(device->pipe_handle, NULL);
+        if (!connected) {
+            DWORD err = GetLastError();
+            if (err != ERROR_PIPE_CONNECTED && err != ERROR_NO_DATA) {
+                Sleep(50);
+                continue;
+            }
+        }
+        InterlockedExchange(&device->connected, 1);
+        while (WaitForSingleObject(device->stop_event, 0) != WAIT_OBJECT_0) {
+            if (WaitForSingleObject(device->stop_event, 25) == WAIT_OBJECT_0)
+                break;
+            if (InterlockedCompareExchange(&device->connected, 1, 1) != 1)
+                break;
+        }
+        DisconnectNamedPipe(device->pipe_handle);
+        InterlockedExchange(&device->connected, 0);
+    }
+    return 0;
+}
+
+static int windows_virtual_camera_publish(hasciicam_virtual_camera_device *device,
+                                          const hasciicam_virtual_camera_frame *frame) {
+    hasciicam_virtual_camera_pipe_frame header;
+    DWORD bytes_written = 0;
+
+    if (device == NULL || frame == NULL)
+        return 0;
+    if (InterlockedCompareExchange(&device->connected, 1, 1) != 1)
+        return 1;
+    if (device->message_buffer == NULL || device->message_size == 0)
+        return 0;
+    if (frame->pixel_format != HASCIICAM_VIRTUAL_CAMERA_PIXFMT_BGRA32 || frame->pixels == NULL)
+        return 0;
+
+    hasciicam_virtual_camera_pipe_frame_init(&header,
+                                             HASCIICAM_VIRTUAL_CAMERA_PIXFMT_YUY2,
+                                             device->request.width,
+                                             device->request.height,
+                                             device->request.width * 2,
+                                             device->sequence++,
+                                             frame->timestamp_100ns);
+    if (!hasciicam_virtual_camera_scale_bgra32_to_yuy2(frame->pixels,
+                                                       frame->width,
+                                                       frame->height,
+                                                       frame->stride_bytes,
+                                                       device->message_buffer + sizeof(header),
+                                                       device->request.width,
+                                                       device->request.height,
+                                                       device->request.width * 2,
+                                                       0,
+                                                       0)) {
+        return 0;
+    }
+    if (!hasciicam_virtual_camera_pipe_encode_message(&header,
+                                                      device->message_buffer + sizeof(header),
+                                                      device->payload_size,
+                                                      device->message_buffer,
+                                                      device->message_size,
+                                                      NULL,
+                                                      0)) {
+        return 0;
+    }
+    if (!WriteFile(device->pipe_handle,
+                   device->message_buffer,
+                   (DWORD)device->message_size,
+                   &bytes_written,
+                   NULL)) {
+        DWORD err = GetLastError();
+        if (err == ERROR_BROKEN_PIPE || err == ERROR_NO_DATA)
+            InterlockedExchange(&device->connected, 0);
+    }
+    return 1;
+}
+
+static void windows_virtual_camera_close(hasciicam_virtual_camera_device *device) {
+    if (device == NULL)
+        return;
+    if (device->stop_event != NULL)
+        SetEvent(device->stop_event);
+    if (device->accept_thread != NULL) {
+        WaitForSingleObject(device->accept_thread, INFINITE);
+        CloseHandle(device->accept_thread);
+        device->accept_thread = NULL;
+    }
+    if (device->pipe_handle != INVALID_HANDLE_VALUE) {
+        DisconnectNamedPipe(device->pipe_handle);
+        CloseHandle(device->pipe_handle);
+        device->pipe_handle = INVALID_HANDLE_VALUE;
+    }
+    if (device->stop_event != NULL) {
+        CloseHandle(device->stop_event);
+        device->stop_event = NULL;
+    }
+    free(device->message_buffer);
+    free(device);
+}
+
+static const char *windows_virtual_camera_name(void) {
+    return "windows-pipe";
+}
+
+static const hasciicam_virtual_camera_ops windows_virtual_camera_ops = {
+    windows_virtual_camera_publish,
+    windows_virtual_camera_close,
+    windows_virtual_camera_name
+};
+#endif
+
 int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
                                           const hasciicam_virtual_camera_request *request) {
     hasciicam_virtual_camera_device *device = NULL;
@@ -115,9 +248,66 @@ int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
     if (device == NULL)
         return 0;
 
+#if defined(_WIN32)
+    if (request == NULL || !request->enabled) {
+        device->ops = &unsupported_ops;
+        device->supported = 0;
+        strncpy(device->backend_name, unsupported_name(), sizeof(device->backend_name) - 1);
+        *out = device;
+        return 1;
+    }
+    device->ops = &windows_virtual_camera_ops;
+    device->supported = 1;
+    strncpy(device->backend_name, windows_virtual_camera_name(), sizeof(device->backend_name) - 1);
+    device->request = *request;
+    if (!hasciicam_virtual_camera_pipe_build_name(request,
+                                                  device->pipe_name,
+                                                  sizeof(device->pipe_name),
+                                                  err,
+                                                  sizeof(err))) {
+        free(device);
+        return 0;
+    }
+    device->payload_size = hasciicam_virtual_camera_yuy2_size(request->width, request->height, request->width * 2);
+    device->message_size = sizeof(hasciicam_virtual_camera_pipe_frame) + device->payload_size;
+    device->message_buffer = (unsigned char *)calloc(1, device->message_size);
+    if (device->message_buffer == NULL) {
+        free(device);
+        return 0;
+    }
+    device->pipe_handle = CreateNamedPipeA(device->pipe_name,
+                                           PIPE_ACCESS_OUTBOUND,
+                                           PIPE_TYPE_BYTE | PIPE_WAIT,
+                                           1,
+                                           (DWORD)device->message_size,
+                                           (DWORD)device->message_size,
+                                           0,
+                                           NULL);
+    if (device->pipe_handle == INVALID_HANDLE_VALUE) {
+        free(device->message_buffer);
+        free(device);
+        return 0;
+    }
+    device->stop_event = CreateEventW(NULL, TRUE, FALSE, NULL);
+    if (device->stop_event == NULL) {
+        CloseHandle(device->pipe_handle);
+        free(device->message_buffer);
+        free(device);
+        return 0;
+    }
+    device->accept_thread = CreateThread(NULL, 0, windows_accept_thread, device, 0, NULL);
+    if (device->accept_thread == NULL) {
+        CloseHandle(device->stop_event);
+        CloseHandle(device->pipe_handle);
+        free(device->message_buffer);
+        free(device);
+        return 0;
+    }
+#else
     device->ops = &unsupported_ops;
     device->supported = 0;
     strncpy(device->backend_name, unsupported_name(), sizeof(device->backend_name) - 1);
+#endif
     *out = device;
     return 1;
 }

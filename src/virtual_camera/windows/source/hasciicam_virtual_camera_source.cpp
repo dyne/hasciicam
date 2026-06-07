@@ -317,6 +317,95 @@ int hasciicam_virtual_camera_source_frame_slot_has_message(const hasciicam_virtu
     return slot != NULL && slot->bytes != NULL && slot->bytes_size > 0;
 }
 
+int hasciicam_virtual_camera_source_read_pipe_message(const hasciicam_virtual_camera_source_config *config,
+                                                      const char *pipe_name,
+                                                      hasciicam_virtual_camera_source_frame_slot *slot,
+                                                      int timeout_ms,
+                                                      char *err,
+                                                      size_t err_size) {
+    HANDLE pipe_handle = INVALID_HANDLE_VALUE;
+    unsigned char *message = NULL;
+    size_t message_size;
+    DWORD bytes_read = 0;
+    hasciicam_virtual_camera_pipe_frame header;
+    const unsigned char *payload = NULL;
+    size_t payload_size = 0;
+    ULONGLONG deadline;
+    int ok = 0;
+
+    if (config == NULL || pipe_name == NULL || slot == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "source config, pipe name, and slot are required");
+        return 0;
+    }
+    if (config->media_type_count == 0) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "source config does not describe a media type");
+        return 0;
+    }
+    message_size = sizeof(hasciicam_virtual_camera_pipe_frame) + config->media_types[0].frame_bytes;
+    message = (unsigned char *)malloc(message_size);
+    if (message == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "unable to allocate source pipe buffer");
+        return 0;
+    }
+
+    if (timeout_ms < 0)
+        timeout_ms = 0;
+    deadline = GetTickCount64() + (ULONGLONG)timeout_ms;
+    while (pipe_handle == INVALID_HANDLE_VALUE) {
+        pipe_handle = CreateFileA(pipe_name,
+                                  GENERIC_READ,
+                                  0,
+                                  NULL,
+                                  OPEN_EXISTING,
+                                  FILE_ATTRIBUTE_NORMAL,
+                                  NULL);
+        if (pipe_handle != INVALID_HANDLE_VALUE)
+            break;
+        if (GetLastError() != ERROR_PIPE_BUSY && GetLastError() != ERROR_FILE_NOT_FOUND)
+            break;
+        if (GetTickCount64() >= deadline)
+            break;
+        Sleep(10);
+    }
+    if (pipe_handle == INVALID_HANDLE_VALUE) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "unable to open virtual camera pipe");
+        goto cleanup;
+    }
+
+    if (!ReadFile(pipe_handle, message, (DWORD)message_size, &bytes_read, NULL) || bytes_read == 0) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "unable to read virtual camera pipe message");
+        goto cleanup;
+    }
+    if (!hasciicam_virtual_camera_pipe_decode_message(message,
+                                                      bytes_read,
+                                                      &header,
+                                                      &payload,
+                                                      &payload_size,
+                                                      err,
+                                                      err_size)) {
+        goto cleanup;
+    }
+    if (!hasciicam_virtual_camera_source_frame_slot_store(slot,
+                                                           message,
+                                                           sizeof(hasciicam_virtual_camera_pipe_frame) + payload_size,
+                                                           err,
+                                                           err_size)) {
+        goto cleanup;
+    }
+    ok = 1;
+
+cleanup:
+    if (pipe_handle != INVALID_HANDLE_VALUE)
+        CloseHandle(pipe_handle);
+    free(message);
+    return ok;
+}
+
 int hasciicam_virtual_camera_source_frame_slot_store(hasciicam_virtual_camera_source_frame_slot *slot,
                                                      const void *message,
                                                      size_t message_size,
@@ -789,11 +878,15 @@ public:
           stream_(NULL),
           presentation_descriptor_(NULL),
           stream_descriptor_(NULL),
+          reader_thread_(NULL),
+          reader_stop_event_(NULL),
           shutdown_(FALSE) {
+        hasciicam_virtual_camera_source_frame_slot_init(&frame_slot_);
         InterlockedIncrement(&g_module_refcount);
     }
 
     ~HasciiCamVirtualCameraSource() {
+        StopReaderThread();
         if (presentation_descriptor_ != NULL)
             presentation_descriptor_->Release();
         if (stream_ != NULL)
@@ -802,6 +895,7 @@ public:
             attributes_->Release();
         if (event_queue_ != NULL)
             event_queue_->Release();
+        hasciicam_virtual_camera_source_frame_slot_close(&frame_slot_);
         InterlockedDecrement(&g_module_refcount);
     }
 
@@ -933,6 +1027,8 @@ public:
     HRESULT Start(IMFPresentationDescriptor *presentation_descriptor,
                   const GUID *time_format,
                   const PROPVARIANT *start_position) {
+        HRESULT hr;
+
         (void)presentation_descriptor;
         (void)time_format;
         (void)start_position;
@@ -944,6 +1040,9 @@ public:
             return MF_E_INVALIDREQUEST;
         if (stream_ != NULL)
             stream_->SetStreamState(MF_STREAM_STATE_RUNNING);
+        hr = StartReaderThread();
+        if (FAILED(hr))
+            return hr;
         return S_OK;
     }
 
@@ -963,6 +1062,7 @@ public:
 
     HRESULT Shutdown(void) {
         shutdown_ = TRUE;
+        StopReaderThread();
         if (stream_ != NULL)
             stream_->Shutdown();
         if (presentation_descriptor_ != NULL) {
@@ -1049,6 +1149,55 @@ public:
         return S_OK;
     }
 
+    HRESULT StartReaderThread(void) {
+        if (reader_stop_event_ == NULL) {
+            reader_stop_event_ = CreateEventW(NULL, TRUE, FALSE, NULL);
+            if (reader_stop_event_ == NULL)
+                return HRESULT_FROM_WIN32(GetLastError());
+        }
+        if (reader_thread_ != NULL)
+            return S_OK;
+        ResetEvent(reader_stop_event_);
+        reader_thread_ = CreateThread(NULL, 0, &HasciiCamVirtualCameraSource::ReaderThreadProc, this, 0, NULL);
+        if (reader_thread_ == NULL)
+            return HRESULT_FROM_WIN32(GetLastError());
+        return S_OK;
+    }
+
+    void StopReaderThread(void) {
+        if (reader_stop_event_ != NULL)
+            SetEvent(reader_stop_event_);
+        if (reader_thread_ != NULL) {
+            WaitForSingleObject(reader_thread_, INFINITE);
+            CloseHandle(reader_thread_);
+            reader_thread_ = NULL;
+        }
+        if (reader_stop_event_ != NULL) {
+            CloseHandle(reader_stop_event_);
+            reader_stop_event_ = NULL;
+        }
+    }
+
+    static DWORD WINAPI ReaderThreadProc(LPVOID param) {
+        HasciiCamVirtualCameraSource *self = (HasciiCamVirtualCameraSource *)param;
+        char err[128];
+
+        if (self == NULL)
+            return 0;
+        while (WaitForSingleObject(self->reader_stop_event_, 0) != WAIT_OBJECT_0) {
+            if (hasciicam_virtual_camera_source_read_pipe_message(&self->config_,
+                                                                  self->config_.pipe_name,
+                                                                  &self->frame_slot_,
+                                                                  250,
+                                                                  err,
+                                                                  sizeof(err))) {
+                self->lifecycle_.last_sequence = self->frame_slot_.sequence;
+                self->lifecycle_.last_timestamp_100ns = self->frame_slot_.timestamp_100ns;
+            }
+        }
+        return 0;
+    }
+
 private:
     LONG refcount_;
     IMFMediaEventQueue *event_queue_;
@@ -1056,8 +1205,11 @@ private:
     HasciiCamVirtualCameraStream *stream_;
     IMFPresentationDescriptor *presentation_descriptor_;
     IMFStreamDescriptor *stream_descriptor_;
+    HANDLE reader_thread_;
+    HANDLE reader_stop_event_;
     hasciicam_virtual_camera_source_config config_;
     hasciicam_virtual_camera_source_lifecycle lifecycle_;
+    hasciicam_virtual_camera_source_frame_slot frame_slot_;
     BOOL shutdown_;
 };
 
