@@ -590,6 +590,11 @@ main (int argc, char **argv) {
   hasciicam_session_stop(&session);
   hasciicam_gui_state_reset_preview(&gui_state);
   hasciicam_output_close(&output);
+  if (!quiet && mode == LIVE && appcfg.virtual_camera) {
+    fprintf(stderr, "Virtual camera frames: accepted=%llu dropped=%llu\n",
+            hasciicam_app_virtual_camera_accepted_frames(&virtual_camera),
+            hasciicam_app_virtual_camera_dropped_frames(&virtual_camera));
+  }
   hasciicam_app_virtual_camera_stop(&virtual_camera, hasciicam_sdl_set_frame_callback);
   hasciicam_render_session_close(&render_session);
   fprintf (stderr, "cya!\n");

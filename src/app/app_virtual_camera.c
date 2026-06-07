@@ -9,10 +9,20 @@
 static void app_virtual_camera_frame_callback(void *user_data,
                                               const struct hasciicam_virtual_camera_frame *frame) {
     hasciicam_app_virtual_camera *vc = (hasciicam_app_virtual_camera *)user_data;
+    unsigned long long delta;
 
     if (vc == NULL || vc->device == NULL || frame == NULL)
         return;
+    if (vc->min_publish_interval_100ns > 0 && vc->last_publish_100ns != 0) {
+        delta = frame->timestamp_100ns - vc->last_publish_100ns;
+        if (delta < vc->min_publish_interval_100ns) {
+            vc->dropped_frames++;
+            return;
+        }
+    }
     (void)hasciicam_virtual_camera_publish(vc->device, frame);
+    vc->last_publish_100ns = frame->timestamp_100ns;
+    vc->accepted_frames++;
 }
 
 static void set_error(char *err, size_t err_size, const char *msg) {
@@ -60,6 +70,9 @@ int hasciicam_app_virtual_camera_start(hasciicam_app_virtual_camera *vc,
         return 0;
     }
     vc->context = context;
+    vc->min_publish_interval_100ns = (cfg->virtual_camera_fps > 0)
+        ? (10000000ULL / (unsigned long long)cfg->virtual_camera_fps)
+        : 0;
     if (!set_callback(context, app_virtual_camera_frame_callback, vc)) {
         hasciicam_virtual_camera_close(vc->device);
         vc->device = NULL;
@@ -84,4 +97,12 @@ void hasciicam_app_virtual_camera_stop(hasciicam_app_virtual_camera *vc,
     }
     vc->context = NULL;
     vc->active = 0;
+}
+
+unsigned long long hasciicam_app_virtual_camera_accepted_frames(const hasciicam_app_virtual_camera *vc) {
+    return vc != NULL ? vc->accepted_frames : 0ULL;
+}
+
+unsigned long long hasciicam_app_virtual_camera_dropped_frames(const hasciicam_app_virtual_camera *vc) {
+    return vc != NULL ? vc->dropped_frames : 0ULL;
 }

@@ -19,6 +19,10 @@ typedef struct hasciicam_app_virtual_camera {
     aa_context *context;
     hasciicam_virtual_camera_device *device;
     int active;
+    unsigned long long min_publish_interval_100ns;
+    unsigned long long last_publish_100ns;
+    unsigned long long accepted_frames;
+    unsigned long long dropped_frames;
 } hasciicam_app_virtual_camera;
 
 /**
@@ -41,6 +45,16 @@ int hasciicam_app_virtual_camera_start(hasciicam_app_virtual_camera *vc,
  */
 void hasciicam_app_virtual_camera_stop(hasciicam_app_virtual_camera *vc,
                                        hasciicam_app_virtual_camera_set_callback_fn set_callback);
+
+/**
+ * Return the number of frames accepted by the current publish gate.
+ */
+unsigned long long hasciicam_app_virtual_camera_accepted_frames(const hasciicam_app_virtual_camera *vc);
+
+/**
+ * Return the number of frames dropped by the current publish gate.
+ */
+unsigned long long hasciicam_app_virtual_camera_dropped_frames(const hasciicam_app_virtual_camera *vc);
 
 #ifdef __cplusplus
 }
