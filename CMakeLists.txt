@@ -357,10 +357,18 @@ if(HASCIICAM_ENABLE_TESTS)
 
   if(WIN32)
     add_library(hasciicam_virtual_camera_source SHARED
+      src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c
       src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp
+      src/virtual_camera/virtual_camera.c
+      src/virtual_camera/virtual_camera_convert.c
     )
-    target_include_directories(hasciicam_virtual_camera_source PRIVATE src/virtual_camera/windows/source)
+    target_include_directories(hasciicam_virtual_camera_source PRIVATE
+      src/virtual_camera/windows/pipe
+      src/virtual_camera/windows/source
+      src/virtual_camera)
     target_compile_definitions(hasciicam_virtual_camera_source PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(hasciicam_virtual_camera_source PRIVATE
+      mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
 
     add_executable(test_virtual_camera_windows
       tests/test_virtual_camera_windows.c

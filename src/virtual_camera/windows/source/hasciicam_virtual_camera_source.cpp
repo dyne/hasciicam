@@ -4,6 +4,11 @@
 
 #include <windows.h>
 #include <mfapi.h>
+#include <mfidl.h>
+#include <mferror.h>
+#include <mfobjects.h>
+#include <ks.h>
+#include <ksmedia.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -409,6 +414,653 @@ unsigned long long hasciicam_virtual_camera_source_sample_time_100ns(unsigned lo
     return start_100ns + sequence * duration;
 }
 
+static HRESULT hasciicam_virtual_camera_source_build_mf_media_type(const hasciicam_virtual_camera_source_media_type *desc,
+                                                                   IMFMediaType **out) {
+    IMFMediaType *type = NULL;
+    HRESULT hr;
+
+    if (out == NULL || desc == NULL)
+        return E_POINTER;
+    *out = NULL;
+
+    hr = MFCreateMediaType(&type);
+    if (FAILED(hr))
+        return hr;
+    hr = type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
+    if (SUCCEEDED(hr))
+        hr = type->SetGUID(MF_MT_SUBTYPE, *desc->subtype);
+    if (SUCCEEDED(hr))
+        hr = MFSetAttributeSize(type, MF_MT_FRAME_SIZE, (UINT32)desc->width, (UINT32)desc->height);
+    if (SUCCEEDED(hr))
+        hr = MFSetAttributeRatio(type, MF_MT_FRAME_RATE, (UINT32)desc->fps, 1);
+    if (SUCCEEDED(hr))
+        hr = MFSetAttributeRatio(type, MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
+    if (SUCCEEDED(hr))
+        hr = type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+    if (SUCCEEDED(hr))
+        hr = type->SetUINT32(MF_MT_FIXED_SIZE_SAMPLES, TRUE);
+    if (SUCCEEDED(hr))
+        hr = type->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
+    if (SUCCEEDED(hr))
+        hr = type->SetUINT32(MF_MT_DEFAULT_STRIDE, (UINT32)desc->stride_bytes);
+    if (SUCCEEDED(hr))
+        hr = type->SetUINT32(MF_MT_SAMPLE_SIZE, (UINT32)desc->frame_bytes);
+    if (SUCCEEDED(hr))
+        hr = type->SetUINT32(MF_MT_AVG_BITRATE, (UINT32)desc->average_bitrate);
+    if (FAILED(hr)) {
+        type->Release();
+        return hr;
+    }
+
+    *out = type;
+    return S_OK;
+}
+
+static HRESULT hasciicam_virtual_camera_source_build_media_types(const hasciicam_virtual_camera_source_config *config,
+                                                                 IMFMediaType **types,
+                                                                 size_t type_count) {
+    size_t i;
+    HRESULT hr = S_OK;
+
+    if (config == NULL || types == NULL)
+        return E_POINTER;
+    for (i = 0; i < type_count; ++i)
+        types[i] = NULL;
+    for (i = 0; i < type_count; ++i) {
+        hr = hasciicam_virtual_camera_source_build_mf_media_type(&config->media_types[i], &types[i]);
+        if (FAILED(hr))
+            break;
+    }
+    if (FAILED(hr)) {
+        while (i > 0) {
+            --i;
+            if (types[i] != NULL)
+                types[i]->Release();
+            types[i] = NULL;
+        }
+    }
+    return hr;
+}
+
+class HasciiCamVirtualCameraStream : public IMFMediaStream2 {
+public:
+    HasciiCamVirtualCameraStream()
+        : refcount_(1),
+          stream_state_(MF_STREAM_STATE_STOPPED),
+          event_queue_(NULL),
+          descriptor_(NULL),
+          type_handler_(NULL),
+          attributes_(NULL),
+          current_media_type_(NULL),
+          shutdown_(FALSE) {
+        InterlockedIncrement(&g_module_refcount);
+    }
+
+    ~HasciiCamVirtualCameraStream() {
+        if (current_media_type_ != NULL)
+            current_media_type_->Release();
+        if (type_handler_ != NULL)
+            type_handler_->Release();
+        if (descriptor_ != NULL)
+            descriptor_->Release();
+        if (attributes_ != NULL)
+            attributes_->Release();
+        if (event_queue_ != NULL)
+            event_queue_->Release();
+        InterlockedDecrement(&g_module_refcount);
+    }
+
+    HRESULT Init(const hasciicam_virtual_camera_source_config *config) {
+        IMFMediaType *media_types[2] = { NULL, NULL };
+        size_t media_type_count;
+        HRESULT hr;
+
+        if (config == NULL)
+            return E_POINTER;
+        config_ = *config;
+
+        hr = MFCreateAttributes(&attributes_, 8);
+        if (FAILED(hr))
+            return hr;
+        hr = attributes_->SetGUID(MF_DEVICESTREAM_STREAM_CATEGORY, PINNAME_VIDEO_CAPTURE);
+        if (SUCCEEDED(hr))
+            hr = attributes_->SetUINT32(MF_DEVICESTREAM_STREAM_ID, 0);
+        if (SUCCEEDED(hr))
+            hr = attributes_->SetUINT32(MF_DEVICESTREAM_FRAMESERVER_SHARED, TRUE);
+        if (SUCCEEDED(hr))
+            hr = MFCreateEventQueue(&event_queue_);
+        if (FAILED(hr))
+            return hr;
+
+        media_type_count = config_.media_type_count;
+        hr = hasciicam_virtual_camera_source_build_media_types(&config_, media_types, media_type_count);
+        if (FAILED(hr))
+            return hr;
+
+        hr = MFCreateStreamDescriptor(0,
+                                       (DWORD)media_type_count,
+                                       media_types,
+                                       &descriptor_);
+        if (FAILED(hr))
+        {
+            while (media_type_count > 0) {
+                --media_type_count;
+                if (media_types[media_type_count] != NULL)
+                    media_types[media_type_count]->Release();
+            }
+            return hr;
+        }
+
+        hr = descriptor_->GetMediaTypeHandler(&type_handler_);
+        if (FAILED(hr))
+        {
+            while (media_type_count > 0) {
+                --media_type_count;
+                if (media_types[media_type_count] != NULL)
+                    media_types[media_type_count]->Release();
+            }
+            return hr;
+        }
+
+        hr = type_handler_->SetCurrentMediaType(media_types[0]);
+        if (FAILED(hr))
+        {
+            while (media_type_count > 0) {
+                --media_type_count;
+                if (media_types[media_type_count] != NULL)
+                    media_types[media_type_count]->Release();
+            }
+            return hr;
+        }
+
+        hr = type_handler_->GetCurrentMediaType(&current_media_type_);
+        if (FAILED(hr))
+        {
+            while (media_type_count > 0) {
+                --media_type_count;
+                if (media_types[media_type_count] != NULL)
+                    media_types[media_type_count]->Release();
+            }
+            return hr;
+        }
+
+        while (media_type_count > 0) {
+            --media_type_count;
+            if (media_types[media_type_count] != NULL)
+                media_types[media_type_count]->Release();
+        }
+
+        return S_OK;
+    }
+
+    ULONG AddRef(void) {
+        return (ULONG)InterlockedIncrement(&refcount_);
+    }
+
+    ULONG Release(void) {
+        ULONG refcount = (ULONG)InterlockedDecrement(&refcount_);
+        if (refcount == 0)
+            delete this;
+        return refcount;
+    }
+
+    HRESULT QueryInterface(REFIID riid, void **ppv) {
+        if (ppv == NULL)
+            return E_POINTER;
+        *ppv = NULL;
+        if (IsEqualIID(riid, IID_IUnknown) ||
+            IsEqualIID(riid, IID_IMFMediaEventGenerator) ||
+            IsEqualIID(riid, IID_IMFMediaStream) ||
+            IsEqualIID(riid, IID_IMFMediaStream2)) {
+            *ppv = static_cast<IMFMediaStream2 *>(this);
+            AddRef();
+            return S_OK;
+        }
+        return E_NOINTERFACE;
+    }
+
+    HRESULT GetEvent(DWORD flags, IMFMediaEvent **event) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (event_queue_ == NULL)
+            return E_UNEXPECTED;
+        return event_queue_->GetEvent(flags, event);
+    }
+
+    HRESULT BeginGetEvent(IMFAsyncCallback *callback, IUnknown *state) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (event_queue_ == NULL)
+            return E_UNEXPECTED;
+        return event_queue_->BeginGetEvent(callback, state);
+    }
+
+    HRESULT EndGetEvent(IMFAsyncResult *result, IMFMediaEvent **event) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (event_queue_ == NULL)
+            return E_UNEXPECTED;
+        return event_queue_->EndGetEvent(result, event);
+    }
+
+    HRESULT QueueEvent(MediaEventType type, REFGUID extended_type, HRESULT status, const PROPVARIANT *value) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (event_queue_ == NULL)
+            return E_UNEXPECTED;
+        return event_queue_->QueueEventParamVar(type, extended_type, status, value);
+    }
+
+    HRESULT GetMediaSource(IMFMediaSource **media_source) {
+        if (media_source == NULL)
+            return E_POINTER;
+        *media_source = NULL;
+        return E_NOTIMPL;
+    }
+
+    HRESULT GetStreamDescriptor(IMFStreamDescriptor **stream_descriptor) {
+        if (stream_descriptor == NULL)
+            return E_POINTER;
+        *stream_descriptor = NULL;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (descriptor_ == NULL)
+            return E_UNEXPECTED;
+        descriptor_->AddRef();
+        *stream_descriptor = descriptor_;
+        return S_OK;
+    }
+
+    HRESULT RequestSample(IUnknown *token) {
+        (void)token;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (stream_state_ != MF_STREAM_STATE_RUNNING)
+            return MF_E_INVALIDREQUEST;
+        return S_OK;
+    }
+
+    HRESULT GetMediaTypeHandler(IMFMediaTypeHandler **handler) {
+        if (handler == NULL)
+            return E_POINTER;
+        *handler = NULL;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (type_handler_ == NULL)
+            return E_UNEXPECTED;
+        type_handler_->AddRef();
+        *handler = type_handler_;
+        return S_OK;
+    }
+
+    HRESULT SetStreamState(MF_STREAM_STATE state) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        stream_state_ = state;
+        return S_OK;
+    }
+
+    HRESULT GetStreamState(MF_STREAM_STATE *state) {
+        if (state == NULL)
+            return E_POINTER;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        *state = stream_state_;
+        return S_OK;
+    }
+
+    HRESULT GetAttributes(IMFAttributes **attributes) {
+        if (attributes == NULL)
+            return E_POINTER;
+        *attributes = NULL;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (attributes_ == NULL)
+            return E_UNEXPECTED;
+        attributes_->AddRef();
+        *attributes = attributes_;
+        return S_OK;
+    }
+
+    HRESULT SetCurrentMediaType(IMFMediaType *media_type) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (type_handler_ == NULL)
+            return E_UNEXPECTED;
+        return type_handler_->SetCurrentMediaType(media_type);
+    }
+
+    HRESULT GetCurrentMediaType(IMFMediaType **media_type) {
+        if (media_type == NULL)
+            return E_POINTER;
+        *media_type = NULL;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (type_handler_ == NULL)
+            return E_UNEXPECTED;
+        return type_handler_->GetCurrentMediaType(media_type);
+    }
+
+    HRESULT Shutdown(void) {
+        shutdown_ = TRUE;
+        stream_state_ = MF_STREAM_STATE_STOPPED;
+        if (event_queue_ != NULL) {
+            event_queue_->Shutdown();
+            event_queue_->Release();
+            event_queue_ = NULL;
+        }
+        if (current_media_type_ != NULL) {
+            current_media_type_->Release();
+            current_media_type_ = NULL;
+        }
+        if (type_handler_ != NULL) {
+            type_handler_->Release();
+            type_handler_ = NULL;
+        }
+        if (descriptor_ != NULL) {
+            descriptor_->Release();
+            descriptor_ = NULL;
+        }
+        if (attributes_ != NULL) {
+            attributes_->Release();
+            attributes_ = NULL;
+        }
+        return S_OK;
+    }
+
+private:
+    LONG refcount_;
+    MF_STREAM_STATE stream_state_;
+    IMFMediaEventQueue *event_queue_;
+    IMFStreamDescriptor *descriptor_;
+    IMFMediaTypeHandler *type_handler_;
+    IMFAttributes *attributes_;
+    IMFMediaType *current_media_type_;
+    hasciicam_virtual_camera_source_config config_;
+    BOOL shutdown_;
+};
+
+class HasciiCamVirtualCameraSource : public IMFMediaSourceEx, public IMFGetService {
+public:
+    HasciiCamVirtualCameraSource()
+        : refcount_(1),
+          event_queue_(NULL),
+          attributes_(NULL),
+          stream_(NULL),
+          presentation_descriptor_(NULL),
+          stream_descriptor_(NULL),
+          shutdown_(FALSE) {
+        InterlockedIncrement(&g_module_refcount);
+    }
+
+    ~HasciiCamVirtualCameraSource() {
+        if (presentation_descriptor_ != NULL)
+            presentation_descriptor_->Release();
+        if (stream_ != NULL)
+            stream_->Release();
+        if (attributes_ != NULL)
+            attributes_->Release();
+        if (event_queue_ != NULL)
+            event_queue_->Release();
+        InterlockedDecrement(&g_module_refcount);
+    }
+
+    HRESULT Init(const hasciicam_virtual_camera_source_config *config) {
+        HRESULT hr;
+
+        if (config == NULL)
+            return E_POINTER;
+        config_ = *config;
+        lifecycle_.state = HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_CREATED;
+        lifecycle_.config = *config;
+
+        hr = MFCreateAttributes(&attributes_, 8);
+        if (FAILED(hr))
+            return hr;
+        hr = attributes_->SetGUID(MF_DEVICESTREAM_STREAM_CATEGORY, PINNAME_VIDEO_CAPTURE);
+        if (SUCCEEDED(hr))
+            hr = attributes_->SetUINT32(MF_DEVICESTREAM_STREAM_ID, 0);
+        if (SUCCEEDED(hr))
+            hr = attributes_->SetUINT32(MF_DEVICESTREAM_FRAMESERVER_SHARED, TRUE);
+        if (SUCCEEDED(hr))
+            hr = MFCreateEventQueue(&event_queue_);
+        if (FAILED(hr))
+            return hr;
+
+        stream_ = new (std::nothrow) HasciiCamVirtualCameraStream();
+        if (stream_ == NULL)
+            return E_OUTOFMEMORY;
+        hr = stream_->Init(&config_);
+        if (FAILED(hr))
+            return hr;
+
+        hr = stream_->GetStreamDescriptor(&stream_descriptor_);
+        if (FAILED(hr))
+            return hr;
+
+        hr = MFCreatePresentationDescriptor(1, &stream_descriptor_, &presentation_descriptor_);
+        if (FAILED(hr))
+            return hr;
+
+        return S_OK;
+    }
+
+    ULONG AddRef(void) {
+        return (ULONG)InterlockedIncrement(&refcount_);
+    }
+
+    ULONG Release(void) {
+        ULONG refcount = (ULONG)InterlockedDecrement(&refcount_);
+        if (refcount == 0)
+            delete this;
+        return refcount;
+    }
+
+    HRESULT QueryInterface(REFIID riid, void **ppv) {
+        if (ppv == NULL)
+            return E_POINTER;
+        *ppv = NULL;
+        if (IsEqualIID(riid, IID_IUnknown) ||
+            IsEqualIID(riid, IID_IMFMediaEventGenerator) ||
+            IsEqualIID(riid, IID_IMFMediaSource) ||
+            IsEqualIID(riid, IID_IMFMediaSourceEx)) {
+            *ppv = static_cast<IMFMediaSourceEx *>(this);
+            AddRef();
+            return S_OK;
+        }
+        if (IsEqualIID(riid, IID_IMFGetService)) {
+            *ppv = static_cast<IMFGetService *>(this);
+            AddRef();
+            return S_OK;
+        }
+        return E_NOINTERFACE;
+    }
+
+    HRESULT GetEvent(DWORD flags, IMFMediaEvent **event) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (event_queue_ == NULL)
+            return E_UNEXPECTED;
+        return event_queue_->GetEvent(flags, event);
+    }
+
+    HRESULT BeginGetEvent(IMFAsyncCallback *callback, IUnknown *state) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (event_queue_ == NULL)
+            return E_UNEXPECTED;
+        return event_queue_->BeginGetEvent(callback, state);
+    }
+
+    HRESULT EndGetEvent(IMFAsyncResult *result, IMFMediaEvent **event) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (event_queue_ == NULL)
+            return E_UNEXPECTED;
+        return event_queue_->EndGetEvent(result, event);
+    }
+
+    HRESULT QueueEvent(MediaEventType type, REFGUID extended_type, HRESULT status, const PROPVARIANT *value) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (event_queue_ == NULL)
+            return E_UNEXPECTED;
+        return event_queue_->QueueEventParamVar(type, extended_type, status, value);
+    }
+
+    HRESULT GetCharacteristics(DWORD *characteristics) {
+        if (characteristics == NULL)
+            return E_POINTER;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        *characteristics = MFMEDIASOURCE_IS_LIVE | MFMEDIASOURCE_DOES_NOT_USE_NETWORK;
+        return S_OK;
+    }
+
+    HRESULT CreatePresentationDescriptor(IMFPresentationDescriptor **descriptor) {
+        if (descriptor == NULL)
+            return E_POINTER;
+        *descriptor = NULL;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (presentation_descriptor_ == NULL)
+            return E_UNEXPECTED;
+        presentation_descriptor_->AddRef();
+        *descriptor = presentation_descriptor_;
+        return S_OK;
+    }
+
+    HRESULT Start(IMFPresentationDescriptor *presentation_descriptor,
+                  const GUID *time_format,
+                  const PROPVARIANT *start_position) {
+        (void)presentation_descriptor;
+        (void)time_format;
+        (void)start_position;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (lifecycle_.state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STARTED)
+            return MF_E_INVALIDREQUEST;
+        if (!hasciicam_virtual_camera_source_lifecycle_start(&lifecycle_, NULL, 0))
+            return MF_E_INVALIDREQUEST;
+        if (stream_ != NULL)
+            stream_->SetStreamState(MF_STREAM_STATE_RUNNING);
+        return S_OK;
+    }
+
+    HRESULT Stop(void) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (!hasciicam_virtual_camera_source_lifecycle_stop(&lifecycle_, NULL, 0))
+            return MF_E_INVALIDREQUEST;
+        if (stream_ != NULL)
+            stream_->SetStreamState(MF_STREAM_STATE_STOPPED);
+        return S_OK;
+    }
+
+    HRESULT Pause(void) {
+        return MF_E_INVALIDREQUEST;
+    }
+
+    HRESULT Shutdown(void) {
+        shutdown_ = TRUE;
+        if (stream_ != NULL)
+            stream_->Shutdown();
+        if (presentation_descriptor_ != NULL) {
+            presentation_descriptor_->Release();
+            presentation_descriptor_ = NULL;
+        }
+        if (stream_descriptor_ != NULL) {
+            stream_descriptor_->Release();
+            stream_descriptor_ = NULL;
+        }
+        if (attributes_ != NULL) {
+            attributes_->Release();
+            attributes_ = NULL;
+        }
+        if (event_queue_ != NULL) {
+            event_queue_->Shutdown();
+            event_queue_->Release();
+            event_queue_ = NULL;
+        }
+        hasciicam_virtual_camera_source_lifecycle_shutdown(&lifecycle_, NULL, 0);
+        return S_OK;
+    }
+
+    HRESULT GetSourceAttributes(IMFAttributes **attributes) {
+        if (attributes == NULL)
+            return E_POINTER;
+        *attributes = NULL;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (attributes_ == NULL)
+            return E_UNEXPECTED;
+        attributes_->AddRef();
+        *attributes = attributes_;
+        return S_OK;
+    }
+
+    HRESULT GetStreamAttributes(DWORD stream_id, IMFAttributes **attributes) {
+        if (attributes == NULL)
+            return E_POINTER;
+        *attributes = NULL;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (stream_id != 0)
+            return MF_E_INVALIDSTREAMNUMBER;
+        if (stream_ == NULL)
+            return E_UNEXPECTED;
+        return stream_->GetAttributes(attributes);
+    }
+
+    HRESULT SetD3DManager(IUnknown *manager) {
+        (void)manager;
+        return S_OK;
+    }
+
+    HRESULT SetMediaType(DWORD stream_id, IMFMediaType *media_type) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (stream_id != 0)
+            return MF_E_INVALIDSTREAMNUMBER;
+        if (stream_ == NULL)
+            return E_UNEXPECTED;
+        return stream_->SetCurrentMediaType(media_type);
+    }
+
+    HRESULT GetService(REFGUID service, REFIID riid, LPVOID *object) {
+        (void)service;
+        (void)riid;
+        if (object == NULL)
+            return E_POINTER;
+        *object = NULL;
+        return MF_E_UNSUPPORTED_SERVICE;
+    }
+
+    HRESULT GetStreamDescriptor(IMFStreamDescriptor **stream_descriptor) {
+        if (stream_descriptor == NULL)
+            return E_POINTER;
+        *stream_descriptor = NULL;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (stream_descriptor_ == NULL)
+            return E_UNEXPECTED;
+        stream_descriptor_->AddRef();
+        *stream_descriptor = stream_descriptor_;
+        return S_OK;
+    }
+
+private:
+    LONG refcount_;
+    IMFMediaEventQueue *event_queue_;
+    IMFAttributes *attributes_;
+    HasciiCamVirtualCameraStream *stream_;
+    IMFPresentationDescriptor *presentation_descriptor_;
+    IMFStreamDescriptor *stream_descriptor_;
+    hasciicam_virtual_camera_source_config config_;
+    hasciicam_virtual_camera_source_lifecycle lifecycle_;
+    BOOL shutdown_;
+};
+
 class HasciiCamVirtualCameraClassFactory : public IClassFactory {
 public:
     HasciiCamVirtualCameraClassFactory() : refcount_(1) {
@@ -444,10 +1096,41 @@ public:
     }
 
     HRESULT STDMETHODCALLTYPE CreateInstance(IUnknown *outer, REFIID riid, void **ppv) override {
-        (void)outer;
-        (void)riid;
         if (ppv != NULL)
             *ppv = NULL;
+        if (outer != NULL)
+            return CLASS_E_NOAGGREGATION;
+        if (IsEqualIID(riid, IID_IUnknown) ||
+            IsEqualIID(riid, IID_IMFMediaEventGenerator) ||
+            IsEqualIID(riid, IID_IMFMediaSource) ||
+            IsEqualIID(riid, IID_IMFMediaSourceEx) ||
+            IsEqualIID(riid, IID_IMFGetService)) {
+            hasciicam_virtual_camera_request request;
+            hasciicam_virtual_camera_source_config config;
+            HasciiCamVirtualCameraSource *source = NULL;
+            HRESULT hr;
+
+            hasciicam_virtual_camera_request_init(&request);
+            request.enabled = 1;
+            request.width = 1280;
+            request.height = 720;
+            request.fps = 30;
+            hr = S_OK;
+            if (!hasciicam_virtual_camera_source_config_prepare(&request, &config, NULL, 0))
+                hr = E_FAIL;
+            if (SUCCEEDED(hr)) {
+                source = new (std::nothrow) HasciiCamVirtualCameraSource();
+                if (source == NULL)
+                    hr = E_OUTOFMEMORY;
+            }
+            if (SUCCEEDED(hr))
+                hr = source->Init(&config);
+            if (SUCCEEDED(hr))
+                hr = source->QueryInterface(riid, ppv);
+            if (source != NULL)
+                source->Release();
+            return hr;
+        }
         return CLASS_E_CLASSNOTAVAILABLE;
     }
 
@@ -462,6 +1145,27 @@ public:
 private:
     LONG refcount_;
 };
+
+STDAPI DllCanUnloadNow(void) {
+    return g_module_refcount == 0 ? S_OK : S_FALSE;
+}
+
+STDAPI DllGetClassObject(REFCLSID clsid, REFIID riid, LPVOID *ppv) {
+    HasciiCamVirtualCameraClassFactory *factory;
+    HRESULT hr;
+
+    if (ppv == NULL)
+        return E_POINTER;
+    *ppv = NULL;
+    if (!IsEqualCLSID(clsid, *hasciicam_virtual_camera_source_clsid()))
+        return CLASS_E_CLASSNOTAVAILABLE;
+    factory = new (std::nothrow) HasciiCamVirtualCameraClassFactory();
+    if (factory == NULL)
+        return E_OUTOFMEMORY;
+    hr = factory->QueryInterface(riid, ppv);
+    factory->Release();
+    return hr;
+}
 
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved) {
     (void)reserved;

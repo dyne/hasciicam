@@ -3,8 +3,19 @@
 #include <string.h>
 #include <wchar.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <mfapi.h>
+#include <mfidl.h>
+#endif
+
 #include "../src/virtual_camera/windows/source/hasciicam_virtual_camera_source.h"
 #include "../src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.h"
+
+#ifdef _WIN32
+STDAPI DllGetClassObject(REFCLSID clsid, REFIID riid, LPVOID *ppv);
+STDAPI DllCanUnloadNow(void);
+#endif
 
 static int failures = 0;
 
@@ -14,6 +25,104 @@ static void expect_true(int cond, const char *msg) {
         failures++;
     }
 }
+
+#ifdef _WIN32
+static void run_windows_com_smoke(void) {
+    IClassFactory *factory = NULL;
+    IMFMediaSourceEx *source = NULL;
+    IMFPresentationDescriptor *presentation = NULL;
+    IMFAttributes *source_attributes = NULL;
+    IMFAttributes *stream_attributes = NULL;
+    IMFGetService *get_service = NULL;
+    DWORD characteristics = 0;
+    HRESULT hr;
+    BOOL com_initialized = FALSE;
+    BOOL mf_started = FALSE;
+
+    hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    expect_true(SUCCEEDED(hr) || hr == RPC_E_CHANGED_MODE,
+                "COM apartment should initialize for the Windows smoke test");
+    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE)
+        return;
+    com_initialized = (hr == S_OK || hr == S_FALSE);
+
+    hr = MFStartup(MF_VERSION, MFSTARTUP_FULL);
+    expect_true(SUCCEEDED(hr), "Media Foundation should start for the Windows smoke test");
+    if (FAILED(hr)) {
+        if (com_initialized)
+            CoUninitialize();
+        return;
+    }
+    mf_started = TRUE;
+
+    hr = DllGetClassObject(hasciicam_virtual_camera_source_clsid(), &IID_IClassFactory, (void **)&factory);
+    expect_true(SUCCEEDED(hr) && factory != NULL, "source class factory should be available");
+    if (SUCCEEDED(hr) && factory != NULL) {
+        hr = factory->lpVtbl->CreateInstance(factory, NULL, &IID_IMFMediaSourceEx, (void **)&source);
+        expect_true(SUCCEEDED(hr) && source != NULL, "source object should be created");
+    }
+
+    if (source != NULL) {
+        hr = source->lpVtbl->GetCharacteristics(source, &characteristics);
+        expect_true(SUCCEEDED(hr), "source characteristics should be available");
+        if (SUCCEEDED(hr)) {
+            expect_true((characteristics & MFMEDIASOURCE_IS_LIVE) != 0,
+                        "source should report itself as live");
+            expect_true((characteristics & MFMEDIASOURCE_DOES_NOT_USE_NETWORK) != 0,
+                        "source should not use the network");
+        }
+
+        hr = source->lpVtbl->CreatePresentationDescriptor(source, &presentation);
+        expect_true(SUCCEEDED(hr) && presentation != NULL,
+                    "source should create a presentation descriptor");
+
+        hr = source->lpVtbl->GetSourceAttributes(source, &source_attributes);
+        expect_true(SUCCEEDED(hr) && source_attributes != NULL,
+                    "source attributes should be available");
+
+        hr = source->lpVtbl->GetStreamAttributes(source, 0, &stream_attributes);
+        expect_true(SUCCEEDED(hr) && stream_attributes != NULL,
+                    "stream attributes should be available");
+
+        hr = source->lpVtbl->QueryInterface(source, &IID_IMFGetService, (void **)&get_service);
+        expect_true(SUCCEEDED(hr) && get_service != NULL,
+                    "source should expose IMFGetService");
+        if (get_service != NULL)
+            get_service->lpVtbl->Release(get_service);
+
+        hr = source->lpVtbl->Start(source, presentation, NULL, NULL);
+        expect_true(SUCCEEDED(hr), "source should start");
+        if (SUCCEEDED(hr)) {
+            expect_true(FAILED(source->lpVtbl->Start(source, presentation, NULL, NULL)),
+                        "starting twice should be rejected");
+            expect_true(SUCCEEDED(source->lpVtbl->Stop(source)),
+                        "source should stop");
+        }
+
+        expect_true(SUCCEEDED(source->lpVtbl->Shutdown(source)),
+                    "source should shut down");
+    }
+
+    if (stream_attributes != NULL)
+        stream_attributes->lpVtbl->Release(stream_attributes);
+    if (source_attributes != NULL)
+        source_attributes->lpVtbl->Release(source_attributes);
+    if (presentation != NULL)
+        presentation->lpVtbl->Release(presentation);
+    if (source != NULL)
+        source->lpVtbl->Release(source);
+    if (factory != NULL)
+        factory->lpVtbl->Release(factory);
+
+    expect_true(DllCanUnloadNow() == S_OK,
+                "source DLL should be unloadable after COM cleanup");
+
+    if (mf_started)
+        MFShutdown();
+    if (com_initialized)
+        CoUninitialize();
+}
+#endif
 
 int main(void) {
     const wchar_t *clsid = hasciicam_virtual_camera_source_clsid_string();
@@ -206,7 +315,7 @@ int main(void) {
                                                                  sizeof(err)),
                     "exact pipe message should decode");
         if (hasciicam_virtual_camera_pipe_decode_message(message,
-                                                         sizeof(message),
+                                                         message_size,
                                                          &decoded,
                                                          &payload,
                                                          &payload_size,
@@ -404,6 +513,10 @@ cleanup_message:
         expect_true(!hasciicam_virtual_camera_source_lifecycle_start(&lifecycle, err, sizeof(err)),
                     "shutdown lifecycle should not restart");
     }
+
+#ifdef _WIN32
+    run_windows_com_smoke();
+#endif
 
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);

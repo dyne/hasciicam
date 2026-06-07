@@ -403,6 +403,11 @@ Known Linux/POSIX assumptions in the current code:
 The Windows build includes working camera capture with backend fallback:
 Media Foundation first, DirectShow second.
 
+The Windows virtual-camera work now also builds a separate source DLL target,
+`hasciicam_virtual_camera_source`, plus a `test_virtual_camera_windows`
+smoke test that exercises the class factory, Media Foundation startup, source
+creation, presentation descriptor setup, and start/stop/shutdown flow.
+
 Preferred direction:
 
 - Keep AA-lib and rendering in C.
