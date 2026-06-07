@@ -29,6 +29,15 @@ typedef struct hasciicam_virtual_camera_source_media_type {
     int framesource_color;
 } hasciicam_virtual_camera_source_media_type;
 
+typedef struct hasciicam_virtual_camera_source_config {
+    hasciicam_virtual_camera_request request;
+    char pipe_name[256];
+    char registration_payload[256];
+    char pipe_sddl[256];
+    hasciicam_virtual_camera_source_media_type media_types[2];
+    size_t media_type_count;
+} hasciicam_virtual_camera_source_config;
+
 /**
  * Return the CLSID used to register the HasciiCam virtual camera source.
  */
@@ -78,6 +87,14 @@ int hasciicam_virtual_camera_source_pipe_sddl(char *out,
                                               size_t out_size,
                                               char *err,
                                               size_t err_size);
+
+/**
+ * Prepare a complete source configuration from a request.
+ */
+int hasciicam_virtual_camera_source_config_prepare(const hasciicam_virtual_camera_request *request,
+                                                   hasciicam_virtual_camera_source_config *out,
+                                                   char *err,
+                                                   size_t err_size);
 
 /**
  * Return the sample duration for the requested frame rate in 100 ns units.

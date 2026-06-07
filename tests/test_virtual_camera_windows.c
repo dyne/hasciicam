@@ -73,6 +73,7 @@ int main(void) {
 
     {
         hasciicam_virtual_camera_request request;
+        hasciicam_virtual_camera_source_config config;
         char pipe_name[256];
         char payload[256];
         char err[128];
@@ -143,6 +144,16 @@ int main(void) {
                         "security descriptor should allow Local Service");
             expect_true(strstr(payload, "S-1-5-") != NULL,
                         "security descriptor should include the current user SID");
+        }
+
+        expect_true(hasciicam_virtual_camera_source_config_prepare(&request, &config, err, sizeof(err)),
+                    "source config should prepare successfully");
+        if (hasciicam_virtual_camera_source_config_prepare(&request, &config, err, sizeof(err))) {
+            expect_true(config.media_type_count == 2, "prepared source config should include two media types");
+            expect_true(strcmp(config.pipe_name, pipe_name) == 0, "prepared source config should reuse the pipe name");
+            expect_true(strstr(config.registration_payload, "fmt=yuy2;") != NULL,
+                        "prepared source config should include the registration payload");
+            expect_true(strstr(config.pipe_sddl, "SY") != NULL, "prepared source config should include the pipe SDDL");
         }
     }
 

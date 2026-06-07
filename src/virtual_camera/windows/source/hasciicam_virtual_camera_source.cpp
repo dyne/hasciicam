@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <mfapi.h>
 #include <stdio.h>
+#include <string.h>
 #include <unknwn.h>
 #include <new>
 
@@ -166,6 +167,46 @@ int hasciicam_virtual_camera_source_pipe_sddl(char *out,
                                               char *err,
                                               size_t err_size) {
     return hasciicam_virtual_camera_pipe_build_sddl(out, out_size, err, err_size);
+}
+
+int hasciicam_virtual_camera_source_config_prepare(const hasciicam_virtual_camera_request *request,
+                                                   hasciicam_virtual_camera_source_config *out,
+                                                   char *err,
+                                                   size_t err_size) {
+    size_t i;
+
+    if (request == NULL || out == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "source request and output config are required");
+        return 0;
+    }
+    memset(out, 0, sizeof(*out));
+    out->request = *request;
+    if (!hasciicam_virtual_camera_source_pipe_name(request, out->pipe_name, sizeof(out->pipe_name), err, err_size))
+        return 0;
+    if (!hasciicam_virtual_camera_source_registration_payload(request,
+                                                              out->registration_payload,
+                                                              sizeof(out->registration_payload),
+                                                              err,
+                                                              err_size))
+        return 0;
+    if (!hasciicam_virtual_camera_source_pipe_sddl(out->pipe_sddl, sizeof(out->pipe_sddl), err, err_size))
+        return 0;
+    out->media_type_count = hasciicam_virtual_camera_source_media_type_count();
+    if (out->media_type_count > sizeof(out->media_types) / sizeof(out->media_types[0]))
+        out->media_type_count = sizeof(out->media_types) / sizeof(out->media_types[0]);
+    for (i = 0; i < out->media_type_count; ++i) {
+        if (!hasciicam_virtual_camera_source_media_type_get(i,
+                                                            request->width,
+                                                            request->height,
+                                                            request->fps,
+                                                            &out->media_types[i])) {
+            if (err != NULL && err_size > 0)
+                snprintf(err, err_size, "failed to prepare media type %zu", i);
+            return 0;
+        }
+    }
+    return 1;
 }
 
 unsigned long long hasciicam_virtual_camera_source_sample_duration_100ns(int fps) {
