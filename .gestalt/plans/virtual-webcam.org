@@ -244,7 +244,7 @@
 :Done when: A standard V4L2 consumer reads stable YUYV ASCII video and HasciiCam remains responsive under consumer churn.
 :END:
 
-** TODO [#A] Run the non-feature regression matrix
+** DONE [#A] Run the non-feature regression matrix
 :PROPERTIES:
 :Why: The change touches SDL flush, configuration, CMake, and cleanup paths used by existing modes.
 :Change: Build and test with virtual-camera support disabled. Run existing synthetic CLI tests for SDL, stdout, text, and HTML. Verify GUI-disabled SDL, non-SDL live output, public embedding API tests, and capture backends still work. On macOS, at minimum configure/build with the option unavailable and confirm no Windows/Linux sources leak into the target.
