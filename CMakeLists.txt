@@ -325,13 +325,13 @@ if(HASCIICAM_ENABLE_TESTS)
     src/app/app_config.c
     src/app/tomlc17/tomlc17.c
     src/virtual_camera/virtual_camera.c
+    src/virtual_camera/virtual_camera_convert.c
   )
   target_include_directories(test_app_config PRIVATE src/app src/render third_party/aalib)
   target_link_libraries(test_app_config PRIVATE aalib)
   if(WIN32)
     target_sources(test_app_config PRIVATE src/compat/getopt.c)
     target_sources(test_app_config PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
-    target_sources(test_app_config PRIVATE src/virtual_camera/virtual_camera_convert.c)
     target_include_directories(test_app_config PRIVATE src/compat)
     target_compile_definitions(test_app_config PRIVATE _CRT_SECURE_NO_WARNINGS)
   endif()
@@ -345,12 +345,12 @@ if(HASCIICAM_ENABLE_TESTS)
     src/app/app_config.c
     src/app/tomlc17/tomlc17.c
     src/virtual_camera/virtual_camera.c
+    src/virtual_camera/virtual_camera_convert.c
   )
   target_include_directories(test_app_virtual_camera PRIVATE src/app src/virtual_camera src/gui)
   target_link_libraries(test_app_virtual_camera PRIVATE aalib)
   if(WIN32)
     target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
-    target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/virtual_camera_convert.c)
     target_compile_definitions(test_app_virtual_camera PRIVATE _CRT_SECURE_NO_WARNINGS)
   endif()
   add_test(NAME app_virtual_camera COMMAND test_app_virtual_camera)
