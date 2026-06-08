@@ -1,5 +1,6 @@
 #include "app_config.h"
 #include "../render/render_font.h"
+#include "../virtual_camera/virtual_camera.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -31,6 +32,7 @@ typedef enum config_value_kind {
     CONFIG_VALUE_SIZE,
     CONFIG_VALUE_PIXEL_SIZE,
     CONFIG_VALUE_CHAR_SIZE,
+    CONFIG_VALUE_VIRTUAL_CAMERA_SIZE,
     CONFIG_VALUE_SDL_VSYNC,
     CONFIG_VALUE_SDL_RENDERER,
     CONFIG_VALUE_MIRROR
@@ -54,6 +56,10 @@ static const struct option long_options[] = {
     {"config", required_argument, NULL, 1007},
     {"font", required_argument, NULL, 1008},
     {"aa-dimmer", required_argument, NULL, 1009},
+    {"virtual-camera", no_argument, NULL, 1010},
+    {"virtual-camera-device", required_argument, NULL, 1011},
+    {"virtual-camera-size", required_argument, NULL, 1012},
+    {"virtual-camera-fps", required_argument, NULL, 1013},
     {"help", no_argument, NULL, 'h'},
     {"aahelp", no_argument, NULL, 'H'},
     {"version", no_argument, NULL, 'v'},
@@ -102,6 +108,10 @@ static const char *help_text =
     "    --mirror       x|-x|y|-y                 - flip image, default x\n"
     "    --config       load startup TOML config  - default ./hasciicam.toml\n"
     " -D --daemon       run in background         - default foregrond\n"
+    "    --virtual-camera enable virtual webcam   - default off\n"
+    "    --virtual-camera-device path|name        - default platform-specific\n"
+    "    --virtual-camera-size WxH                - default 1280x720\n"
+    "    --virtual-camera-fps N                   - default 30\n"
     "    --frames N     stop after N rendered frames (test/smoke)\n"
     " -U --uid          setuid (int)              - default current\n"
     " -G --gid          setgid (int)              - default current\n"
@@ -129,6 +139,10 @@ static const config_key_desc config_keys[] = {
     {"size", CONFIG_VALUE_SIZE, 0, 0},
     {"pixel_size", CONFIG_VALUE_PIXEL_SIZE, 1, 1},
     {"char_size", CONFIG_VALUE_CHAR_SIZE, 1, 1},
+    {"virtual_camera", CONFIG_VALUE_BOOL, 1, 1},
+    {"virtual_camera_device", CONFIG_VALUE_STRING, 1, 1},
+    {"virtual_camera_size", CONFIG_VALUE_VIRTUAL_CAMERA_SIZE, 1, 1},
+    {"virtual_camera_fps", CONFIG_VALUE_INT, 1, 1},
     {"output_file", CONFIG_VALUE_STRING, 1, 1},
     {"aa_driver", CONFIG_VALUE_STRING, 1, 1},
     {"daemon", CONFIG_VALUE_BOOL, 1, 1},
@@ -414,6 +428,39 @@ static int set_config_value(hasciicam_config *cfg,
         cfg->explicit_size = 1;
         return 1;
     }
+    if (strcmp(key, "virtual_camera") == 0) {
+        if (!parse_bool_value(value, &cfg->virtual_camera)) {
+            set_errorf(err, err_size, "invalid value for %s", key);
+            return 0;
+        }
+        return 1;
+    }
+    if (strcmp(key, "virtual_camera_device") == 0) {
+        strncpy(cfg->virtual_camera_device, value, sizeof(cfg->virtual_camera_device) - 1);
+        cfg->virtual_camera_device[sizeof(cfg->virtual_camera_device) - 1] = '\0';
+        return 1;
+    }
+    if (strcmp(key, "virtual_camera_size") == 0) {
+        if (!hasciicam_virtual_camera_parse_size(value, &w, &h)) {
+            set_error(err, err_size, "invalid value for virtual_camera_size: expected WxH");
+            return 0;
+        }
+        if ((w & 1) != 0 || (h & 1) != 0) {
+            set_error(err, err_size, "invalid value for virtual_camera_size: expected even WxH");
+            return 0;
+        }
+        cfg->virtual_camera_width = w;
+        cfg->virtual_camera_height = h;
+        return 1;
+    }
+    if (strcmp(key, "virtual_camera_fps") == 0) {
+        if (!parse_int_value(value, &iv) || iv <= 0) {
+            set_error(err, err_size, "invalid value for virtual_camera_fps: expected positive integer");
+            return 0;
+        }
+        cfg->virtual_camera_fps = iv;
+        return 1;
+    }
     if (strcmp(key, "output_file") == 0) {
         strncpy(cfg->aafile, value, sizeof(cfg->aafile) - 1);
         cfg->aafile[sizeof(cfg->aafile) - 1] = '\0';
@@ -623,6 +670,26 @@ static int config_value_as_string(const hasciicam_config *cfg,
         *out_is_quoted = 1;
         return 1;
     }
+    if (strcmp(key, "virtual_camera") == 0) {
+        snprintf(out, out_size, "%s", cfg->virtual_camera ? "true" : "false");
+        *out_is_quoted = 0;
+        return 1;
+    }
+    if (strcmp(key, "virtual_camera_device") == 0) {
+        snprintf(out, out_size, "%s", cfg->virtual_camera_device);
+        *out_is_quoted = 1;
+        return 1;
+    }
+    if (strcmp(key, "virtual_camera_size") == 0) {
+        snprintf(out, out_size, "%dx%d", cfg->virtual_camera_width, cfg->virtual_camera_height);
+        *out_is_quoted = 1;
+        return 1;
+    }
+    if (strcmp(key, "virtual_camera_fps") == 0) {
+        snprintf(out, out_size, "%d", cfg->virtual_camera_fps);
+        *out_is_quoted = 0;
+        return 1;
+    }
     if (strcmp(key, "output_file") == 0) {
         snprintf(out, out_size, "%s", cfg->aafile);
         *out_is_quoted = 1;
@@ -776,6 +843,7 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
 
 #if defined(_WIN32)
     cfg->device[0] = '\0';
+    strcpy(cfg->virtual_camera_device, "");
 #else
     {
         struct stat st;
@@ -784,6 +852,7 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
         else
             strcpy(cfg->device, "/dev/video");
     }
+    strcpy(cfg->virtual_camera_device, "/dev/video10");
 #endif
 
     strcpy(cfg->background, "000000");
@@ -813,6 +882,10 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
     cfg->sdl_fullscreen = 0;
     cfg->mirror_x = 1;
     cfg->mirror_y = 0;
+    cfg->virtual_camera = 0;
+    cfg->virtual_camera_width = 1280;
+    cfg->virtual_camera_height = 720;
+    cfg->virtual_camera_fps = 30;
 }
 
 int hasciicam_config_load_env(hasciicam_config *cfg, char *err, size_t err_size) {
@@ -1115,6 +1188,27 @@ void hasciicam_config_parse(hasciicam_config *cfg,
             break;
         case 1009:
             if (!set_config_value(cfg, "aa_dimmer", optarg, env_err, sizeof(env_err))) {
+                fprintf(stderr, "!! %s\n", env_err);
+                exit(1);
+            }
+            break;
+        case 1010:
+            cfg->virtual_camera = 1;
+            break;
+        case 1011:
+            if (!set_config_value(cfg, "virtual_camera_device", optarg, env_err, sizeof(env_err))) {
+                fprintf(stderr, "!! %s\n", env_err);
+                exit(1);
+            }
+            break;
+        case 1012:
+            if (!set_config_value(cfg, "virtual_camera_size", optarg, env_err, sizeof(env_err))) {
+                fprintf(stderr, "!! %s\n", env_err);
+                exit(1);
+            }
+            break;
+        case 1013:
+            if (!set_config_value(cfg, "virtual_camera_fps", optarg, env_err, sizeof(env_err))) {
                 fprintf(stderr, "!! %s\n", env_err);
                 exit(1);
             }

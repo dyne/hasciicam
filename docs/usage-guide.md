@@ -47,7 +47,30 @@ rendering options:
  -I --invert       invert colors             - default off
  -B --background   background color (hex)    - default 000000
  -F --foreground   foreground color (hex)    - default FFFFFF
- ```
+```
+
+## Linux Virtual Camera Output
+
+HasciiCam can write its live SDL ASCII frames into an existing
+[`v4l2loopback`](https://github.com/v4l2loopback/v4l2loopback) output device.
+HasciiCam does not load the kernel module, create devices, or change system
+permissions for you.
+
+Typical setup on Linux:
+
+```sh
+sudo modprobe v4l2loopback video_nr=10 card_label="HasciiCam" exclusive_caps=1
+v4l2-ctl --device=/dev/video10 --all
+./hasciicam -d synthetic:// -O SDL --virtual-camera --virtual-camera-device /dev/video10
+```
+
+Notes:
+
+- `exclusive_caps=1` is the common setting for browser and WebRTC consumers.
+- `v4l2-ctl` is useful for verification and troubleshooting.
+- HasciiCam negotiates the output format itself; you do not need to call
+  `v4l2loopback-ctl set-fps` or `set-caps` for normal use.
+- The loopback device must already exist and be writable by the current user.
 
 ## Build From Source
 

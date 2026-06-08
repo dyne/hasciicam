@@ -42,6 +42,7 @@ static void clear_test_env(void) {
     const char *keys[] = {
         "show_help", "show_aahelp", "show_version",
         "quiet", "mode", "device", "input", "size", "pixel_size", "char_size",
+        "virtual_camera", "virtual_camera_device", "virtual_camera_size", "virtual_camera_fps",
         "output_file", "aa_driver", "daemon", "font_size", "font_face", "font",
         "refresh", "aa_bright", "aa_contrast", "aa_gamma", "aa_dimmer", "invert",
         "background", "foreground", "uid", "gid", "frames",
@@ -66,6 +67,10 @@ static void test_env_load(void) {
     set_env_var("aa_dimmer", "off");
     set_env_var("sdl_vsync", "off");
     set_env_var("char_size", "80x25");
+    set_env_var("virtual_camera", "true");
+    set_env_var("virtual_camera_device", "HasciiCam");
+    set_env_var("virtual_camera_size", "1280x720");
+    set_env_var("virtual_camera_fps", "30");
 
     hasciicam_config_init_defaults(&cfg);
     expect_true(hasciicam_config_load_env(&cfg, err, sizeof(err)), "load_env should succeed");
@@ -78,6 +83,12 @@ static void test_env_load(void) {
     expect_true(cfg.sdl_vsync == 0, "sdl_vsync should be off");
     expect_true(cfg.size_intent == HASCIICAM_SIZE_CHARS, "char_size should set char intent");
     expect_true(cfg.size_w == 80 && cfg.size_h == 25, "char_size should parse 80x25");
+    expect_true(cfg.virtual_camera == 1, "virtual_camera should be true");
+    expect_true(strcmp(cfg.virtual_camera_device, "HasciiCam") == 0,
+                "virtual_camera_device should be HasciiCam");
+    expect_true(cfg.virtual_camera_width == 1280 && cfg.virtual_camera_height == 720,
+                "virtual_camera_size should parse 1280x720");
+    expect_true(cfg.virtual_camera_fps == 30, "virtual_camera_fps should be 30");
 
     clear_test_env();
 }
@@ -89,6 +100,17 @@ static void test_defaults(void) {
     expect_true(strcmp(cfg.background, "000000") == 0, "default background should be black");
     expect_true(strcmp(cfg.foreground, "FFFFFF") == 0, "default foreground should be white");
     expect_true(cfg.aa_dimmer == 1, "default aa_dimmer should be on");
+    expect_true(cfg.virtual_camera == 0, "default virtual_camera should be off");
+#if defined(_WIN32)
+    expect_true(strcmp(cfg.virtual_camera_device, "") == 0,
+                "default virtual_camera_device should be empty on Windows");
+#else
+    expect_true(strcmp(cfg.virtual_camera_device, "/dev/video10") == 0,
+                "default virtual_camera_device should be /dev/video10 on Linux");
+#endif
+    expect_true(cfg.virtual_camera_width == 1280 && cfg.virtual_camera_height == 720,
+                "default virtual_camera_size should be 1280x720");
+    expect_true(cfg.virtual_camera_fps == 30, "default virtual_camera_fps should be 30");
 }
 
 static void test_cli_overrides_env(void) {
@@ -204,6 +226,11 @@ static void test_toml_roundtrip(void) {
     cfg.size_h = 30;
     cfg.explicit_size = 1;
     strcpy(cfg.font, "vga8");
+    cfg.virtual_camera = 1;
+    cfg.virtual_camera_width = 1280;
+    cfg.virtual_camera_height = 720;
+    cfg.virtual_camera_fps = 30;
+    strcpy(cfg.virtual_camera_device, "HasciiCam");
 
     expect_true(hasciicam_config_save_toml(&cfg, path, err, sizeof(err)), "save_toml should succeed");
 
@@ -217,6 +244,12 @@ static void test_toml_roundtrip(void) {
     expect_true(loaded.size_intent == HASCIICAM_SIZE_CHARS, "roundtrip size intent should be chars");
     expect_true(loaded.size_w == 90 && loaded.size_h == 30, "roundtrip size should match");
     expect_true(strcmp(loaded.font, "vga8") == 0, "roundtrip font should match");
+    expect_true(loaded.virtual_camera == 1, "roundtrip virtual_camera should match");
+    expect_true(strcmp(loaded.virtual_camera_device, "HasciiCam") == 0,
+                "roundtrip virtual_camera_device should match");
+    expect_true(loaded.virtual_camera_width == 1280 && loaded.virtual_camera_height == 720,
+                "roundtrip virtual_camera_size should match");
+    expect_true(loaded.virtual_camera_fps == 30, "roundtrip virtual_camera_fps should match");
 
     remove(path);
 }
@@ -300,6 +333,18 @@ static void test_env_size_key_ignored(void) {
     clear_test_env();
 }
 
+static void test_env_virtual_camera_size_rejected(void) {
+    hasciicam_config cfg;
+    char err[200];
+
+    clear_test_env();
+    set_env_var("virtual_camera_size", "1279x720");
+    hasciicam_config_init_defaults(&cfg);
+    expect_true(!hasciicam_config_load_env(&cfg, err, sizeof(err)),
+                "load_env should reject odd virtual_camera_size");
+    clear_test_env();
+}
+
 int main(void) {
     test_defaults();
     test_env_load();
@@ -312,6 +357,7 @@ int main(void) {
     test_toml_mirror_roundtrip();
     test_toml_size_key_rejected();
     test_env_size_key_ignored();
+    test_env_virtual_camera_size_rejected();
 
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);

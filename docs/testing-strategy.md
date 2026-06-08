@@ -24,6 +24,10 @@ Current examples:
 - `frame_convert`: deterministic conversion coverage.
 - `core_link`: public embedding API link/creation smoke.
 - `pipeline_smoke`: synthetic frame end-to-end render smoke via public API.
+- `virtual_camera`: platform-neutral virtual-camera contract coverage.
+- `app_virtual_camera`: SDL callback and publish-gate coverage.
+- `virtual_camera_windows`, `virtual_camera_install`: Windows COM/source and install helpers.
+- `virtual_camera_v4l2`: Linux V4L2 output helper coverage.
 
 ### Deterministic CLI smoke tests
 
@@ -101,6 +105,7 @@ Already in repository:
 4. CTest labels: `unit`, `core`, `cli`, `visual`, `camera`.
 5. CLI tests: `cli_help`, `cli_aahelp`, `cli_stdout`, `cli_text`, `cli_html`.
 6. Opt-in tests: `visual_sdl`, `camera_text`.
+7. Virtual camera feature tests are split by platform and stay deterministic unless a real consumer is explicitly available.
 
 Do not let synthetic capture become fallback behavior. It must be selected
 explicitly so real capture regressions remain visible.

@@ -85,6 +85,28 @@ Checks:
 - V4L2 backend selected
 - live ASCII updates
 
+## Linux (virtual camera output)
+
+Prepare a loopback device first:
+
+```sh
+sudo modprobe v4l2loopback video_nr=10 card_label="HasciiCam" exclusive_caps=1
+v4l2-ctl --device=/dev/video10 --all
+```
+
+Run HasciiCam against the existing output node:
+
+```sh
+./hasciicam -d synthetic:// --frames 2 -O SDL --virtual-camera --virtual-camera-device /dev/video10
+```
+
+Checks:
+
+- startup succeeds without trying to load kernel modules
+- `v4l2-ctl` reports the loopback device
+- live SDL output stays responsive while the loopback node is attached
+- a consumer application can open `/dev/video10` after the producer starts
+
 ## Linux (size negotiation)
 
 ```sh

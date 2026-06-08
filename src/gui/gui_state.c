@@ -114,6 +114,37 @@ void hasciicam_gui_state_set_capture_controls(hasciicam_gui_state *state,
     }
 }
 
+void hasciicam_gui_state_set_virtual_camera(hasciicam_gui_state *state,
+                                            int enabled,
+                                            const char *backend,
+                                            const char *name,
+                                            const char *device,
+                                            int width,
+                                            int height,
+                                            int fps,
+                                            int connected,
+                                            unsigned long long accepted_frames,
+                                            unsigned long long dropped_frames) {
+    if (state == NULL)
+        return;
+    state->virtual_camera_enabled = enabled ? 1 : 0;
+    state->virtual_camera_connected = connected ? 1 : 0;
+    state->virtual_camera_width = width;
+    state->virtual_camera_height = height;
+    state->virtual_camera_fps = fps;
+    state->virtual_camera_accepted_frames = accepted_frames;
+    state->virtual_camera_dropped_frames = dropped_frames;
+    strncpy(state->virtual_camera_backend, backend != NULL ? backend : "",
+            sizeof(state->virtual_camera_backend) - 1);
+    state->virtual_camera_backend[sizeof(state->virtual_camera_backend) - 1] = '\0';
+    strncpy(state->virtual_camera_name, name != NULL ? name : "",
+            sizeof(state->virtual_camera_name) - 1);
+    state->virtual_camera_name[sizeof(state->virtual_camera_name) - 1] = '\0';
+    strncpy(state->virtual_camera_device, device != NULL ? device : "",
+            sizeof(state->virtual_camera_device) - 1);
+    state->virtual_camera_device[sizeof(state->virtual_camera_device) - 1] = '\0';
+}
+
 int hasciicam_gui_state_update_preview(hasciicam_gui_state *state,
                                        const unsigned char *gray_frame,
                                        int width,

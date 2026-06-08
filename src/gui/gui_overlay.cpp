@@ -257,6 +257,19 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
     }
 
     ImGui::Separator();
+    ImGui::Text("Virtual Camera");
+    ImGui::Text("Enabled: %s", state->virtual_camera_enabled ? "yes" : "no");
+    ImGui::Text("Backend: %s", state->virtual_camera_backend[0] ? state->virtual_camera_backend : "(none)");
+    ImGui::Text("Name: %s", state->virtual_camera_name[0] ? state->virtual_camera_name : "(none)");
+    ImGui::Text("Device: %s", state->virtual_camera_device[0] ? state->virtual_camera_device : "(none)");
+    ImGui::Text("Size: %dx%d @ %d fps",
+                state->virtual_camera_width,
+                state->virtual_camera_height,
+                state->virtual_camera_fps);
+    ImGui::Text("State: %s", state->virtual_camera_connected ? "connected" : "disconnected");
+    ImGui::Text("Dropped frames: %llu", state->virtual_camera_dropped_frames);
+
+    ImGui::Separator();
     ImGui::Text("Colors");
     rgb_to_float3(state->foreground_rgb, fg);
     rgb_to_float3(state->background_rgb, bg);

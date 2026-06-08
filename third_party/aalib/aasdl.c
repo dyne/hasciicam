@@ -9,6 +9,7 @@
 #include "aaint.h"
 #include "aasdlint.h"
 #include "gui_bridge.h"
+#include "../../src/virtual_camera/virtual_camera.h"
 #include "../render/render_font.h"
 #if defined(HASCIICAM_ENABLE_GUI)
 #include "../gui/gui_overlay.h"
@@ -502,6 +503,8 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     d->gui_ready = 0;
     d->gui_visible = 0;
     d->gui_state = NULL;
+    d->frame_callback = NULL;
+    d->frame_callback_user_data = NULL;
     d->x_offset_px = 0;
     d->y_offset_px = 0;
     d->force_clear = 1;
@@ -732,6 +735,18 @@ static void SDL_flush(aa_context *c)
         }
     }
 
+    if (d->frame_callback != NULL && d->stream_pixels != NULL) {
+        hasciicam_virtual_camera_frame frame;
+        memset(&frame, 0, sizeof(frame));
+        frame.pixels = (const unsigned char *)d->stream_pixels;
+        frame.width = content_px_w;
+        frame.height = content_px_h;
+        frame.stride_bytes = d->stream_width * (int)sizeof(*d->stream_pixels);
+        frame.pixel_format = HASCIICAM_VIRTUAL_CAMERA_PIXFMT_BGRA32;
+        frame.timestamp_100ns = (unsigned long long)SDL_GetTicks64() * 10000ULL;
+        d->frame_callback(d->frame_callback_user_data, &frame);
+    }
+
     if (SDL_UpdateTexture(d->stream_texture,
                           NULL,
                           d->stream_pixels,
@@ -860,6 +875,20 @@ int hasciicam_sdl_set_gui_state(aa_context *context, struct hasciicam_gui_state 
     d->gui_ready = 0;
 #endif
     return d->gui_ready;
+}
+
+int hasciicam_sdl_set_frame_callback(aa_context *context,
+                                     hasciicam_sdl_frame_callback callback,
+                                     void *user_data) {
+    struct sdldriverdata *d;
+    if (context == NULL || context->driverdata == NULL)
+        return 0;
+    if (context->driver != &SDL_d)
+        return 0;
+    d = (struct sdldriverdata *)context->driverdata;
+    d->frame_callback = callback;
+    d->frame_callback_user_data = user_data;
+    return 1;
 }
 
 int hasciicam_sdl_set_runtime_colors(aa_context *context,

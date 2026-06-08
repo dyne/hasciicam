@@ -47,6 +47,7 @@
 #include <aalib.h>
 #include "app/app_config.h"
 #include "app/app_live_controls.h"
+#include "app/app_virtual_camera.h"
 #include "app/app_size.h"
 #include "app/app_session.h"
 #include "capture/capture_backend.h"
@@ -109,6 +110,28 @@ static void apply_sdl_runtime_options(const hasciicam_config *cfg) {
     set_process_env("HASCIICAM_SDL_FULLSCREEN", "1");
 }
 
+static void sync_virtual_camera_gui_state(hasciicam_gui_state *gui_state,
+                                          const hasciicam_app_virtual_camera *virtual_camera) {
+  const hasciicam_virtual_camera_request *request;
+  const char *backend_name = "";
+
+  if (gui_state == NULL || virtual_camera == NULL)
+    return;
+  request = hasciicam_app_virtual_camera_request(virtual_camera);
+  backend_name = hasciicam_app_virtual_camera_backend_name(virtual_camera);
+  hasciicam_gui_state_set_virtual_camera(gui_state,
+                                         request != NULL ? request->enabled : 0,
+                                         backend_name,
+                                         "HasciiCam",
+                                         request != NULL ? request->device : "",
+                                         request != NULL ? request->width : 0,
+                                         request != NULL ? request->height : 0,
+                                         request != NULL ? request->fps : 0,
+                                         virtual_camera->active,
+                                         hasciicam_app_virtual_camera_accepted_frames(virtual_camera),
+                                         hasciicam_app_virtual_camera_dropped_frames(virtual_camera));
+}
+
 /* greyscale image is sampled from Y luminance component */
 int YtoRGB[256];
 int xstep=2, ystep=4;
@@ -130,6 +153,7 @@ main (int argc, char **argv) {
   hasciicam_render_session render_session;
   hasciicam_gui_state gui_state;
   hasciicam_output output;
+  hasciicam_app_virtual_camera virtual_camera;
   capture_control_desc control_descs[CAPTURE_MAX_CONTROLS];
   int control_count = 0;
   struct geometry aa_geo;
@@ -170,6 +194,7 @@ main (int argc, char **argv) {
           PACKAGE, VERSION);
 
   hasciicam_config_init_defaults(&appcfg);
+  hasciicam_app_virtual_camera_init(&virtual_camera);
 
   /* default values */
 #if defined(_WIN32)
@@ -206,6 +231,11 @@ main (int argc, char **argv) {
   foreground = appcfg.foreground;
   fontface = appcfg.fontface;
   aadriver = appcfg.aadriver;
+
+  if (appcfg.virtual_camera && mode != LIVE) {
+    fprintf(stderr, "!! virtual camera is only available in live mode\n");
+    exit(-1);
+  }
   selected_font = hasciicam_font_find(appcfg.font);
   if (selected_font.font == 0) {
     fprintf(stderr, "!! unknown font '%s'\n", appcfg.font);
@@ -346,6 +376,31 @@ main (int argc, char **argv) {
     exit(-1);
   }
 
+  if (mode == LIVE && appcfg.virtual_camera) {
+    char virtual_camera_err[256];
+    if (render_session.context == NULL || render_session.context->driver == NULL ||
+        strcmp(render_session.context->driver->shortname, "SDL") != 0) {
+      fprintf(stderr, "!! virtual camera requires the SDL live driver\n");
+      hasciicam_session_stop(&session);
+      hasciicam_render_session_close(&render_session);
+      exit(-1);
+    }
+    virtual_camera_err[0] = '\0';
+    if (!hasciicam_app_virtual_camera_start(&virtual_camera,
+                                            render_session.context,
+                                            &appcfg,
+                                            hasciicam_sdl_set_frame_callback,
+                                            virtual_camera_err,
+                                            sizeof(virtual_camera_err))) {
+      fprintf(stderr, "!! cannot initialize virtual camera: %s\n",
+              virtual_camera_err[0] ? virtual_camera_err : "unknown error");
+      hasciicam_session_stop(&session);
+      hasciicam_render_session_close(&render_session);
+      exit(-1);
+    }
+    sync_virtual_camera_gui_state(&gui_state, &virtual_camera);
+  }
+
   /* report which driver was actually initialized */
   if(!quiet && render_session.context->driver) {
     fprintf(stderr,"Using driver: %s (%s)\n",
@@ -368,6 +423,7 @@ main (int argc, char **argv) {
   hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
   control_count = hasciicam_session_list_controls(&session, control_descs, CAPTURE_MAX_CONTROLS);
   hasciicam_gui_state_set_capture_controls(&gui_state, control_descs, control_count);
+  sync_virtual_camera_gui_state(&gui_state, &virtual_camera);
   hasciicam_sdl_set_runtime_colors(render_session.context,
                                    gui_state.foreground_rgb,
                                    gui_state.background_rgb,
@@ -457,6 +513,7 @@ main (int argc, char **argv) {
         hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
         control_count = hasciicam_session_list_controls(&session, control_descs, CAPTURE_MAX_CONTROLS);
         hasciicam_gui_state_set_capture_controls(&gui_state, control_descs, control_count);
+        sync_virtual_camera_gui_state(&gui_state, &virtual_camera);
         if (strcmp(previous_font, gui_state.font) != 0)
           gui_state.font_change_requested = 1;
         strncpy(gui_state.active_font, previous_font, sizeof(gui_state.active_font) - 1);
@@ -550,6 +607,9 @@ main (int argc, char **argv) {
         hasciicam_session_request_stop(&session);
       }
     }
+    if (mode == LIVE && appcfg.virtual_camera) {
+      sync_virtual_camera_gui_state(&gui_state, &virtual_camera);
+    }
 
   }
 
@@ -558,6 +618,12 @@ main (int argc, char **argv) {
   hasciicam_session_stop(&session);
   hasciicam_gui_state_reset_preview(&gui_state);
   hasciicam_output_close(&output);
+  if (!quiet && mode == LIVE && appcfg.virtual_camera) {
+    fprintf(stderr, "Virtual camera frames: accepted=%llu dropped=%llu\n",
+            hasciicam_app_virtual_camera_accepted_frames(&virtual_camera),
+            hasciicam_app_virtual_camera_dropped_frames(&virtual_camera));
+  }
+  hasciicam_app_virtual_camera_stop(&virtual_camera, hasciicam_sdl_set_frame_callback);
   hasciicam_render_session_close(&render_session);
   fprintf (stderr, "cya!\n");
   exit (0);

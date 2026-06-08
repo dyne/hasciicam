@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
+if(POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW)
+endif()
 project(hasciicam VERSION 2.0 LANGUAGES C CXX)
 
 if(APPLE)
@@ -19,6 +22,12 @@ option(HASCIICAM_ENABLE_SDL "Enable SDL output driver" ON)
 option(HASCIICAM_ENABLE_X11 "Enable X11 output driver" ON)
 option(HASCIICAM_ENABLE_CURSES "Enable curses output driver" ON)
 option(HASCIICAM_ENABLE_GUI "Enable on-screen Dear ImGui controls in SDL live mode" ON)
+if(WIN32 OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND HASCIICAM_ENABLE_SDL))
+  set(HASCIICAM_DEFAULT_ENABLE_VIRTUAL_CAMERA ON)
+else()
+  set(HASCIICAM_DEFAULT_ENABLE_VIRTUAL_CAMERA OFF)
+endif()
+option(HASCIICAM_ENABLE_VIRTUAL_CAMERA "Enable virtual camera output" ${HASCIICAM_DEFAULT_ENABLE_VIRTUAL_CAMERA})
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   option(HASCIICAM_ENABLE_CAPTURE_V4L2 "Enable V4L2 capture backend" ON)
 else()
@@ -37,9 +46,16 @@ else()
   option(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION "Enable AVFoundation capture backend" OFF)
 endif()
 
+if(HASCIICAM_ENABLE_VIRTUAL_CAMERA AND NOT HASCIICAM_ENABLE_SDL)
+  message(FATAL_ERROR
+    "HASCIICAM_ENABLE_VIRTUAL_CAMERA requires HASCIICAM_ENABLE_SDL=ON. "
+    "Virtual camera publishing only works in live SDL mode.")
+endif()
+
 set(HASCIICAM_WITH_SDL OFF)
 set(HASCIICAM_WITH_X11 OFF)
 set(HASCIICAM_WITH_CURSES OFF)
+set(HASCIICAM_WITH_VIRTUAL_CAMERA OFF)
 
 if(HASCIICAM_ENABLE_SDL)
   find_package(SDL2 QUIET)
@@ -156,6 +172,10 @@ target_include_directories(hasciicam_core PRIVATE src/app)
 if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
   target_sources(hasciicam_core PRIVATE src/capture/capture_avfoundation.mm)
 endif()
+if(HASCIICAM_ENABLE_VIRTUAL_CAMERA)
+  set(HASCIICAM_WITH_VIRTUAL_CAMERA ON)
+  add_compile_definitions(HASCIICAM_ENABLE_VIRTUAL_CAMERA=1)
+endif()
 
 set(HASCIICAM_WITH_GUI OFF)
 set(HASCIICAM_GUI_SOURCES)
@@ -177,6 +197,7 @@ if(HASCIICAM_ENABLE_GUI AND HASCIICAM_WITH_SDL)
       third_party/imgui
       third_party/imgui/backends
       src/gui
+      src/virtual_camera
     )
     target_compile_definitions(aalib PRIVATE HASCIICAM_ENABLE_GUI=1)
   else()
@@ -209,8 +230,11 @@ if(HASCIICAM_WITH_CURSES)
   target_include_directories(hasciicam_core PUBLIC ${CURSES_INCLUDE_DIRS})
 endif()
 
-if(HASCIICAM_ENABLE_CAPTURE_MF OR HASCIICAM_ENABLE_CAPTURE_DSHOW)
+if(WIN32)
   target_link_libraries(hasciicam_core PUBLIC mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+  if(HASCIICAM_ENABLE_VIRTUAL_CAMERA)
+    target_link_libraries(hasciicam_core PUBLIC mfsensorgroup)
+  endif()
 endif()
 if(HASCIICAM_WITH_GUI AND WIN32)
   target_link_libraries(hasciicam_core PUBLIC comdlg32)
@@ -258,6 +282,7 @@ message(STATUS "  HASCIICAM_ENABLE_SDL=${HASCIICAM_ENABLE_SDL} (found=${HASCIICA
 message(STATUS "  HASCIICAM_ENABLE_X11=${HASCIICAM_ENABLE_X11} (found=${HASCIICAM_WITH_X11})")
 message(STATUS "  HASCIICAM_ENABLE_CURSES=${HASCIICAM_ENABLE_CURSES} (found=${HASCIICAM_WITH_CURSES})")
 message(STATUS "  HASCIICAM_ENABLE_GUI=${HASCIICAM_ENABLE_GUI} (enabled=${HASCIICAM_WITH_GUI})")
+message(STATUS "  HASCIICAM_ENABLE_VIRTUAL_CAMERA=${HASCIICAM_ENABLE_VIRTUAL_CAMERA} (enabled=${HASCIICAM_WITH_VIRTUAL_CAMERA})")
 message(STATUS "  HASCIICAM_ENABLE_CAPTURE_V4L2=${HASCIICAM_ENABLE_CAPTURE_V4L2}")
 message(STATUS "  HASCIICAM_ENABLE_CAPTURE_MF=${HASCIICAM_ENABLE_CAPTURE_MF}")
 message(STATUS "  HASCIICAM_ENABLE_CAPTURE_DSHOW=${HASCIICAM_ENABLE_CAPTURE_DSHOW}")
@@ -268,6 +293,39 @@ if(HASCIICAM_BUILD_CLI)
   install(TARGETS hasciicam DESTINATION bin)
 endif()
 install(FILES docs/hasciicam.1 DESTINATION share/man/man1 OPTIONAL)
+
+if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
+  add_library(hasciicam_virtual_camera_source SHARED
+    src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c
+    src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c
+    src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp
+    src/virtual_camera/windows/source/hasciicam_virtual_camera_source.def
+    src/virtual_camera/virtual_camera.c
+    src/virtual_camera/virtual_camera_convert.c
+  )
+  target_include_directories(hasciicam_virtual_camera_source PRIVATE
+    src/virtual_camera/windows/install
+    src/virtual_camera/windows/pipe
+    src/virtual_camera/windows/source
+    src/virtual_camera)
+  target_compile_definitions(hasciicam_virtual_camera_source PRIVATE _CRT_SECURE_NO_WARNINGS)
+  set_property(TARGET hasciicam_virtual_camera_source PROPERTY
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  target_link_libraries(hasciicam_virtual_camera_source PRIVATE
+    mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+
+  add_executable(hasciicam_vcamctl
+    src/virtual_camera/windows/tool/hasciicam_vcamctl.c
+    src/virtual_camera/windows/install/hasciicam_virtual_camera_install.c
+  )
+  target_include_directories(hasciicam_vcamctl PRIVATE
+    src/virtual_camera/windows/install)
+  target_compile_definitions(hasciicam_vcamctl PRIVATE _CRT_SECURE_NO_WARNINGS)
+  target_link_libraries(hasciicam_vcamctl PRIVATE advapi32)
+
+  install(TARGETS hasciicam_virtual_camera_source hasciicam_vcamctl
+          RUNTIME DESTINATION bin)
+endif()
 
 if(HASCIICAM_ENABLE_TESTS)
   enable_testing()
@@ -302,16 +360,43 @@ if(HASCIICAM_ENABLE_TESTS)
     tests/test_app_config.c
     src/app/app_config.c
     src/app/tomlc17/tomlc17.c
+    src/virtual_camera/virtual_camera.c
+    src/virtual_camera/virtual_camera_convert.c
   )
   target_include_directories(test_app_config PRIVATE src/app src/render third_party/aalib)
   target_link_libraries(test_app_config PRIVATE aalib)
   if(WIN32)
     target_sources(test_app_config PRIVATE src/compat/getopt.c)
+    target_sources(test_app_config PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
+    target_sources(test_app_config PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c)
     target_include_directories(test_app_config PRIVATE src/compat)
     target_compile_definitions(test_app_config PRIVATE _CRT_SECURE_NO_WARNINGS)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_sources(test_app_config PRIVATE src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.c)
   endif()
   add_test(NAME app_config COMMAND test_app_config)
   set_tests_properties(app_config PROPERTIES LABELS "unit;core")
+
+  add_executable(test_app_virtual_camera
+    tests/test_app_virtual_camera.c
+    tests/test_app_virtual_camera_windows_stub.c
+    src/app/app_virtual_camera.c
+    src/app/app_config.c
+    src/app/tomlc17/tomlc17.c
+    src/virtual_camera/virtual_camera.c
+    src/virtual_camera/virtual_camera_convert.c
+  )
+  target_include_directories(test_app_virtual_camera PRIVATE src/app src/virtual_camera src/gui)
+  target_link_libraries(test_app_virtual_camera PRIVATE aalib)
+  if(WIN32)
+    target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
+    target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c)
+    target_compile_definitions(test_app_virtual_camera PRIVATE _CRT_SECURE_NO_WARNINGS)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.c)
+  endif()
+  add_test(NAME app_virtual_camera COMMAND test_app_virtual_camera)
+  set_tests_properties(app_virtual_camera PROPERTIES LABELS "unit;core")
 
   add_executable(test_gui_state
     tests/test_gui_state.c
@@ -328,6 +413,86 @@ if(HASCIICAM_ENABLE_TESTS)
   target_include_directories(test_capture_size PRIVATE src/capture)
   add_test(NAME capture_size COMMAND test_capture_size)
   set_tests_properties(capture_size PROPERTIES LABELS "unit;core")
+
+  add_executable(test_virtual_camera
+    tests/test_virtual_camera.c
+    src/virtual_camera/virtual_camera.c
+    src/virtual_camera/virtual_camera_convert.c
+  )
+  target_include_directories(test_virtual_camera PRIVATE src/virtual_camera)
+  if(WIN32)
+    target_sources(test_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
+    target_sources(test_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_sources(test_virtual_camera PRIVATE src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.c)
+  endif()
+  add_test(NAME virtual_camera COMMAND test_virtual_camera)
+  set_tests_properties(virtual_camera PROPERTIES LABELS "unit;core")
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
+    add_executable(test_virtual_camera_v4l2
+      tests/test_virtual_camera_v4l2.c
+      src/virtual_camera/virtual_camera.c
+      src/virtual_camera/virtual_camera_convert.c
+      src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.c
+    )
+    target_include_directories(test_virtual_camera_v4l2 PRIVATE
+      src/virtual_camera
+      src/virtual_camera/linux)
+    add_test(NAME virtual_camera_v4l2 COMMAND test_virtual_camera_v4l2)
+    set_tests_properties(virtual_camera_v4l2 PROPERTIES LABELS "unit;core")
+  endif()
+
+  if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
+    add_test(NAME hasciicam_vcamctl_help COMMAND hasciicam_vcamctl --help)
+    set_tests_properties(hasciicam_vcamctl_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: hasciicam-vcam")
+    set_tests_properties(hasciicam_vcamctl_help PROPERTIES LABELS "cli")
+
+    add_executable(test_app_virtual_camera_windows
+      tests/test_app_virtual_camera_windows.c
+      src/virtual_camera/windows/hasciicam_app_virtual_camera_windows.c
+    )
+    target_include_directories(test_app_virtual_camera_windows PRIVATE
+      src/app
+      src/virtual_camera/windows/source
+      src/virtual_camera)
+    target_compile_definitions(test_app_virtual_camera_windows PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(test_app_virtual_camera_windows PRIVATE
+      aalib mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+    add_test(NAME app_virtual_camera_windows COMMAND test_app_virtual_camera_windows)
+    set_tests_properties(app_virtual_camera_windows PROPERTIES LABELS "unit;core")
+
+    add_executable(test_virtual_camera_windows
+      tests/test_virtual_camera_windows.c
+      src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c
+      src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c
+      src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp
+      src/virtual_camera/virtual_camera.c
+      src/virtual_camera/virtual_camera_convert.c
+    )
+    target_include_directories(test_virtual_camera_windows PRIVATE
+      src/virtual_camera/windows/pipe
+      src/virtual_camera/windows/source
+      src/virtual_camera)
+    target_compile_definitions(test_virtual_camera_windows PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(test_virtual_camera_windows PRIVATE
+      mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+    add_dependencies(test_virtual_camera_windows hasciicam_virtual_camera_source)
+    add_test(NAME virtual_camera_windows COMMAND test_virtual_camera_windows)
+    set_tests_properties(virtual_camera_windows PROPERTIES LABELS "unit;core")
+
+    add_executable(test_virtual_camera_install
+      tests/test_virtual_camera_install.c
+      src/virtual_camera/windows/install/hasciicam_virtual_camera_install.c
+    )
+    target_include_directories(test_virtual_camera_install PRIVATE
+      src/virtual_camera/windows/install)
+    target_compile_definitions(test_virtual_camera_install PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(test_virtual_camera_install PRIVATE advapi32)
+    add_test(NAME virtual_camera_install COMMAND test_virtual_camera_install)
+    set_tests_properties(virtual_camera_install PROPERTIES LABELS "unit;core")
+
+  endif()
 
   add_executable(test_capture_control
     tests/test_capture_control.c
