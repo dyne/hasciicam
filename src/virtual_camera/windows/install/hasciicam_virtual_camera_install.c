@@ -168,13 +168,20 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
         return 0;
     }
     if (!CopyFileW(source_path, dest_path, FALSE)) {
-        set_error(err, err_size, "unable to copy DLL into install root");
+        snprintf(err, err_size, "unable to copy DLL into install root (error=%lu)",
+                 (unsigned long)GetLastError());
         return 0;
     }
-    if (!apply_sddl_to_path(dest_dir, kHasciiCamInstallDirectorySddl, err, err_size))
+    if (!apply_sddl_to_path(dest_dir, kHasciiCamInstallDirectorySddl, err, err_size)) {
+        snprintf(err, err_size, "unable to set install directory permissions (error=%lu)",
+                 (unsigned long)GetLastError());
         return 0;
-    if (!apply_sddl_to_path(dest_path, kHasciiCamInstallFileSddl, err, err_size))
+    }
+    if (!apply_sddl_to_path(dest_path, kHasciiCamInstallFileSddl, err, err_size)) {
+        snprintf(err, err_size, "unable to set DLL permissions (error=%lu)",
+                 (unsigned long)GetLastError());
         return 0;
+    }
     return 1;
 }
 

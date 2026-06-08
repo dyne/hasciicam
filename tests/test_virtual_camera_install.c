@@ -93,6 +93,8 @@ int main(void) {
                              L"%ls\\hasciicam_virtual_camera_source.dll",
                              module_dir) >= 0) {
                     wcscpy(dll_path, source_path);
+                    expect_true(GetFileAttributesW(dll_path) != INVALID_FILE_ATTRIBUTES,
+                                "source DLL should exist next to the test binary");
                 }
             }
         }
@@ -102,13 +104,15 @@ int main(void) {
         if (length > 0 && length < (DWORD)(sizeof(temp_root) / sizeof(temp_root[0]))) {
             expect_true(swprintf(dest_dir,
                                  sizeof(dest_dir) / sizeof(dest_dir[0]),
-                                 L"%lsHasciiCamInstallTest",
-                                 temp_root) >= 0,
+                                 L"%lsHasciiCamInstallTest_%lu",
+                                 temp_root,
+                                 (unsigned long)GetCurrentProcessId()) >= 0,
                         "temporary install root formatting should succeed");
             if (swprintf(dest_dir,
                          sizeof(dest_dir) / sizeof(dest_dir[0]),
-                         L"%lsHasciiCamInstallTest",
-                         temp_root) >= 0) {
+                         L"%lsHasciiCamInstallTest_%lu",
+                         temp_root,
+                         (unsigned long)GetCurrentProcessId()) >= 0) {
                 expect_true(swprintf(dest_path,
                                      sizeof(dest_path) / sizeof(dest_path[0]),
                                      L"%ls\\hasciicam_virtual_camera_source.dll",
@@ -118,11 +122,13 @@ int main(void) {
                              sizeof(dest_path) / sizeof(dest_path[0]),
                              L"%ls\\hasciicam_virtual_camera_source.dll",
                              dest_dir) >= 0) {
-                    expect_true(hasciicam_virtual_camera_install_copy_dll(dll_path,
-                                                                          dest_path,
-                                                                          err,
-                                                                          sizeof(err)),
-                                "copy helper should set permissions on a writable temp root");
+                    int copied = hasciicam_virtual_camera_install_copy_dll(dll_path,
+                                                                           dest_path,
+                                                                           err,
+                                                                           sizeof(err));
+                    if (!copied)
+                        fprintf(stderr, "copy helper error: %s\n", err);
+                    expect_true(copied, "copy helper should set permissions on a writable temp root");
                     DeleteFileW(dest_path);
                     RemoveDirectoryW(dest_dir);
                 }
