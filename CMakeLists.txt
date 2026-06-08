@@ -19,6 +19,12 @@ option(HASCIICAM_ENABLE_SDL "Enable SDL output driver" ON)
 option(HASCIICAM_ENABLE_X11 "Enable X11 output driver" ON)
 option(HASCIICAM_ENABLE_CURSES "Enable curses output driver" ON)
 option(HASCIICAM_ENABLE_GUI "Enable on-screen Dear ImGui controls in SDL live mode" ON)
+if(WIN32 OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND HASCIICAM_ENABLE_SDL))
+  set(HASCIICAM_DEFAULT_ENABLE_VIRTUAL_CAMERA ON)
+else()
+  set(HASCIICAM_DEFAULT_ENABLE_VIRTUAL_CAMERA OFF)
+endif()
+option(HASCIICAM_ENABLE_VIRTUAL_CAMERA "Enable virtual camera output" ${HASCIICAM_DEFAULT_ENABLE_VIRTUAL_CAMERA})
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   option(HASCIICAM_ENABLE_CAPTURE_V4L2 "Enable V4L2 capture backend" ON)
 else()
@@ -37,9 +43,16 @@ else()
   option(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION "Enable AVFoundation capture backend" OFF)
 endif()
 
+if(HASCIICAM_ENABLE_VIRTUAL_CAMERA AND NOT HASCIICAM_ENABLE_SDL)
+  message(FATAL_ERROR
+    "HASCIICAM_ENABLE_VIRTUAL_CAMERA requires HASCIICAM_ENABLE_SDL=ON. "
+    "Virtual camera publishing only works in live SDL mode.")
+endif()
+
 set(HASCIICAM_WITH_SDL OFF)
 set(HASCIICAM_WITH_X11 OFF)
 set(HASCIICAM_WITH_CURSES OFF)
+set(HASCIICAM_WITH_VIRTUAL_CAMERA OFF)
 
 if(HASCIICAM_ENABLE_SDL)
   find_package(SDL2 QUIET)
@@ -156,6 +169,10 @@ target_include_directories(hasciicam_core PRIVATE src/app)
 if(HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION)
   target_sources(hasciicam_core PRIVATE src/capture/capture_avfoundation.mm)
 endif()
+if(HASCIICAM_ENABLE_VIRTUAL_CAMERA)
+  set(HASCIICAM_WITH_VIRTUAL_CAMERA ON)
+  target_compile_definitions(hasciicam_core PRIVATE HASCIICAM_ENABLE_VIRTUAL_CAMERA=1)
+endif()
 
 set(HASCIICAM_WITH_GUI OFF)
 set(HASCIICAM_GUI_SOURCES)
@@ -259,6 +276,7 @@ message(STATUS "  HASCIICAM_ENABLE_SDL=${HASCIICAM_ENABLE_SDL} (found=${HASCIICA
 message(STATUS "  HASCIICAM_ENABLE_X11=${HASCIICAM_ENABLE_X11} (found=${HASCIICAM_WITH_X11})")
 message(STATUS "  HASCIICAM_ENABLE_CURSES=${HASCIICAM_ENABLE_CURSES} (found=${HASCIICAM_WITH_CURSES})")
 message(STATUS "  HASCIICAM_ENABLE_GUI=${HASCIICAM_ENABLE_GUI} (enabled=${HASCIICAM_WITH_GUI})")
+message(STATUS "  HASCIICAM_ENABLE_VIRTUAL_CAMERA=${HASCIICAM_ENABLE_VIRTUAL_CAMERA} (enabled=${HASCIICAM_WITH_VIRTUAL_CAMERA})")
 message(STATUS "  HASCIICAM_ENABLE_CAPTURE_V4L2=${HASCIICAM_ENABLE_CAPTURE_V4L2}")
 message(STATUS "  HASCIICAM_ENABLE_CAPTURE_MF=${HASCIICAM_ENABLE_CAPTURE_MF}")
 message(STATUS "  HASCIICAM_ENABLE_CAPTURE_DSHOW=${HASCIICAM_ENABLE_CAPTURE_DSHOW}")
@@ -361,7 +379,7 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME virtual_camera COMMAND test_virtual_camera)
   set_tests_properties(virtual_camera PROPERTIES LABELS "unit;core")
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
     add_executable(test_virtual_camera_v4l2
       tests/test_virtual_camera_v4l2.c
       src/virtual_camera/virtual_camera.c
@@ -371,7 +389,7 @@ if(HASCIICAM_ENABLE_TESTS)
     set_tests_properties(virtual_camera_v4l2 PROPERTIES LABELS "unit;core")
   endif()
 
-  if(WIN32)
+if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
     add_library(hasciicam_virtual_camera_source SHARED
       src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c
       src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp

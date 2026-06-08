@@ -189,7 +189,7 @@
 :Notes: Keep platform sources conditional and avoid making the Windows COM source or Linux headers part of unrelated targets.
 :END:
 
-** TODO [#A] Add focused CMake options and targets
+** DONE [#A] Add focused CMake options and targets
 :PROPERTIES:
 :Why: Virtual webcam support has platform SDK and installation requirements that should not burden normal builds.
 :Change: Add `HASCIICAM_ENABLE_VIRTUAL_CAMERA` defaulting ON only on Windows 11-capable SDK builds and Linux when SDL is enabled, plus platform-specific internal detection/status. Require SDL at configure time only when this option is enabled. Compile the Windows publisher into `hasciicam_core`, the Windows COM source as a separate shared-library target, and the Linux adapter only on Linux. Add clear status lines for API/header/library availability. Ensure `HASCIICAM_BUILD_CLI=OFF`, GUI off, capture backends off, and macOS builds still work.
