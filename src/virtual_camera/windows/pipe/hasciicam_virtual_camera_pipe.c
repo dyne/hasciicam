@@ -289,7 +289,6 @@ int hasciicam_virtual_camera_pipe_build_name(const hasciicam_virtual_camera_requ
                                              char *err,
                                              size_t err_size) {
     char device[128];
-    char user[64];
     char *cursor;
     size_t remaining;
 
@@ -305,15 +304,12 @@ int hasciicam_virtual_camera_pipe_build_name(const hasciicam_virtual_camera_requ
     }
     if (!sanitize_component(request->device, device, sizeof(device)))
         return 0;
-    if (!sanitize_component(current_username(), user, sizeof(user)))
-        return 0;
 
     cursor = out;
     remaining = out_size;
     if (!append_formatted(&cursor,
                           &remaining,
-                          "\\\\.\\pipe\\HasciiCam_%s_%s_%dx%d@%d",
-                          user,
+                          "\\\\.\\pipe\\HasciiCam_%s_%dx%d@%d",
                           device[0] != '\0' ? device : "default",
                           request->width,
                           request->height,

@@ -414,6 +414,7 @@ if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
     target_include_directories(hasciicam_vcamctl PRIVATE
       src/virtual_camera/windows/install)
     target_compile_definitions(hasciicam_vcamctl PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(hasciicam_vcamctl PRIVATE advapi32)
     add_test(NAME hasciicam_vcamctl_help COMMAND hasciicam_vcamctl --help)
     set_tests_properties(hasciicam_vcamctl_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: hasciicam-vcam")
     set_tests_properties(hasciicam_vcamctl_help PROPERTIES LABELS "cli")
@@ -456,6 +457,7 @@ if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
     target_include_directories(test_virtual_camera_install PRIVATE
       src/virtual_camera/windows/install)
     target_compile_definitions(test_virtual_camera_install PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(test_virtual_camera_install PRIVATE advapi32)
     add_test(NAME virtual_camera_install COMMAND test_virtual_camera_install)
     set_tests_properties(virtual_camera_install PROPERTIES LABELS "unit;core")
 

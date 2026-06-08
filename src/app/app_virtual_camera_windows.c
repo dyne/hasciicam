@@ -19,9 +19,17 @@ static const char *describe_start_failure_hresult(HRESULT hr) {
         return "installation missing";
     if (hr == HRESULT_FROM_WIN32(ERROR_BUSY) || hr == E_INVALIDARG)
         return "device busy";
+    if (hr == CO_E_ERRORINDLL)
+        return "source DLL load failed";
     if (hr == CLASS_E_CLASSNOTAVAILABLE)
         return "registration missing";
     return "registration failed";
+}
+
+static void format_hresult_detail(HRESULT hr, char *out, size_t out_size) {
+    if (out == NULL || out_size == 0)
+        return;
+    snprintf(out, out_size, "0x%08lx (%s)", (unsigned long)hr, describe_start_failure_hresult(hr));
 }
 
 int hasciicam_app_virtual_camera_windows_start(hasciicam_app_virtual_camera *vc,
@@ -80,7 +88,13 @@ int hasciicam_app_virtual_camera_windows_start(hasciicam_app_virtual_camera *vc,
 
     hr = virtual_camera->lpVtbl->Start(virtual_camera, NULL);
     if (FAILED(hr)) {
-        set_error(err, err_size, "virtual camera start failed");
+        char detail[128];
+        format_hresult_detail(hr, detail, sizeof(detail));
+        {
+            char message[192];
+            snprintf(message, sizeof(message), "virtual camera start failed (%s)", detail);
+            set_error(err, err_size, message);
+        }
         goto fail;
     }
 

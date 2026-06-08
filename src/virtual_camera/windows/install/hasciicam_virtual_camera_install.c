@@ -3,12 +3,15 @@
 #ifdef _WIN32
 
 #include <windows.h>
+#include <sddl.h>
 #include <shlobj.h>
 #include <stdio.h>
 
 static const wchar_t kHasciiCamInstallRootName[] = L"HasciiCam";
 static const wchar_t kHasciiCamInstallDllName[] = L"hasciicam_virtual_camera_source.dll";
 static const wchar_t kHasciiCamInstallClsid[] = L"{29E1D0B1-0AF8-4D6F-9D5E-0F9A0F0D4F58}";
+static const wchar_t kHasciiCamInstallDirectorySddl[] = L"D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;GRGX;;;LS)";
+static const wchar_t kHasciiCamInstallFileSddl[] = L"D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;LS)";
 
 static void set_error(char *err, size_t err_size, const char *msg) {
     if (err == NULL || err_size == 0)
@@ -45,6 +48,32 @@ static int ensure_directory(const wchar_t *path) {
         return 0;
     rc = SHCreateDirectoryExW(NULL, path, NULL);
     return rc == ERROR_SUCCESS || rc == ERROR_FILE_EXISTS || rc == ERROR_ALREADY_EXISTS;
+}
+
+static int apply_sddl_to_path(const wchar_t *path,
+                              const wchar_t *sddl,
+                              char *err,
+                              size_t err_size) {
+    PSECURITY_DESCRIPTOR security_descriptor = NULL;
+
+    if (path == NULL || sddl == NULL) {
+        set_error(err, err_size, "path and security descriptor are required");
+        return 0;
+    }
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl,
+                                                              SDDL_REVISION_1,
+                                                              &security_descriptor,
+                                                              NULL)) {
+        set_error(err, err_size, "unable to build security descriptor");
+        return 0;
+    }
+    if (!SetFileSecurityW(path, DACL_SECURITY_INFORMATION, security_descriptor)) {
+        LocalFree(security_descriptor);
+        set_error(err, err_size, "unable to set access permissions");
+        return 0;
+    }
+    LocalFree(security_descriptor);
+    return 1;
 }
 
 const wchar_t *hasciicam_virtual_camera_install_clsid_string(void) {
@@ -142,6 +171,10 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
         set_error(err, err_size, "unable to copy DLL into install root");
         return 0;
     }
+    if (!apply_sddl_to_path(dest_dir, kHasciiCamInstallDirectorySddl, err, err_size))
+        return 0;
+    if (!apply_sddl_to_path(dest_path, kHasciiCamInstallFileSddl, err, err_size))
+        return 0;
     return 1;
 }
 

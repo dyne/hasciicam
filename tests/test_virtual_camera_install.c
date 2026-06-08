@@ -63,6 +63,74 @@ int main(void) {
                     "registry key should target InprocServer32");
     }
 
+#ifdef _WIN32
+    {
+        wchar_t module_path[MAX_PATH];
+        wchar_t module_dir[MAX_PATH];
+        wchar_t source_path[MAX_PATH];
+        wchar_t temp_root[MAX_PATH];
+        wchar_t dest_dir[MAX_PATH];
+        wchar_t dest_path[MAX_PATH];
+        wchar_t *slash;
+        DWORD length;
+
+        length = GetModuleFileNameW(NULL, module_path, (DWORD)(sizeof(module_path) / sizeof(module_path[0])));
+        expect_true(length > 0 && length < (DWORD)(sizeof(module_path) / sizeof(module_path[0])),
+                    "test executable path should be available");
+        if (length > 0 && length < (DWORD)(sizeof(module_path) / sizeof(module_path[0]))) {
+            wcscpy(module_dir, module_path);
+            slash = wcsrchr(module_dir, L'\\');
+            expect_true(slash != NULL, "test executable path should contain a directory separator");
+            if (slash != NULL) {
+                *slash = L'\0';
+                expect_true(swprintf(source_path,
+                                     sizeof(source_path) / sizeof(source_path[0]),
+                                     L"%ls\\hasciicam_virtual_camera_source.dll",
+                                     module_dir) >= 0,
+                            "source DLL path formatting should succeed");
+                if (swprintf(source_path,
+                             sizeof(source_path) / sizeof(source_path[0]),
+                             L"%ls\\hasciicam_virtual_camera_source.dll",
+                             module_dir) >= 0) {
+                    wcscpy(dll_path, source_path);
+                }
+            }
+        }
+        length = GetTempPathW((DWORD)(sizeof(temp_root) / sizeof(temp_root[0])), temp_root);
+        expect_true(length > 0 && length < (DWORD)(sizeof(temp_root) / sizeof(temp_root[0])),
+                    "temporary directory should be available");
+        if (length > 0 && length < (DWORD)(sizeof(temp_root) / sizeof(temp_root[0]))) {
+            expect_true(swprintf(dest_dir,
+                                 sizeof(dest_dir) / sizeof(dest_dir[0]),
+                                 L"%lsHasciiCamInstallTest",
+                                 temp_root) >= 0,
+                        "temporary install root formatting should succeed");
+            if (swprintf(dest_dir,
+                         sizeof(dest_dir) / sizeof(dest_dir[0]),
+                         L"%lsHasciiCamInstallTest",
+                         temp_root) >= 0) {
+                expect_true(swprintf(dest_path,
+                                     sizeof(dest_path) / sizeof(dest_path[0]),
+                                     L"%ls\\hasciicam_virtual_camera_source.dll",
+                                     dest_dir) >= 0,
+                            "temporary DLL path formatting should succeed");
+                if (swprintf(dest_path,
+                             sizeof(dest_path) / sizeof(dest_path[0]),
+                             L"%ls\\hasciicam_virtual_camera_source.dll",
+                             dest_dir) >= 0) {
+                    expect_true(hasciicam_virtual_camera_install_copy_dll(dll_path,
+                                                                          dest_path,
+                                                                          err,
+                                                                          sizeof(err)),
+                                "copy helper should set permissions on a writable temp root");
+                    DeleteFileW(dest_path);
+                    RemoveDirectoryW(dest_dir);
+                }
+            }
+        }
+    }
+#endif
+
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);
         return 1;

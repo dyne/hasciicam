@@ -24,6 +24,46 @@ static const wchar_t kHasciiCamVirtualCameraSourceClsidString[] =
     L"{29E1D0B1-0AF8-4D6F-9D5E-0F9A0F0D4F58}";
 
 static LONG g_module_refcount = 0;
+static LONG g_com_refcount = 0;
+static LONG g_mf_refcount = 0;
+
+static HRESULT hasciicam_virtual_camera_source_com_acquire(void) {
+    LONG previous = InterlockedIncrement(&g_com_refcount);
+    if (previous == 1) {
+        HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+        if (FAILED(hr) && hr != S_FALSE && hr != RPC_E_CHANGED_MODE) {
+            InterlockedDecrement(&g_com_refcount);
+            return hr;
+        }
+        if (hr == RPC_E_CHANGED_MODE)
+            InterlockedDecrement(&g_com_refcount);
+    }
+    return S_OK;
+}
+
+static void hasciicam_virtual_camera_source_com_release(void) {
+    LONG previous = InterlockedDecrement(&g_com_refcount);
+    if (previous == 0)
+        CoUninitialize();
+}
+
+static HRESULT hasciicam_virtual_camera_source_mf_acquire(void) {
+    LONG previous = InterlockedIncrement(&g_mf_refcount);
+    if (previous == 1) {
+        HRESULT hr = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
+        if (FAILED(hr)) {
+            InterlockedDecrement(&g_mf_refcount);
+            return hr;
+        }
+    }
+    return S_OK;
+}
+
+static void hasciicam_virtual_camera_source_mf_release(void) {
+    LONG previous = InterlockedDecrement(&g_mf_refcount);
+    if (previous == 0)
+        MFShutdown();
+}
 
 static const hasciicam_virtual_camera_source_media_type kSupportedMediaTypes[] = {
     {
@@ -1036,6 +1076,8 @@ public:
           stream_descriptor_(NULL),
           reader_thread_(NULL),
           reader_stop_event_(NULL),
+          com_initialized_(FALSE),
+          mf_initialized_(FALSE),
           shutdown_(FALSE) {
         hasciicam_virtual_camera_source_frame_slot_init(&frame_slot_);
         InterlockedIncrement(&g_module_refcount);
@@ -1052,6 +1094,14 @@ public:
         if (event_queue_ != NULL)
             event_queue_->Release();
         hasciicam_virtual_camera_source_frame_slot_close(&frame_slot_);
+        if (com_initialized_) {
+            hasciicam_virtual_camera_source_com_release();
+            com_initialized_ = FALSE;
+        }
+        if (mf_initialized_) {
+            hasciicam_virtual_camera_source_mf_release();
+            mf_initialized_ = FALSE;
+        }
         InterlockedDecrement(&g_module_refcount);
     }
 
@@ -1060,6 +1110,14 @@ public:
 
         if (config == NULL)
             return E_POINTER;
+        hr = hasciicam_virtual_camera_source_com_acquire();
+        if (FAILED(hr))
+            return hr;
+        com_initialized_ = TRUE;
+        hr = hasciicam_virtual_camera_source_mf_acquire();
+        if (FAILED(hr))
+            return hr;
+        mf_initialized_ = TRUE;
         config_ = *config;
         lifecycle_.state = HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_CREATED;
         lifecycle_.config = *config;
@@ -1239,6 +1297,14 @@ public:
             event_queue_ = NULL;
         }
         hasciicam_virtual_camera_source_lifecycle_shutdown(&lifecycle_, NULL, 0);
+        if (com_initialized_) {
+            hasciicam_virtual_camera_source_com_release();
+            com_initialized_ = FALSE;
+        }
+        if (mf_initialized_) {
+            hasciicam_virtual_camera_source_mf_release();
+            mf_initialized_ = FALSE;
+        }
         return S_OK;
     }
 
@@ -1363,6 +1429,8 @@ private:
     IMFStreamDescriptor *stream_descriptor_;
     HANDLE reader_thread_;
     HANDLE reader_stop_event_;
+    BOOL com_initialized_;
+    BOOL mf_initialized_;
     hasciicam_virtual_camera_source_config config_;
     hasciicam_virtual_camera_source_lifecycle lifecycle_;
     hasciicam_virtual_camera_source_frame_slot frame_slot_;
