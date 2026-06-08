@@ -81,12 +81,15 @@ static void run_windows_com_smoke(void) {
     IMFMediaEvent *stream_event = NULL;
     IMFMediaStream *stream = NULL;
     IMFMediaSource *stream_source = NULL;
+    IMFStreamDescriptor *presentation_stream = NULL;
     IMFSample *sample = NULL;
     PROPVARIANT start_position;
     MediaEventType event_type;
     LONGLONG first_sample_time = 0;
     LONGLONG second_sample_time = 0;
     DWORD characteristics = 0;
+    UINT32 frame_source_types = 0;
+    BOOL selected = FALSE;
     HRESULT hr;
     BOOL com_initialized = FALSE;
     BOOL mf_started = FALSE;
@@ -131,6 +134,24 @@ static void run_windows_com_smoke(void) {
         hr = source->lpVtbl->CreatePresentationDescriptor(source, &presentation);
         expect_true(SUCCEEDED(hr) && presentation != NULL,
                     "source should create a presentation descriptor");
+        if (presentation != NULL) {
+            hr = presentation->lpVtbl->GetStreamDescriptorByIndex(
+                presentation, 0, &selected, &presentation_stream);
+            expect_true(SUCCEEDED(hr) && presentation_stream != NULL,
+                        "presentation should expose stream zero");
+            if (presentation_stream != NULL) {
+                expect_true(SUCCEEDED(presentation_stream->lpVtbl->GetUINT32(
+                                presentation_stream,
+                                &MF_DEVICESTREAM_ATTRIBUTE_FRAMESOURCE_TYPES,
+                                &frame_source_types)) &&
+                            frame_source_types == MFFrameSourceTypes_Color,
+                            "stream descriptor should identify a color source");
+                presentation_stream->lpVtbl->Release(presentation_stream);
+                presentation_stream = NULL;
+            }
+            expect_true(SUCCEEDED(presentation->lpVtbl->SelectStream(presentation, 0)),
+                        "presentation stream zero should be selectable");
+        }
 
         hr = source->lpVtbl->GetSourceAttributes(source, &source_attributes);
         expect_true(SUCCEEDED(hr) && source_attributes != NULL,
@@ -259,6 +280,8 @@ static void run_windows_com_smoke(void) {
         sample->lpVtbl->Release(sample);
     if (stream != NULL)
         stream->lpVtbl->Release(stream);
+    if (presentation_stream != NULL)
+        presentation_stream->lpVtbl->Release(presentation_stream);
     if (source_attributes != NULL)
         source_attributes->lpVtbl->Release(source_attributes);
     if (presentation != NULL)
@@ -574,8 +597,8 @@ int main(void) {
                 "clsid string should match the declared source id");
     expect_true(hasciicam_virtual_camera_source_clsid() != NULL,
                 "clsid pointer should exist");
-    expect_true(hasciicam_virtual_camera_source_media_type_count() == 2,
-                "source should advertise YUY2 and NV12 media types");
+    expect_true(hasciicam_virtual_camera_source_media_type_count() == 1,
+                "source should advertise only its produced YUY2 media type");
 
     {
         hasciicam_virtual_camera_source_media_type media_type;
@@ -601,25 +624,6 @@ int main(void) {
             expect_true(media_type.stream_id == 0, "YUY2 stream id should be 0");
             expect_true(media_type.frameserver_shared == 1, "YUY2 stream should be shared");
             expect_true(media_type.framesource_color == 1, "YUY2 stream should be color");
-        }
-    }
-
-    {
-        hasciicam_virtual_camera_source_media_type media_type;
-        int ok = hasciicam_virtual_camera_source_media_type_get(1, 1280, 720, 30, &media_type);
-        expect_true(ok, "NV12 media type should describe configured geometry");
-        if (ok) {
-            expect_true(media_type.pixel_format == HASCIICAM_VIRTUAL_CAMERA_PIXFMT_NV12,
-                        "second media type should be NV12");
-            expect_true(media_type.subtype != NULL, "NV12 subtype GUID should exist");
-            expect_true(wcscmp(media_type.subtype_name, L"MFVideoFormat_NV12") == 0,
-                        "NV12 subtype name should be stable");
-            expect_true(media_type.stride_bytes == 1280, "NV12 stride should follow luma width");
-            expect_true(media_type.frame_bytes == 1382400ULL, "NV12 frame size should match packed geometry");
-            expect_true(media_type.sample_duration_100ns == 333333ULL,
-                        "NV12 sample duration should match 30 fps");
-            expect_true(media_type.average_bitrate == 331776000ULL,
-                        "NV12 bitrate should match geometry and frame rate");
         }
     }
 
@@ -701,7 +705,7 @@ int main(void) {
         expect_true(hasciicam_virtual_camera_source_config_prepare(&request, &config, err, sizeof(err)),
                     "source config should prepare successfully");
         if (hasciicam_virtual_camera_source_config_prepare(&request, &config, err, sizeof(err))) {
-            expect_true(config.media_type_count == 2, "prepared source config should include two media types");
+            expect_true(config.media_type_count == 1, "prepared source config should include its YUY2 media type");
             expect_true(strcmp(config.pipe_name, pipe_name) == 0, "prepared source config should reuse the pipe name");
             expect_true(strstr(config.registration_payload, "fmt=yuy2;") != NULL,
                         "prepared source config should include the registration payload");

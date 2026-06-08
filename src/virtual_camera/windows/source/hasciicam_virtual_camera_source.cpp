@@ -43,23 +43,6 @@ static const hasciicam_virtual_camera_source_media_type kSupportedMediaTypes[] =
         0,
         1,
         1
-    },
-    {
-        HASCIICAM_VIRTUAL_CAMERA_PIXFMT_NV12,
-        L"MFVideoFormat_NV12",
-        &MFVideoFormat_NV12,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        1,
-        1,
-        0,
-        1,
-        1
     }
 };
 
@@ -765,6 +748,9 @@ public:
         if (SUCCEEDED(hr))
             hr = attributes_->SetUINT32(MF_DEVICESTREAM_FRAMESERVER_SHARED, TRUE);
         if (SUCCEEDED(hr))
+            hr = attributes_->SetUINT32(MF_DEVICESTREAM_ATTRIBUTE_FRAMESOURCE_TYPES,
+                                        MFFrameSourceTypes_Color);
+        if (SUCCEEDED(hr))
             hr = MFCreateEventQueue(&event_queue_);
         if (FAILED(hr))
             return hr;
@@ -780,6 +766,22 @@ public:
                                        &descriptor_);
         if (FAILED(hr))
         {
+            while (media_type_count > 0) {
+                --media_type_count;
+                if (media_types[media_type_count] != NULL)
+                    media_types[media_type_count]->Release();
+            }
+            return hr;
+        }
+        hr = descriptor_->SetGUID(MF_DEVICESTREAM_STREAM_CATEGORY, PINNAME_VIDEO_CAPTURE);
+        if (SUCCEEDED(hr))
+            hr = descriptor_->SetUINT32(MF_DEVICESTREAM_STREAM_ID, 0);
+        if (SUCCEEDED(hr))
+            hr = descriptor_->SetUINT32(MF_DEVICESTREAM_FRAMESERVER_SHARED, TRUE);
+        if (SUCCEEDED(hr))
+            hr = descriptor_->SetUINT32(MF_DEVICESTREAM_ATTRIBUTE_FRAMESOURCE_TYPES,
+                                        MFFrameSourceTypes_Color);
+        if (FAILED(hr)) {
             while (media_type_count > 0) {
                 --media_type_count;
                 if (media_types[media_type_count] != NULL)
@@ -1253,8 +1255,12 @@ public:
     HRESULT Start(IMFPresentationDescriptor *presentation_descriptor,
                   const GUID *time_format,
                   const PROPVARIANT *start_position) {
+        IMFStreamDescriptor *stream_descriptor = NULL;
+        IMFMediaTypeHandler *type_handler = NULL;
+        IMFMediaType *media_type = NULL;
         PROPVARIANT start_value;
         MediaEventType stream_event;
+        BOOL selected = FALSE;
         HRESULT hr;
 
         if (shutdown_)
@@ -1265,12 +1271,35 @@ public:
             return MF_E_UNSUPPORTED_TIME_FORMAT;
         if (start_position->vt != VT_EMPTY && start_position->vt != VT_I8)
             return MF_E_UNSUPPORTED_TIME_FORMAT;
+        hr = presentation_descriptor->GetStreamDescriptorByIndex(
+            0, &selected, &stream_descriptor);
+        if (FAILED(hr))
+            return hr;
+        if (!selected) {
+            stream_descriptor->Release();
+            return MF_E_INVALIDREQUEST;
+        }
+        hr = stream_descriptor->GetMediaTypeHandler(&type_handler);
+        if (SUCCEEDED(hr))
+            hr = type_handler->GetCurrentMediaType(&media_type);
+        if (SUCCEEDED(hr))
+            hr = stream_->SetCurrentMediaType(media_type);
+        if (media_type != NULL)
+            media_type->Release();
+        if (type_handler != NULL)
+            type_handler->Release();
+        stream_descriptor->Release();
+        if (FAILED(hr))
+            return hr;
         if (lifecycle_.state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STARTED)
             return MF_E_INVALIDREQUEST;
         if (!hasciicam_virtual_camera_source_lifecycle_start(&lifecycle_, NULL, 0))
             return MF_E_INVALIDREQUEST;
         if (stream_ == NULL)
             return E_UNEXPECTED;
+        hr = presentation_descriptor_->SelectStream(0);
+        if (FAILED(hr))
+            return hr;
         hr = stream_->SetStreamState(MF_STREAM_STATE_RUNNING);
         if (FAILED(hr))
             return hr;
