@@ -47,6 +47,14 @@ int main(void) {
     cfg.virtual_camera_fps = 30;
     strcpy(cfg.virtual_camera_device, "HasciiCam");
 
+    {
+        char context[256];
+        hasciicam_app_virtual_camera_format_context(&cfg, context, sizeof(context));
+        expect_true(strstr(context, "backend=") != NULL, "diagnostic context should include backend");
+        expect_true(strstr(context, "size=1280x720") != NULL, "diagnostic context should include size");
+        expect_true(strstr(context, "fps=30") != NULL, "diagnostic context should include fps");
+    }
+
     expect_true(hasciicam_app_virtual_camera_start(&vc, dummy_context, &cfg, fake_set_callback, err, sizeof(err)),
                 "start should succeed with a fake SDL callback hook");
     expect_true(vc.active == 1, "controller should be active after start");

@@ -31,6 +31,38 @@ static void set_error(char *err, size_t err_size, const char *msg) {
     snprintf(err, err_size, "%s", msg != NULL ? msg : "unknown error");
 }
 
+void hasciicam_app_virtual_camera_format_context(const hasciicam_config *cfg,
+                                                 char *out,
+                                                 size_t out_size) {
+    const char *device = "";
+    const char *backend = "";
+    int width = 0;
+    int height = 0;
+    int fps = 0;
+
+    if (out == NULL || out_size == 0)
+        return;
+    if (cfg != NULL) {
+        device = cfg->virtual_camera_device;
+        width = cfg->virtual_camera_width;
+        height = cfg->virtual_camera_height;
+        fps = cfg->virtual_camera_fps;
+    }
+#if defined(_WIN32)
+    backend = "windows-pipe";
+#elif defined(__linux__)
+    backend = "v4l2-output";
+#else
+    backend = "unsupported";
+#endif
+    snprintf(out, out_size, "backend=%s size=%dx%d fps=%d device=%s",
+             backend,
+             width,
+             height,
+             fps,
+             (device != NULL && device[0] != '\0') ? device : "(default)");
+}
+
 void hasciicam_app_virtual_camera_init(hasciicam_app_virtual_camera *vc) {
     if (vc == NULL)
         return;
@@ -74,7 +106,15 @@ int hasciicam_app_virtual_camera_start(hasciicam_app_virtual_camera *vc,
     request.device[sizeof(request.device) - 1] = '\0';
     vc->request = request;
     if (!hasciicam_virtual_camera_open_default(&vc->device, &request)) {
-        set_error(err, err_size, "virtual camera backend unavailable");
+        char context[256];
+        hasciicam_app_virtual_camera_format_context(cfg, context, sizeof(context));
+        if (context[0] != '\0') {
+            char detail[320];
+            snprintf(detail, sizeof(detail), "virtual camera backend unavailable (%s)", context);
+            set_error(err, err_size, detail);
+        } else {
+            set_error(err, err_size, "virtual camera backend unavailable");
+        }
         return 0;
     }
     vc->context = context;

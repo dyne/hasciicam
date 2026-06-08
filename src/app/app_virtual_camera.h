@@ -77,6 +77,13 @@ const hasciicam_virtual_camera_request *hasciicam_app_virtual_camera_request(
  */
 const char *hasciicam_app_virtual_camera_backend_name(const hasciicam_app_virtual_camera *vc);
 
+/**
+ * Format a concise diagnostic context for virtual-camera startup errors.
+ */
+void hasciicam_app_virtual_camera_format_context(const hasciicam_config *cfg,
+                                                 char *out,
+                                                 size_t out_size);
+
 #ifdef _WIN32
 /**
  * Register and start the Windows session virtual camera.
