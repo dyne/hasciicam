@@ -1,4 +1,5 @@
 src/hasciicam
+.gestalt/
 build/
 build-*/
 *.[oa]
