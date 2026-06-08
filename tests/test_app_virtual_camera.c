@@ -112,6 +112,16 @@ int main(void) {
         seen_callback(seen_user_data, &frame);
         expect_true(hasciicam_app_virtual_camera_accepted_frames(&vc) == 2ULL,
                     "frame at the interval boundary should be accepted");
+        frame.timestamp_100ns = 1000000ULL + (10000000ULL / 30ULL) +
+                                (10000000ULL / 45ULL);
+        seen_callback(seen_user_data, &frame);
+        expect_true(hasciicam_app_virtual_camera_accepted_frames(&vc) == 2ULL,
+                    "early uneven-cadence frame should be dropped");
+        frame.timestamp_100ns = 1000000ULL + 2ULL * (10000000ULL / 30ULL) +
+                                1ULL;
+        seen_callback(seen_user_data, &frame);
+        expect_true(hasciicam_app_virtual_camera_accepted_frames(&vc) == 3ULL,
+                    "deadline accumulator should preserve the requested average cadence");
     }
 
     hasciicam_app_virtual_camera_stop(&vc, fake_set_callback);

@@ -21,7 +21,14 @@ static void app_virtual_camera_frame_callback(void *user_data,
         }
     }
     (void)hasciicam_virtual_camera_publish(vc->device, frame);
-    vc->last_publish_100ns = frame->timestamp_100ns;
+    if (vc->last_publish_100ns == 0 || vc->min_publish_interval_100ns == 0) {
+        vc->last_publish_100ns = frame->timestamp_100ns;
+    } else {
+        do {
+            vc->last_publish_100ns += vc->min_publish_interval_100ns;
+        } while (frame->timestamp_100ns - vc->last_publish_100ns >=
+                 vc->min_publish_interval_100ns);
+    }
     vc->accepted_frames++;
 }
 
