@@ -77,6 +77,7 @@ static void run_windows_com_smoke(void) {
     IMFAttributes *source_attributes = NULL;
     IMFAttributes *stream_attributes = NULL;
     IMFGetService *get_service = NULL;
+    IMFSampleAllocatorControl *allocator_control = NULL;
     IMFMediaEvent *source_event = NULL;
     IMFMediaEvent *stream_event = NULL;
     IMFMediaStream *stream = NULL;
@@ -88,7 +89,9 @@ static void run_windows_com_smoke(void) {
     LONGLONG first_sample_time = 0;
     LONGLONG second_sample_time = 0;
     DWORD characteristics = 0;
+    DWORD input_stream_id = 99;
     UINT32 frame_source_types = 0;
+    MFSampleAllocatorUsage allocator_usage = MFSampleAllocatorUsage_DoesNotAllocate;
     BOOL selected = FALSE;
     HRESULT hr;
     BOOL com_initialized = FALSE;
@@ -166,6 +169,20 @@ static void run_windows_com_smoke(void) {
                     "source should expose IMFGetService");
         if (get_service != NULL)
             get_service->lpVtbl->Release(get_service);
+        hr = source->lpVtbl->QueryInterface(
+            source, &IID_IMFSampleAllocatorControl, (void **)&allocator_control);
+        expect_true(SUCCEEDED(hr) && allocator_control != NULL,
+                    "source should expose IMFSampleAllocatorControl");
+        if (allocator_control != NULL) {
+            expect_true(SUCCEEDED(allocator_control->lpVtbl->GetAllocatorUsage(
+                            allocator_control,
+                            0,
+                            &input_stream_id,
+                            &allocator_usage)) &&
+                        input_stream_id == 0 &&
+                        allocator_usage == MFSampleAllocatorUsage_UsesProvidedAllocator,
+                        "source should request the Frame Server sample allocator");
+        }
 
         PropVariantInit(&start_position);
         hr = source->lpVtbl->Start(source, presentation, NULL, &start_position);
@@ -276,6 +293,8 @@ static void run_windows_com_smoke(void) {
 
     if (stream_attributes != NULL)
         stream_attributes->lpVtbl->Release(stream_attributes);
+    if (allocator_control != NULL)
+        allocator_control->lpVtbl->Release(allocator_control);
     if (sample != NULL)
         sample->lpVtbl->Release(sample);
     if (stream != NULL)

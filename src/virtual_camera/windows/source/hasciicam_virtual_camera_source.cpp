@@ -758,6 +758,7 @@ public:
           type_handler_(NULL),
           attributes_(NULL),
           current_media_type_(NULL),
+          sample_allocator_(NULL),
           source_(NULL),
           frame_lock_(NULL),
           next_sample_time_100ns_(0),
@@ -770,6 +771,8 @@ public:
     ~HasciiCamVirtualCameraStream() {
         if (current_media_type_ != NULL)
             current_media_type_->Release();
+        if (sample_allocator_ != NULL)
+            sample_allocator_->Release();
         if (type_handler_ != NULL)
             type_handler_->Release();
         if (descriptor_ != NULL)
@@ -977,6 +980,13 @@ public:
 
     HRESULT RequestSample(IUnknown *token) {
         IMFSample *sample = NULL;
+        IMFSample *allocated_sample = NULL;
+        IMFMediaBuffer *source_buffer = NULL;
+        IMFMediaBuffer *destination_buffer = NULL;
+        BYTE *source_bytes = NULL;
+        BYTE *destination_bytes = NULL;
+        DWORD source_length = 0;
+        DWORD destination_capacity = 0;
         unsigned long long start_100ns = 0ULL;
         unsigned long long sequence = 0ULL;
         unsigned long long sample_time;
@@ -1006,6 +1016,39 @@ public:
         ReleaseSRWLockShared(frame_lock_);
         if (FAILED(hr) || sample == NULL)
             return FAILED(hr) ? hr : E_FAIL;
+        if (sample_allocator_ != NULL) {
+            hr = sample_allocator_->AllocateSample(&allocated_sample);
+            if (SUCCEEDED(hr))
+                hr = sample->ConvertToContiguousBuffer(&source_buffer);
+            if (SUCCEEDED(hr))
+                hr = allocated_sample->GetBufferByIndex(0, &destination_buffer);
+            if (SUCCEEDED(hr))
+                hr = source_buffer->Lock(&source_bytes, NULL, &source_length);
+            if (SUCCEEDED(hr))
+                hr = destination_buffer->Lock(&destination_bytes, &destination_capacity, NULL);
+            if (SUCCEEDED(hr) && destination_capacity < source_length)
+                hr = MF_E_BUFFERTOOSMALL;
+            if (SUCCEEDED(hr))
+                memcpy(destination_bytes, source_bytes, source_length);
+            if (destination_bytes != NULL)
+                destination_buffer->Unlock();
+            if (source_bytes != NULL)
+                source_buffer->Unlock();
+            if (SUCCEEDED(hr))
+                hr = destination_buffer->SetCurrentLength(source_length);
+            if (source_buffer != NULL)
+                source_buffer->Release();
+            if (destination_buffer != NULL)
+                destination_buffer->Release();
+            sample->Release();
+            sample = allocated_sample;
+            allocated_sample = NULL;
+            if (FAILED(hr)) {
+                if (sample != NULL)
+                    sample->Release();
+                return hr;
+            }
+        }
         sample_duration = hasciicam_virtual_camera_source_sample_duration_100ns(config_.request.fps);
         sample_time = (unsigned long long)MFGetSystemTime();
         if (!sample_clock_started_) {
@@ -1108,6 +1151,20 @@ public:
         return type_handler_->GetCurrentMediaType(media_type);
     }
 
+    HRESULT SetSampleAllocator(IMFVideoSampleAllocator *allocator) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (sample_allocator_ != NULL)
+            sample_allocator_->Release();
+        sample_allocator_ = allocator;
+        if (sample_allocator_ != NULL)
+            sample_allocator_->AddRef();
+        hasciicam_virtual_camera_source_trace(
+            "sample allocator %s",
+            sample_allocator_ != NULL ? "set" : "cleared");
+        return S_OK;
+    }
+
     HRESULT Shutdown(void) {
         shutdown_ = TRUE;
         stream_state_ = MF_STREAM_STATE_STOPPED;
@@ -1120,6 +1177,10 @@ public:
         if (current_media_type_ != NULL) {
             current_media_type_->Release();
             current_media_type_ = NULL;
+        }
+        if (sample_allocator_ != NULL) {
+            sample_allocator_->Release();
+            sample_allocator_ = NULL;
         }
         if (type_handler_ != NULL) {
             type_handler_->Release();
@@ -1144,6 +1205,7 @@ private:
     IMFMediaTypeHandler *type_handler_;
     IMFAttributes *attributes_;
     IMFMediaType *current_media_type_;
+    IMFVideoSampleAllocator *sample_allocator_;
     IMFMediaSource *source_;
     hasciicam_virtual_camera_source_config config_;
     const hasciicam_virtual_camera_source_frame_slot *frame_slot_;
@@ -1155,7 +1217,10 @@ private:
     BOOL shutdown_;
 };
 
-class HasciiCamVirtualCameraSource : public IMFMediaSourceEx, public IMFGetService, public IKsControl {
+class HasciiCamVirtualCameraSource : public IMFMediaSourceEx,
+                                    public IMFGetService,
+                                    public IKsControl,
+                                    public IMFSampleAllocatorControl {
 public:
     HasciiCamVirtualCameraSource()
         : refcount_(1),
@@ -1268,6 +1333,11 @@ public:
         }
         if (IsEqualIID(riid, __uuidof(IKsControl))) {
             *ppv = static_cast<IKsControl *>(this);
+            AddRef();
+            return S_OK;
+        }
+        if (IsEqualIID(riid, IID_IMFSampleAllocatorControl)) {
+            *ppv = static_cast<IMFSampleAllocatorControl *>(this);
             AddRef();
             return S_OK;
         }
@@ -1500,6 +1570,39 @@ public:
             return E_POINTER;
         *object = NULL;
         return MF_E_UNSUPPORTED_SERVICE;
+    }
+
+    HRESULT SetDefaultAllocator(DWORD output_stream_id, IUnknown *allocator) {
+        IMFVideoSampleAllocator *video_allocator = NULL;
+        HRESULT hr;
+
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (output_stream_id != 0)
+            return MF_E_INVALIDSTREAMNUMBER;
+        if (allocator == NULL)
+            return E_POINTER;
+        hr = allocator->QueryInterface(
+            IID_IMFVideoSampleAllocator, (void **)&video_allocator);
+        if (FAILED(hr))
+            return hr;
+        hr = stream_->SetSampleAllocator(video_allocator);
+        video_allocator->Release();
+        return hr;
+    }
+
+    HRESULT GetAllocatorUsage(DWORD output_stream_id,
+                              DWORD *input_stream_id,
+                              MFSampleAllocatorUsage *usage) {
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (output_stream_id != 0)
+            return MF_E_INVALIDSTREAMNUMBER;
+        if (input_stream_id == NULL || usage == NULL)
+            return E_POINTER;
+        *input_stream_id = output_stream_id;
+        *usage = MFSampleAllocatorUsage_UsesProvidedAllocator;
+        return S_OK;
     }
 
     HRESULT KsProperty(PKSPROPERTY property,
