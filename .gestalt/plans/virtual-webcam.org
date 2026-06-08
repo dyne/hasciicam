@@ -3,7 +3,7 @@
 #+DATE: 2026-06-07
 #+KEYWORDS: hasciicam virtual-camera windows media-foundation sdl v4l2loopback webcam
 
-* TODO [#A] Fix the product scope and frame contract
+* DONE [#A] Fix the product scope and frame contract
 :PROPERTIES:
 :Effort: 0.5 day
 :Goal: Define exactly what HasciiCam publishes, when the virtual camera exists, and which platform versions are supported before adding platform code.
@@ -26,7 +26,7 @@
 :Done when: Window resize and font changes cannot invalidate the active webcam media type, and output geometry/rate have documented, testable rules.
 :END:
 
-** TODO [#B] Define startup failures and diagnostics
+** DONE [#B] Define startup failures and diagnostics
 :PROPERTIES:
 :Why: Camera registration, camera privacy, COM activation, a missing loopback module, or an already-busy device can fail independently of SDL live rendering.
 :Change: Add concise diagnostics naming the virtual-camera backend, output dimensions, fps, selected Linux path, and activation result unless `--quiet` is set. Classify failures as unsupported OS/API, installation/registration missing, privacy denied, device absent, device not V4L2 output-capable, busy, format rejected, or transport disconnected. An explicitly requested virtual camera must make startup fail before entering the capture loop; a runtime consumer disconnect must not stop SDL live rendering and should allow reconnection.
@@ -96,7 +96,7 @@
 :Done when: Publication has bounded work per SDL flush and predictable cadence without needless threading.
 :END:
 
-* TODO [#A] Implement the Windows 11 Media Foundation virtual camera
+* DONE [#A] Implement the Windows 11 Media Foundation virtual camera
 :PROPERTIES:
 :Effort: 4-6 days
 :Goal: Make HasciiCam appear as a standard Windows camera source to Media Foundation, DirectShow-compatible applications routed through Frame Server, browsers, and conferencing applications while live SDL mode is running.
