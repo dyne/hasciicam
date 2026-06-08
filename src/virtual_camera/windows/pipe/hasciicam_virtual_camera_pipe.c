@@ -310,15 +310,14 @@ int hasciicam_virtual_camera_pipe_build_name(const hasciicam_virtual_camera_requ
 
     cursor = out;
     remaining = out_size;
-    if (!append_text(&cursor, &remaining, "\\\\.\\pipe\\HasciiCam\\"))
-        goto fail;
-    if (!append_text(&cursor, &remaining, user))
-        goto fail;
-    if (!append_text(&cursor, &remaining, "\\"))
-        goto fail;
-    if (!append_text(&cursor, &remaining, device[0] != '\0' ? device : "default"))
-        goto fail;
-    if (!append_formatted(&cursor, &remaining, "\\%dx%d@%d", request->width, request->height, request->fps))
+    if (!append_formatted(&cursor,
+                          &remaining,
+                          "\\\\.\\pipe\\HasciiCam_%s_%s_%dx%d@%d",
+                          user,
+                          device[0] != '\0' ? device : "default",
+                          request->width,
+                          request->height,
+                          request->fps))
         goto fail;
     return 1;
 

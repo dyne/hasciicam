@@ -414,6 +414,8 @@ static void windows_virtual_camera_close(hasciicam_virtual_camera_device *device
         return;
     if (device->stop_event != NULL)
         SetEvent(device->stop_event);
+    if (device->accept_thread != NULL)
+        CancelSynchronousIo(device->accept_thread);
     if (device->accept_thread != NULL) {
         WaitForSingleObject(device->accept_thread, INFINITE);
         CloseHandle(device->accept_thread);
@@ -444,20 +446,26 @@ static const hasciicam_virtual_camera_ops windows_virtual_camera_ops = {
 #endif
 
 int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
-                                          const hasciicam_virtual_camera_request *request) {
+                                          const hasciicam_virtual_camera_request *request,
+                                          char *err,
+                                          size_t err_size) {
     hasciicam_virtual_camera_device *device = NULL;
-    char err[128];
+    char local_err[128];
 
     if (out == NULL)
         return 0;
     *out = NULL;
 
-    if (!hasciicam_virtual_camera_request_validate(request, err, sizeof(err)))
+    if (!hasciicam_virtual_camera_request_validate(request, local_err, sizeof(local_err))) {
+        set_error(err, err_size, local_err);
         return 0;
+    }
 
     device = (hasciicam_virtual_camera_device *)calloc(1, sizeof(*device));
-    if (device == NULL)
+    if (device == NULL) {
+        set_error(err, err_size, "unable to allocate virtual camera device");
         return 0;
+    }
 
 #if defined(_WIN32)
     if (request == NULL || !request->enabled) {
@@ -474,8 +482,9 @@ int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
     if (!hasciicam_virtual_camera_pipe_build_name(request,
                                                   device->pipe_name,
                                                   sizeof(device->pipe_name),
-                                                  err,
-                                                  sizeof(err))) {
+                                                  local_err,
+                                                  sizeof(local_err))) {
+        set_error(err, err_size, local_err);
         free(device);
         return 0;
     }
@@ -483,6 +492,7 @@ int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
     device->message_size = sizeof(hasciicam_virtual_camera_pipe_frame) + device->payload_size;
     device->message_buffer = (unsigned char *)calloc(1, device->message_size);
     if (device->message_buffer == NULL) {
+        set_error(err, err_size, "unable to allocate virtual camera message buffer");
         free(device);
         return 0;
     }
@@ -495,12 +505,14 @@ int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
                                            0,
                                            NULL);
     if (device->pipe_handle == INVALID_HANDLE_VALUE) {
+        set_error(err, err_size, "unable to create named pipe");
         free(device->message_buffer);
         free(device);
         return 0;
     }
     device->stop_event = CreateEventW(NULL, TRUE, FALSE, NULL);
     if (device->stop_event == NULL) {
+        set_error(err, err_size, "unable to create virtual camera stop event");
         CloseHandle(device->pipe_handle);
         free(device->message_buffer);
         free(device);
@@ -508,6 +520,7 @@ int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
     }
     device->accept_thread = CreateThread(NULL, 0, windows_accept_thread, device, 0, NULL);
     if (device->accept_thread == NULL) {
+        set_error(err, err_size, "unable to create virtual camera accept thread");
         CloseHandle(device->stop_event);
         CloseHandle(device->pipe_handle);
         free(device->message_buffer);

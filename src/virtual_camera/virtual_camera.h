@@ -112,7 +112,9 @@ int hasciicam_virtual_camera_scale_bgra32_to_nv12(const unsigned char *src,
  * Open the default virtual-camera backend or a no-op fallback.
  */
 int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
-                                          const hasciicam_virtual_camera_request *request);
+                                          const hasciicam_virtual_camera_request *request,
+                                          char *err,
+                                          size_t err_size);
 
 /**
  * Publish one frame to the active backend or discard it in the no-op fallback.

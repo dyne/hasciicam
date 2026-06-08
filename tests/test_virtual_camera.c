@@ -66,7 +66,7 @@ int main(void) {
                 "validate should reject zero fps");
 
     request.enabled = 0;
-    expect_true(hasciicam_virtual_camera_open_default(&device, &request),
+    expect_true(hasciicam_virtual_camera_open_default(&device, &request, err, sizeof(err)),
                 "open_default should return a fallback device");
     expect_true(device != NULL, "device should be allocated");
     expect_true(hasciicam_virtual_camera_is_supported(device) == 0,

@@ -283,7 +283,7 @@ static void run_windows_backend_roundtrip(void) {
     request.width = 2;
     request.height = 2;
     request.fps = 30;
-    expect_true(hasciicam_virtual_camera_open_default(&device, &request),
+    expect_true(hasciicam_virtual_camera_open_default(&device, &request, err, sizeof(err)),
                 "windows backend should open");
     expect_true(device != NULL, "windows backend should allocate");
     expect_true(hasciicam_virtual_camera_is_supported(device) == 1,
@@ -442,11 +442,11 @@ int main(void) {
         expect_true(hasciicam_virtual_camera_pipe_build_name(&request, pipe_name, sizeof(pipe_name), err, sizeof(err)),
                     "pipe name should be generated for an enabled request");
         if (hasciicam_virtual_camera_pipe_build_name(&request, pipe_name, sizeof(pipe_name), err, sizeof(err))) {
-            expect_true(strstr(pipe_name, "\\\\.\\pipe\\HasciiCam\\") == pipe_name,
+            expect_true(strstr(pipe_name, "\\\\.\\pipe\\HasciiCam_") == pipe_name,
                         "pipe name should use the expected prefix");
-            expect_true(strstr(pipe_name, "\\Device_One_Two\\") != NULL,
+            expect_true(strstr(pipe_name, "_Device_One_Two_") != NULL,
                         "pipe name should sanitize device characters");
-            expect_true(strstr(pipe_name, "\\1280x720@30") != NULL,
+            expect_true(strstr(pipe_name, "_1280x720@30") != NULL,
                         "pipe name should encode geometry and fps");
         }
 
@@ -463,7 +463,7 @@ int main(void) {
                                                                      sizeof(err))) {
             expect_true(strstr(payload, "v=1;") == payload,
                         "payload should start with the version");
-            expect_true(strstr(payload, "pipe=\\\\.\\pipe\\HasciiCam\\") != NULL,
+            expect_true(strstr(payload, "pipe=\\\\.\\pipe\\HasciiCam_") != NULL,
                         "payload should include the pipe name");
             expect_true(strstr(payload, "device=Device_One_Two;") != NULL,
                         "payload should sanitize the device name");

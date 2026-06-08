@@ -105,7 +105,7 @@ int hasciicam_app_virtual_camera_start(hasciicam_app_virtual_camera *vc,
     strncpy(request.device, cfg->virtual_camera_device, sizeof(request.device) - 1);
     request.device[sizeof(request.device) - 1] = '\0';
     vc->request = request;
-    if (!hasciicam_virtual_camera_open_default(&vc->device, &request)) {
+    if (!hasciicam_virtual_camera_open_default(&vc->device, &request, err, err_size)) {
         char context[256];
         hasciicam_app_virtual_camera_format_context(cfg, context, sizeof(context));
         if (context[0] != '\0') {
