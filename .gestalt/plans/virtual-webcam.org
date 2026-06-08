@@ -166,7 +166,7 @@
 :Done when: HasciiCam can write YUYV ASCII frames to an existing loopback node without confusing it with the input camera.
 :END:
 
-** TODO [#A] Handle backpressure and device lifecycle
+** DONE [#A] Handle backpressure and device lifecycle
 :PROPERTIES:
 :Why: A loopback consumer may connect late, disconnect, or read slower than HasciiCam renders.
 :Change: Write exactly one complete normalized frame per due publish call. Treat `EAGAIN`/`EWOULDBLOCK` as a dropped frame, retry `EINTR`, and treat short writes or permanent device errors as publisher disconnects reported once. Do not stop live SDL rendering after a runtime output failure. Close the fd on app cleanup so `exclusive_caps=1` devices return to OUTPUT-only state. Prevent selecting the same device path as the capture input and virtual-camera output.

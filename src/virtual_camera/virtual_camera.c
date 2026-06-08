@@ -145,6 +145,24 @@ int hasciicam_virtual_camera_v4l2_is_output_capable(unsigned int capabilities) {
            (capabilities & V4L2_CAP_VIDEO_OUTPUT_MPLANE) != 0;
 }
 
+int hasciicam_virtual_camera_v4l2_should_retry_write(int errnum) {
+    return errnum == EINTR;
+}
+
+int hasciicam_virtual_camera_v4l2_should_drop_frame(int errnum) {
+    return errnum == EAGAIN || errnum == EWOULDBLOCK;
+}
+
+int hasciicam_virtual_camera_v4l2_should_disconnect_write(ssize_t written, size_t payload_size, int errnum) {
+    if (written == (ssize_t)payload_size)
+        return 0;
+    if (written < 0 && hasciicam_virtual_camera_v4l2_should_retry_write(errnum))
+        return 0;
+    if (written < 0 && hasciicam_virtual_camera_v4l2_should_drop_frame(errnum))
+        return 0;
+    return 1;
+}
+
 static int linux_v4l2_open_device(const hasciicam_virtual_camera_request *request,
                                   int *fd_out,
                                   int *width_out,
@@ -240,9 +258,11 @@ static int linux_v4l2_publish(hasciicam_virtual_camera_device *device,
         written = write(device->fd, device->payload_buffer, device->payload_size);
         if (written == (ssize_t)device->payload_size)
             return 1;
-        if (written < 0 && errno == EINTR)
+        if (written < 0 && hasciicam_virtual_camera_v4l2_should_retry_write(errno))
             continue;
-        if (written < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+        if (written < 0 && hasciicam_virtual_camera_v4l2_should_drop_frame(errno))
+            return 1;
+        if (!hasciicam_virtual_camera_v4l2_should_disconnect_write(written, device->payload_size, errno))
             return 1;
         device->disconnected = 1;
         close(device->fd);
