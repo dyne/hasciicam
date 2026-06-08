@@ -108,6 +108,17 @@ cmake -S . -B build-msvc-rel -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHA
 cmake --build build-msvc-rel
 ```
 
+## Virtual Webcam Output
+
+HasciiCam can publish the live SDL ASCII frame stream as a virtual webcam.
+The published image is the ASCII render itself, not the cursor, ImGui overlay,
+or window chrome.
+
+- Windows: install the project-owned source DLL, run `hasciicam -O SDL --virtual-camera`, and use Windows 11 build 22000 or later.
+- Linux: load an existing `v4l2loopback` device, then run `hasciicam -O SDL --virtual-camera --virtual-camera-device /dev/video10`.
+- The feature is opt-in and only works in live SDL mode.
+- Virtual camera size and fps are configurable; the current defaults are `1280x720` at `30` fps.
+
 # CREDITS
 
 Hasciicam is designed, written and maintained by [Jaromil](https://jaromil.dyne.org)

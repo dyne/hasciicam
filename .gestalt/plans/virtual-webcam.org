@@ -205,7 +205,7 @@
 :Done when: All configuration sources agree, help is accurate, and the GUI reports rather than owns platform setup.
 :END:
 
-** TODO [#B] Update user and maintainer documentation
+** DONE [#B] Update user and maintainer documentation
 :PROPERTIES:
 :Why: Windows installation/version constraints and Linux kernel-module setup are essential user-facing behavior.
 :Change: Update `README.md`, `docs/usage-guide.md`, `docs/hasciicam.1`, `docs/smoke-tests.md`, and `docs/testing-strategy.md`. Explain that only the ASCII content is published, not cursor/overlay/window chrome; Windows first support is Windows 11 build 22000+ and needs the source DLL installed; Linux needs `v4l2loopback`; and macOS virtual-camera output is not implemented. After implementation, add a concise durable architecture summary to `AGENTS.md` naming `src/virtual_camera/`, the SDL callback, Windows source DLL/IPC boundary, and Linux output adapter.
