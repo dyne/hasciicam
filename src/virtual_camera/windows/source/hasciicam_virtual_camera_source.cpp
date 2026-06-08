@@ -1617,6 +1617,7 @@ public:
             return MF_E_INVALIDREQUEST;
         if (stream_ == NULL)
             return E_UNEXPECTED;
+        StopReaderThread();
         hr = stream_->SetStreamState(MF_STREAM_STATE_STOPPED);
         if (SUCCEEDED(hr))
             hr = stream_->QueueEvent(MEStreamStopped, GUID_NULL, S_OK, NULL);

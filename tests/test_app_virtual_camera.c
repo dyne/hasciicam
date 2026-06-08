@@ -3,6 +3,7 @@
 
 #include "../src/app/app_virtual_camera.h"
 #include "../src/gui/gui_bridge.h"
+#include "../src/virtual_camera/virtual_camera_internal.h"
 
 static int failures = 0;
 static int register_calls = 0;
@@ -10,6 +11,27 @@ static int unregister_calls = 0;
 static aa_context *seen_context = NULL;
 static void *seen_user_data = NULL;
 static hasciicam_sdl_frame_callback seen_callback = NULL;
+
+static int failing_publish(hasciicam_virtual_camera_device *device,
+                           const hasciicam_virtual_camera_frame *frame) {
+    (void)device;
+    (void)frame;
+    return 0;
+}
+
+static void fake_close(hasciicam_virtual_camera_device *device) {
+    (void)device;
+}
+
+static const char *fake_backend_name(void) {
+    return "test";
+}
+
+static const hasciicam_virtual_camera_ops failing_ops = {
+    failing_publish,
+    fake_close,
+    fake_backend_name
+};
 
 static void expect_true(int cond, const char *msg) {
     if (!cond) {
@@ -122,6 +144,21 @@ int main(void) {
         seen_callback(seen_user_data, &frame);
         expect_true(hasciicam_app_virtual_camera_accepted_frames(&vc) == 3ULL,
                     "deadline accumulator should preserve the requested average cadence");
+
+        hasciicam_virtual_camera_close(vc.device);
+        vc.device = hasciicam_virtual_camera_device_create(
+            &failing_ops, 1, "test", NULL, err, sizeof(err));
+        frame.timestamp_100ns += 10000000ULL / 30ULL;
+        {
+            unsigned long long last_publish = vc.last_publish_100ns;
+            seen_callback(seen_user_data, &frame);
+            expect_true(hasciicam_app_virtual_camera_accepted_frames(&vc) == 3ULL,
+                        "failed publish should not be counted as accepted");
+            expect_true(hasciicam_app_virtual_camera_dropped_frames(&vc) == 3ULL,
+                        "failed publish should be counted as dropped");
+            expect_true(vc.last_publish_100ns == last_publish,
+                        "failed publish should not advance the publish deadline");
+        }
     }
 
     hasciicam_app_virtual_camera_stop(&vc, fake_set_callback);

@@ -58,7 +58,10 @@ int hasciicam_virtual_camera_pipe_frame_validate(const hasciicam_virtual_camera_
                                                  size_t err_size);
 
 /**
- * Build a stable per-user/per-camera pipe name from the configured request.
+ * Build a stable per-camera pipe name from the configured request.
+ *
+ * Access is restricted separately to the current user, LocalService, and
+ * LocalSystem by the pipe security descriptor.
  */
 int hasciicam_virtual_camera_pipe_build_name(const hasciicam_virtual_camera_request *request,
                                              char *out,

@@ -6,9 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_WIN32)
+#if defined(HASCIICAM_ENABLE_VIRTUAL_CAMERA) && defined(_WIN32)
 #include "windows/pipe/hasciicam_virtual_camera_windows.h"
-#elif defined(__linux__)
+#elif defined(HASCIICAM_ENABLE_VIRTUAL_CAMERA) && defined(__linux__)
 #include "linux/hasciicam_virtual_camera_v4l2.h"
 #endif
 
@@ -123,9 +123,9 @@ int hasciicam_virtual_camera_validate_device_pair(const char *capture_device,
 }
 
 const char *hasciicam_virtual_camera_default_backend_name(void) {
-#if defined(_WIN32)
+#if defined(HASCIICAM_ENABLE_VIRTUAL_CAMERA) && defined(_WIN32)
     return hasciicam_virtual_camera_windows_name();
-#elif defined(__linux__)
+#elif defined(HASCIICAM_ENABLE_VIRTUAL_CAMERA) && defined(__linux__)
     return hasciicam_virtual_camera_v4l2_name();
 #else
     return "unsupported";
@@ -181,9 +181,9 @@ int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
     if (!request->enabled)
         return open_unsupported(out, err, err_size);
 
-#if defined(_WIN32)
+#if defined(HASCIICAM_ENABLE_VIRTUAL_CAMERA) && defined(_WIN32)
     return hasciicam_virtual_camera_windows_open(out, request, err, err_size);
-#elif defined(__linux__)
+#elif defined(HASCIICAM_ENABLE_VIRTUAL_CAMERA) && defined(__linux__)
     return hasciicam_virtual_camera_v4l2_open(out, request, err, err_size);
 #else
     return open_unsupported(out, err, err_size);

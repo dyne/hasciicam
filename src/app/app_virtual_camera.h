@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(HASCIICAM_ENABLE_VIRTUAL_CAMERA)
 typedef struct IMFVirtualCamera IMFVirtualCamera;
 #endif
 
@@ -23,7 +23,7 @@ typedef struct hasciicam_app_virtual_camera {
     aa_context *context;
     hasciicam_virtual_camera_device *device;
     hasciicam_virtual_camera_request request;
-#ifdef _WIN32
+#if defined(_WIN32) && defined(HASCIICAM_ENABLE_VIRTUAL_CAMERA)
     IMFVirtualCamera *virtual_camera;
     int windows_com_initialized;
     int windows_mf_initialized;
@@ -84,7 +84,7 @@ void hasciicam_app_virtual_camera_format_context(const hasciicam_config *cfg,
                                                  char *out,
                                                  size_t out_size);
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(HASCIICAM_ENABLE_VIRTUAL_CAMERA)
 /**
  * Register and start the Windows session virtual camera.
  */

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
+#include <sddl.h>
 
 typedef struct hasciicam_virtual_camera_windows_state {
     HANDLE pipe_handle;
@@ -204,6 +205,9 @@ int hasciicam_virtual_camera_windows_open(hasciicam_virtual_camera_device **out,
                                           size_t err_size) {
     hasciicam_virtual_camera_windows_state *state;
     char local_err[128];
+    char pipe_sddl[256];
+    PSECURITY_DESCRIPTOR pipe_security_descriptor = NULL;
+    SECURITY_ATTRIBUTES pipe_security_attributes;
 
     if (out == NULL || request == NULL)
         return 0;
@@ -239,6 +243,26 @@ int hasciicam_virtual_camera_windows_open(hasciicam_virtual_camera_device **out,
     }
     InitializeCriticalSection(&state->frame_lock);
     state->frame_lock_initialized = 1;
+    if (!hasciicam_virtual_camera_pipe_build_sddl(pipe_sddl,
+                                                  sizeof(pipe_sddl),
+                                                  local_err,
+                                                  sizeof(local_err)) ||
+        !ConvertStringSecurityDescriptorToSecurityDescriptorA(
+            pipe_sddl,
+            SDDL_REVISION_1,
+            &pipe_security_descriptor,
+            NULL)) {
+        hasciicam_virtual_camera_set_error(
+            err, err_size, local_err[0] != '\0' ? local_err : "unable to build named pipe security");
+        free(state->message_buffer);
+        free(state->write_buffer);
+        DeleteCriticalSection(&state->frame_lock);
+        free(state);
+        return 0;
+    }
+    pipe_security_attributes.nLength = sizeof(pipe_security_attributes);
+    pipe_security_attributes.lpSecurityDescriptor = pipe_security_descriptor;
+    pipe_security_attributes.bInheritHandle = FALSE;
     state->pipe_handle = CreateNamedPipeA(state->pipe_name,
                                           PIPE_ACCESS_OUTBOUND,
                                           PIPE_TYPE_BYTE | PIPE_WAIT,
@@ -246,7 +270,8 @@ int hasciicam_virtual_camera_windows_open(hasciicam_virtual_camera_device **out,
                                           (DWORD)state->message_size,
                                           (DWORD)state->message_size,
                                           0,
-                                          NULL);
+                                          &pipe_security_attributes);
+    LocalFree(pipe_security_descriptor);
     if (state->pipe_handle == INVALID_HANDLE_VALUE) {
         hasciicam_virtual_camera_set_error(err, err_size, "unable to create named pipe");
         free(state->message_buffer);

@@ -284,6 +284,10 @@ static void run_windows_com_smoke(void) {
                         "starting twice should be rejected");
             expect_true(SUCCEEDED(source->lpVtbl->Stop(source)),
                         "source should stop");
+            expect_true(SUCCEEDED(source->lpVtbl->Start(source, presentation, NULL, &start_position)),
+                        "source should restart after stop");
+            expect_true(SUCCEEDED(source->lpVtbl->Stop(source)),
+                        "restarted source should stop");
         }
         PropVariantClear(&start_position);
 
