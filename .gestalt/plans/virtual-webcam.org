@@ -151,7 +151,7 @@
 :Done when: A reviewer can install and completely remove the Windows source using documented project-owned commands.
 :END:
 
-* TODO [#A] Implement Linux v4l2loopback output
+* DONE [#A] Implement Linux v4l2loopback output
 :PROPERTIES:
 :Effort: 1.5 days
 :Goal: Feed the same fixed-size ASCII pixel stream into an existing V4L2 loopback output device without changing capture or SDL code.
