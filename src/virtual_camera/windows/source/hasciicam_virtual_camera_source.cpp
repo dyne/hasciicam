@@ -761,8 +761,11 @@ public:
           sample_allocator_(NULL),
           source_(NULL),
           frame_lock_(NULL),
+          frame_ready_(NULL),
           next_sample_time_100ns_(0),
           sample_request_count_(0),
+          last_delivered_sequence_(0),
+          delivered_frame_(FALSE),
           sample_clock_started_(FALSE),
           shutdown_(FALSE) {
         InterlockedIncrement(&g_module_refcount);
@@ -788,17 +791,19 @@ public:
                  const hasciicam_virtual_camera_source_frame_slot *frame_slot,
                  const hasciicam_virtual_camera_source_lifecycle *lifecycle,
                  PSRWLOCK frame_lock,
+                 PCONDITION_VARIABLE frame_ready,
                  IMFMediaSource *source) {
         IMFMediaType *media_types[2] = { NULL, NULL };
         size_t media_type_count;
         HRESULT hr;
 
-        if (config == NULL || frame_lock == NULL || source == NULL)
+        if (config == NULL || frame_lock == NULL || frame_ready == NULL || source == NULL)
             return E_POINTER;
         config_ = *config;
         frame_slot_ = frame_slot;
         lifecycle_ = lifecycle;
         frame_lock_ = frame_lock;
+        frame_ready_ = frame_ready;
         source_ = source;
 
         hr = MFCreateAttributes(&attributes_, 8);
@@ -996,6 +1001,7 @@ public:
         unsigned long long sequence = 0ULL;
         unsigned long long sample_time;
         unsigned long long sample_duration;
+        DWORD wait_ms;
         HRESULT hr;
 
         if (shutdown_)
@@ -1005,7 +1011,17 @@ public:
         sample_request_count_++;
         if (sample_request_count_ == 1)
             hasciicam_virtual_camera_source_trace("first sample request received");
-        AcquireSRWLockShared(frame_lock_);
+        wait_ms = config_.request.fps > 0
+            ? (DWORD)((1000 + config_.request.fps - 1) / config_.request.fps)
+            : 33;
+        AcquireSRWLockExclusive(frame_lock_);
+        while (frame_slot_ == NULL ||
+               !hasciicam_virtual_camera_source_frame_slot_has_message(frame_slot_) ||
+               (delivered_frame_ &&
+                frame_slot_->sequence == last_delivered_sequence_)) {
+            if (!SleepConditionVariableSRW(frame_ready_, frame_lock_, wait_ms, 0))
+                break;
+        }
         if (lifecycle_ != NULL) {
             start_100ns = lifecycle_->last_timestamp_100ns;
             sequence = lifecycle_->last_sequence;
@@ -1013,6 +1029,8 @@ public:
         if (frame_slot_ != NULL && hasciicam_virtual_camera_source_frame_slot_has_message(frame_slot_)) {
             start_100ns = frame_slot_->timestamp_100ns;
             sequence = frame_slot_->sequence;
+            last_delivered_sequence_ = sequence;
+            delivered_frame_ = TRUE;
         }
         hr = hasciicam_virtual_camera_source_make_sample(&config_,
                                                          frame_slot_,
@@ -1021,7 +1039,7 @@ public:
                                                          &sample,
                                                          NULL,
                                                          0);
-        ReleaseSRWLockShared(frame_lock_);
+        ReleaseSRWLockExclusive(frame_lock_);
         if (FAILED(hr) || sample == NULL) {
             hasciicam_virtual_camera_source_trace(
                 "sample failure stage=%s result=0x%08lx",
@@ -1178,6 +1196,8 @@ public:
         stream_state_ = state;
         if (state == MF_STREAM_STATE_RUNNING) {
             next_sample_time_100ns_ = 0;
+            last_delivered_sequence_ = 0;
+            delivered_frame_ = FALSE;
             sample_clock_started_ = FALSE;
         }
         return S_OK;
@@ -1297,8 +1317,11 @@ private:
     const hasciicam_virtual_camera_source_frame_slot *frame_slot_;
     const hasciicam_virtual_camera_source_lifecycle *lifecycle_;
     PSRWLOCK frame_lock_;
+    PCONDITION_VARIABLE frame_ready_;
     unsigned long long next_sample_time_100ns_;
     unsigned long long sample_request_count_;
+    unsigned long long last_delivered_sequence_;
+    BOOL delivered_frame_;
     BOOL sample_clock_started_;
     BOOL shutdown_;
 };
@@ -1321,6 +1344,7 @@ public:
           reader_frame_count_(0),
           shutdown_(FALSE) {
         InitializeSRWLock(&frame_lock_);
+        InitializeConditionVariable(&frame_ready_);
         hasciicam_virtual_camera_source_frame_slot_init(&frame_slot_);
         InterlockedIncrement(&g_module_refcount);
     }
@@ -1368,6 +1392,7 @@ public:
                            &frame_slot_,
                            &lifecycle_,
                            &frame_lock_,
+                           &frame_ready_,
                            static_cast<IMFMediaSource *>(this));
         if (FAILED(hr))
             return hr;
@@ -1801,6 +1826,7 @@ public:
                 self->lifecycle_.last_timestamp_100ns = self->frame_slot_.timestamp_100ns;
                 self->reader_frame_count_++;
                 ReleaseSRWLockExclusive(&self->frame_lock_);
+                WakeAllConditionVariable(&self->frame_ready_);
                 if (self->reader_frame_count_ == 1 ||
                     self->reader_frame_count_ % 300 == 0) {
                     hasciicam_virtual_camera_source_trace(
@@ -1827,6 +1853,7 @@ private:
     BOOL stream_announced_;
     unsigned long long reader_frame_count_;
     SRWLOCK frame_lock_;
+    CONDITION_VARIABLE frame_ready_;
     hasciicam_virtual_camera_source_config config_;
     hasciicam_virtual_camera_source_lifecycle lifecycle_;
     hasciicam_virtual_camera_source_frame_slot frame_slot_;
