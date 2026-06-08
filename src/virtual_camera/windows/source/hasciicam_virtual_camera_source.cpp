@@ -8,6 +8,7 @@
 #include <mferror.h>
 #include <mfobjects.h>
 #include <ks.h>
+#include <ksproxy.h>
 #include <ksmedia.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1065,7 +1066,7 @@ private:
     BOOL shutdown_;
 };
 
-class HasciiCamVirtualCameraSource : public IMFMediaSourceEx, public IMFGetService {
+class HasciiCamVirtualCameraSource : public IMFMediaSourceEx, public IMFGetService, public IKsControl {
 public:
     HasciiCamVirtualCameraSource()
         : refcount_(1),
@@ -1178,6 +1179,11 @@ public:
         }
         if (IsEqualIID(riid, IID_IMFGetService)) {
             *ppv = static_cast<IMFGetService *>(this);
+            AddRef();
+            return S_OK;
+        }
+        if (IsEqualIID(riid, __uuidof(IKsControl))) {
+            *ppv = static_cast<IKsControl *>(this);
             AddRef();
             return S_OK;
         }
@@ -1356,6 +1362,48 @@ public:
             return E_POINTER;
         *object = NULL;
         return MF_E_UNSUPPORTED_SERVICE;
+    }
+
+    HRESULT KsProperty(PKSPROPERTY property,
+                       ULONG property_length,
+                       LPVOID data,
+                       ULONG data_length,
+                       ULONG *bytes_returned) {
+        (void)property;
+        (void)property_length;
+        (void)data;
+        (void)data_length;
+        if (bytes_returned != NULL)
+            *bytes_returned = 0;
+        return E_NOTIMPL;
+    }
+
+    HRESULT KsMethod(PKSMETHOD method,
+                     ULONG method_length,
+                     LPVOID data,
+                     ULONG data_length,
+                     ULONG *bytes_returned) {
+        (void)method;
+        (void)method_length;
+        (void)data;
+        (void)data_length;
+        if (bytes_returned != NULL)
+            *bytes_returned = 0;
+        return E_NOTIMPL;
+    }
+
+    HRESULT KsEvent(PKSEVENT event,
+                    ULONG event_length,
+                    LPVOID data,
+                    ULONG data_length,
+                    ULONG *bytes_returned) {
+        (void)event;
+        (void)event_length;
+        (void)data;
+        (void)data_length;
+        if (bytes_returned != NULL)
+            *bytes_returned = 0;
+        return E_NOTIMPL;
     }
 
     HRESULT GetStreamDescriptor(IMFStreamDescriptor **stream_descriptor) {
