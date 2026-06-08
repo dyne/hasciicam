@@ -359,13 +359,12 @@ int hasciicam_virtual_camera_source_frame_slot_has_message(const hasciicam_virtu
     return slot != NULL && slot->bytes != NULL && slot->bytes_size > 0;
 }
 
-int hasciicam_virtual_camera_source_read_pipe_message(const hasciicam_virtual_camera_source_config *config,
-                                                      const char *pipe_name,
-                                                      hasciicam_virtual_camera_source_frame_slot *slot,
-                                                      int timeout_ms,
-                                                      char *err,
-                                                      size_t err_size) {
-    HANDLE pipe_handle = INVALID_HANDLE_VALUE;
+static int hasciicam_virtual_camera_source_read_pipe_handle(
+    const hasciicam_virtual_camera_source_config *config,
+    HANDLE pipe_handle,
+    hasciicam_virtual_camera_source_frame_slot *slot,
+    char *err,
+    size_t err_size) {
     unsigned char *message = NULL;
     size_t message_size;
     DWORD bytes_read = 0;
@@ -373,6 +372,60 @@ int hasciicam_virtual_camera_source_read_pipe_message(const hasciicam_virtual_ca
     hasciicam_virtual_camera_pipe_frame header;
     const unsigned char *payload = NULL;
     size_t payload_size = 0;
+    int ok = 0;
+
+    message_size = sizeof(hasciicam_virtual_camera_pipe_frame) +
+                   config->media_types[0].frame_bytes;
+    message = (unsigned char *)malloc(message_size);
+    if (message == NULL) {
+        if (err != NULL && err_size > 0)
+            snprintf(err, err_size, "unable to allocate source pipe buffer");
+        return 0;
+    }
+    while (total_read < (DWORD)message_size) {
+        if (!ReadFile(pipe_handle,
+                      message + total_read,
+                      (DWORD)message_size - total_read,
+                      &bytes_read,
+                      NULL) ||
+            bytes_read == 0) {
+            if (err != NULL && err_size > 0)
+                snprintf(err, err_size, "unable to read virtual camera pipe message");
+            goto cleanup;
+        }
+        total_read += bytes_read;
+    }
+    if (!hasciicam_virtual_camera_pipe_decode_message(message,
+                                                      total_read,
+                                                      &header,
+                                                      &payload,
+                                                      &payload_size,
+                                                      err,
+                                                      err_size)) {
+        goto cleanup;
+    }
+    if (!hasciicam_virtual_camera_source_frame_slot_store(
+            slot,
+            message,
+            sizeof(hasciicam_virtual_camera_pipe_frame) + payload_size,
+            err,
+            err_size)) {
+        goto cleanup;
+    }
+    ok = 1;
+
+cleanup:
+    free(message);
+    return ok;
+}
+
+int hasciicam_virtual_camera_source_read_pipe_message(const hasciicam_virtual_camera_source_config *config,
+                                                      const char *pipe_name,
+                                                      hasciicam_virtual_camera_source_frame_slot *slot,
+                                                      int timeout_ms,
+                                                      char *err,
+                                                      size_t err_size) {
+    HANDLE pipe_handle = INVALID_HANDLE_VALUE;
     ULONGLONG deadline;
     int ok = 0;
 
@@ -386,14 +439,6 @@ int hasciicam_virtual_camera_source_read_pipe_message(const hasciicam_virtual_ca
             snprintf(err, err_size, "source config does not describe a media type");
         return 0;
     }
-    message_size = sizeof(hasciicam_virtual_camera_pipe_frame) + config->media_types[0].frame_bytes;
-    message = (unsigned char *)malloc(message_size);
-    if (message == NULL) {
-        if (err != NULL && err_size > 0)
-            snprintf(err, err_size, "unable to allocate source pipe buffer");
-        return 0;
-    }
-
     if (timeout_ms < 0)
         timeout_ms = 0;
     deadline = GetTickCount64() + (ULONGLONG)timeout_ms;
@@ -419,41 +464,12 @@ int hasciicam_virtual_camera_source_read_pipe_message(const hasciicam_virtual_ca
         goto cleanup;
     }
 
-    while (total_read < (DWORD)message_size) {
-        if (!ReadFile(pipe_handle,
-                      message + total_read,
-                      (DWORD)message_size - total_read,
-                      &bytes_read,
-                      NULL) ||
-            bytes_read == 0) {
-            if (err != NULL && err_size > 0)
-                snprintf(err, err_size, "unable to read virtual camera pipe message");
-            goto cleanup;
-        }
-        total_read += bytes_read;
-    }
-    if (!hasciicam_virtual_camera_pipe_decode_message(message,
-                                                      total_read,
-                                                      &header,
-                                                      &payload,
-                                                      &payload_size,
-                                                      err,
-                                                      err_size)) {
-        goto cleanup;
-    }
-    if (!hasciicam_virtual_camera_source_frame_slot_store(slot,
-                                                           message,
-                                                           sizeof(hasciicam_virtual_camera_pipe_frame) + payload_size,
-                                                           err,
-                                                           err_size)) {
-        goto cleanup;
-    }
-    ok = 1;
+    ok = hasciicam_virtual_camera_source_read_pipe_handle(
+        config, pipe_handle, slot, err, err_size);
 
 cleanup:
     if (pipe_handle != INVALID_HANDLE_VALUE)
         CloseHandle(pipe_handle);
-    free(message);
     return ok;
 }
 
@@ -1804,18 +1820,32 @@ public:
     static DWORD WINAPI ReaderThreadProc(LPVOID param) {
         HasciiCamVirtualCameraSource *self = (HasciiCamVirtualCameraSource *)param;
         hasciicam_virtual_camera_source_frame_slot incoming;
+        HANDLE pipe_handle = INVALID_HANDLE_VALUE;
         char err[128];
 
         if (self == NULL)
             return 0;
         hasciicam_virtual_camera_source_frame_slot_init(&incoming);
         while (WaitForSingleObject(self->reader_stop_event_, 0) != WAIT_OBJECT_0) {
-            if (hasciicam_virtual_camera_source_read_pipe_message(&self->config_,
-                                                                  self->config_.pipe_name,
-                                                                  &incoming,
-                                                                  250,
-                                                                  err,
-                                                                  sizeof(err))) {
+            if (pipe_handle == INVALID_HANDLE_VALUE) {
+                pipe_handle = CreateFileA(self->config_.pipe_name,
+                                          GENERIC_READ,
+                                          0,
+                                          NULL,
+                                          OPEN_EXISTING,
+                                          FILE_ATTRIBUTE_NORMAL,
+                                          NULL);
+                if (pipe_handle == INVALID_HANDLE_VALUE) {
+                    Sleep(10);
+                    continue;
+                }
+                hasciicam_virtual_camera_source_trace("pipe connected");
+            }
+            if (hasciicam_virtual_camera_source_read_pipe_handle(&self->config_,
+                                                                 pipe_handle,
+                                                                 &incoming,
+                                                                 err,
+                                                                 sizeof(err))) {
                 AcquireSRWLockExclusive(&self->frame_lock_);
                 {
                     hasciicam_virtual_camera_source_frame_slot previous = self->frame_slot_;
@@ -1835,8 +1865,13 @@ public:
                         self->lifecycle_.last_sequence,
                         self->lifecycle_.last_timestamp_100ns);
                 }
+            } else {
+                CloseHandle(pipe_handle);
+                pipe_handle = INVALID_HANDLE_VALUE;
             }
         }
+        if (pipe_handle != INVALID_HANDLE_VALUE)
+            CloseHandle(pipe_handle);
         hasciicam_virtual_camera_source_frame_slot_close(&incoming);
         return 0;
     }
