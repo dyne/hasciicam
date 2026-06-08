@@ -101,6 +101,13 @@ static void test_defaults(void) {
     expect_true(strcmp(cfg.foreground, "FFFFFF") == 0, "default foreground should be white");
     expect_true(cfg.aa_dimmer == 1, "default aa_dimmer should be on");
     expect_true(cfg.virtual_camera == 0, "default virtual_camera should be off");
+#if defined(_WIN32)
+    expect_true(strcmp(cfg.virtual_camera_device, "") == 0,
+                "default virtual_camera_device should be empty on Windows");
+#else
+    expect_true(strcmp(cfg.virtual_camera_device, "/dev/video10") == 0,
+                "default virtual_camera_device should be /dev/video10 on Linux");
+#endif
     expect_true(cfg.virtual_camera_width == 1280 && cfg.virtual_camera_height == 720,
                 "default virtual_camera_size should be 1280x720");
     expect_true(cfg.virtual_camera_fps == 30, "default virtual_camera_fps should be 30");
