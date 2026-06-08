@@ -388,6 +388,7 @@ if(HASCIICAM_ENABLE_TESTS)
     add_executable(test_virtual_camera_v4l2
       tests/test_virtual_camera_v4l2.c
       src/virtual_camera/virtual_camera.c
+      src/virtual_camera/virtual_camera_convert.c
     )
     target_include_directories(test_virtual_camera_v4l2 PRIVATE src/virtual_camera)
     add_test(NAME virtual_camera_v4l2 COMMAND test_virtual_camera_v4l2)
