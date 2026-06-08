@@ -134,6 +134,7 @@ int hasciicam_virtual_camera_scale_bgra32_to_yuy2(const unsigned char *src,
     int x;
     int y;
     size_t dst_stride;
+    size_t row_bytes;
 
     if (src == NULL || dst == NULL || src_width <= 0 || src_height <= 0 ||
         dst_width <= 0 || dst_height <= 0 || src_stride_bytes <= 0 || dst_stride_bytes < 0)
@@ -148,7 +149,18 @@ int hasciicam_virtual_camera_scale_bgra32_to_yuy2(const unsigned char *src,
                                                  &scaled_h))
         return 0;
     dst_stride = (dst_stride_bytes > 0) ? (size_t)dst_stride_bytes : (size_t)dst_width * 2u;
-    memset(dst, 0x10, hasciicam_virtual_camera_yuy2_size(dst_width, dst_height, (int)dst_stride));
+    row_bytes = (size_t)dst_width * 2u;
+    for (y = 0; y < dst_height; ++y) {
+        unsigned char *row = dst + (size_t)y * dst_stride;
+        for (x = 0; x < dst_width; x += 2) {
+            row[(size_t)x * 2u + 0u] = 0x10;
+            row[(size_t)x * 2u + 1u] = 0x80;
+            row[(size_t)x * 2u + 2u] = 0x10;
+            row[(size_t)x * 2u + 3u] = 0x80;
+        }
+        if (dst_stride > row_bytes)
+            memset(row + row_bytes, 0, dst_stride - row_bytes);
+    }
 
     for (y = 0; y < scaled_h; ++y) {
         int dst_y = y0 + y;
@@ -222,7 +234,8 @@ int hasciicam_virtual_camera_scale_bgra32_to_nv12(const unsigned char *src,
     uv_stride = (uv_stride_bytes > 0) ? (size_t)uv_stride_bytes : (size_t)dst_width;
     y_plane = dst;
     uv_plane = dst + y_stride * (size_t)dst_height;
-    memset(dst, 0x10, hasciicam_virtual_camera_nv12_size(dst_width, dst_height, (int)y_stride, (int)uv_stride));
+    memset(y_plane, 0x10, y_stride * (size_t)dst_height);
+    memset(uv_plane, 0x80, uv_stride * (size_t)dst_height / 2u);
 
     for (y = 0; y < scaled_h; ++y) {
         int dst_y = y0 + y;

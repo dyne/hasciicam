@@ -104,11 +104,14 @@ int main(void) {
                                                               yuy2, 4, 2, 0,
                                                               0, 0),
                 "yuy2 conversion should succeed");
-    expect_true(yuy2[0] == 0x10 && yuy2[1] == 0x10, "left letterbox should stay black");
+    expect_true(yuy2[0] == 0x10 && yuy2[1] == 0x80,
+                "left letterbox should use black luma and neutral chroma");
     expect_true(yuy2[2] == 82, "red y should be 82");
     expect_true(yuy2[4] == 144, "green y should be 144");
-    expect_true(yuy2[6] == 0x10 && yuy2[7] == 0x10, "right letterbox should stay black");
-    expect_true(yuy2[8] == 0x10 && yuy2[9] == 0x10, "lower letterbox should stay black");
+    expect_true(yuy2[6] == 0x10 && yuy2[7] == 0x80,
+                "right letterbox should use black luma and neutral chroma");
+    expect_true(yuy2[8] == 0x10 && yuy2[9] == 0x80,
+                "lower letterbox should use black luma and neutral chroma");
     expect_true(yuy2[10] == 41, "blue y should be 41");
     expect_true(yuy2[12] == 235, "white y should be 235");
 
@@ -125,8 +128,9 @@ int main(void) {
     expect_true(nv12[5] == 41, "nv12 blue y should be 41");
     expect_true(nv12[6] == 235, "nv12 white y should be 235");
     expect_true(nv12[7] == 0x10, "nv12 lower right letterbox should stay black");
-    expect_true(nv12[9] == 128 && nv12[10] == 128,
-                "nv12 chroma should average to neutral for the test pattern");
+    expect_true(nv12[8] == 128 && nv12[9] == 128 &&
+                nv12[10] == 128 && nv12[11] == 128,
+                "nv12 letterbox chroma should remain neutral");
 
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);
