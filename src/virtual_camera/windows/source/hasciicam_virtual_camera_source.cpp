@@ -328,6 +328,7 @@ int hasciicam_virtual_camera_source_read_pipe_message(const hasciicam_virtual_ca
     unsigned char *message = NULL;
     size_t message_size;
     DWORD bytes_read = 0;
+    DWORD total_read = 0;
     hasciicam_virtual_camera_pipe_frame header;
     const unsigned char *payload = NULL;
     size_t payload_size = 0;
@@ -377,13 +378,21 @@ int hasciicam_virtual_camera_source_read_pipe_message(const hasciicam_virtual_ca
         goto cleanup;
     }
 
-    if (!ReadFile(pipe_handle, message, (DWORD)message_size, &bytes_read, NULL) || bytes_read == 0) {
-        if (err != NULL && err_size > 0)
-            snprintf(err, err_size, "unable to read virtual camera pipe message");
-        goto cleanup;
+    while (total_read < (DWORD)message_size) {
+        if (!ReadFile(pipe_handle,
+                      message + total_read,
+                      (DWORD)message_size - total_read,
+                      &bytes_read,
+                      NULL) ||
+            bytes_read == 0) {
+            if (err != NULL && err_size > 0)
+                snprintf(err, err_size, "unable to read virtual camera pipe message");
+            goto cleanup;
+        }
+        total_read += bytes_read;
     }
     if (!hasciicam_virtual_camera_pipe_decode_message(message,
-                                                      bytes_read,
+                                                      total_read,
                                                       &header,
                                                       &payload,
                                                       &payload_size,
@@ -1372,6 +1381,7 @@ public:
         if (reader_stop_event_ != NULL)
             SetEvent(reader_stop_event_);
         if (reader_thread_ != NULL) {
+            CancelSynchronousIo(reader_thread_);
             WaitForSingleObject(reader_thread_, INFINITE);
             CloseHandle(reader_thread_);
             reader_thread_ = NULL;

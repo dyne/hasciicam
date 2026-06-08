@@ -4,17 +4,23 @@
 #include "hasciicam_virtual_camera_pipe.h"
 
 #include <stdlib.h>
+#include <string.h>
 #include <windows.h>
 
 typedef struct hasciicam_virtual_camera_windows_state {
     HANDLE pipe_handle;
     HANDLE accept_thread;
+    HANDLE writer_thread;
     HANDLE stop_event;
+    HANDLE frame_event;
+    CRITICAL_SECTION frame_lock;
+    int frame_lock_initialized;
     LONG connected;
     unsigned long long sequence;
     hasciicam_virtual_camera_request request;
     char pipe_name[256];
     unsigned char *message_buffer;
+    unsigned char *write_buffer;
     size_t message_size;
     size_t payload_size;
 } hasciicam_virtual_camera_windows_state;
@@ -47,11 +53,50 @@ static DWORD WINAPI windows_accept_thread(LPVOID param) {
     return 0;
 }
 
+static DWORD WINAPI windows_writer_thread(LPVOID param) {
+    hasciicam_virtual_camera_windows_state *state =
+        (hasciicam_virtual_camera_windows_state *)param;
+    HANDLE wait_handles[2];
+
+    if (state == NULL)
+        return 0;
+    wait_handles[0] = state->stop_event;
+    wait_handles[1] = state->frame_event;
+    for (;;) {
+        DWORD wait_result = WaitForMultipleObjects(2, wait_handles, FALSE, INFINITE);
+        DWORD bytes_written = 0;
+
+        if (wait_result == WAIT_OBJECT_0)
+            break;
+        if (wait_result != WAIT_OBJECT_0 + 1)
+            continue;
+        if (InterlockedCompareExchange(&state->connected, 1, 1) != 1)
+            continue;
+
+        EnterCriticalSection(&state->frame_lock);
+        memcpy(state->write_buffer, state->message_buffer, state->message_size);
+        LeaveCriticalSection(&state->frame_lock);
+
+        if (!WriteFile(state->pipe_handle,
+                       state->write_buffer,
+                       (DWORD)state->message_size,
+                       &bytes_written,
+                       NULL) ||
+            bytes_written != (DWORD)state->message_size) {
+            DWORD err = GetLastError();
+            if (err == ERROR_OPERATION_ABORTED &&
+                WaitForSingleObject(state->stop_event, 0) == WAIT_OBJECT_0)
+                break;
+            InterlockedExchange(&state->connected, 0);
+        }
+    }
+    return 0;
+}
+
 static int windows_publish(hasciicam_virtual_camera_device *device,
                            const hasciicam_virtual_camera_frame *frame) {
     hasciicam_virtual_camera_windows_state *state;
     hasciicam_virtual_camera_pipe_frame header;
-    DWORD bytes_written = 0;
 
     state = (hasciicam_virtual_camera_windows_state *)
         hasciicam_virtual_camera_device_state(device);
@@ -64,6 +109,7 @@ static int windows_publish(hasciicam_virtual_camera_device *device,
     if (frame->pixel_format != HASCIICAM_VIRTUAL_CAMERA_PIXFMT_BGRA32 || frame->pixels == NULL)
         return 0;
 
+    EnterCriticalSection(&state->frame_lock);
     hasciicam_virtual_camera_pipe_frame_init(&header,
                                              HASCIICAM_VIRTUAL_CAMERA_PIXFMT_YUY2,
                                              state->request.width,
@@ -81,8 +127,10 @@ static int windows_publish(hasciicam_virtual_camera_device *device,
             state->request.height,
             state->request.width * 2,
             0,
-            0))
+            0)) {
+        LeaveCriticalSection(&state->frame_lock);
         return 0;
+    }
     if (!hasciicam_virtual_camera_pipe_encode_message(
             &header,
             state->message_buffer + sizeof(header),
@@ -90,17 +138,12 @@ static int windows_publish(hasciicam_virtual_camera_device *device,
             state->message_buffer,
             state->message_size,
             NULL,
-            0))
+            0)) {
+        LeaveCriticalSection(&state->frame_lock);
         return 0;
-    if (!WriteFile(state->pipe_handle,
-                   state->message_buffer,
-                   (DWORD)state->message_size,
-                   &bytes_written,
-                   NULL)) {
-        DWORD err = GetLastError();
-        if (err == ERROR_BROKEN_PIPE || err == ERROR_NO_DATA)
-            InterlockedExchange(&state->connected, 0);
     }
+    LeaveCriticalSection(&state->frame_lock);
+    SetEvent(state->frame_event);
     return 1;
 }
 
@@ -113,11 +156,19 @@ static void windows_close(hasciicam_virtual_camera_device *device) {
         return;
     if (state->stop_event != NULL)
         SetEvent(state->stop_event);
+    if (state->frame_event != NULL)
+        SetEvent(state->frame_event);
     if (state->accept_thread != NULL)
         CancelSynchronousIo(state->accept_thread);
+    if (state->writer_thread != NULL)
+        CancelSynchronousIo(state->writer_thread);
     if (state->accept_thread != NULL) {
         WaitForSingleObject(state->accept_thread, INFINITE);
         CloseHandle(state->accept_thread);
+    }
+    if (state->writer_thread != NULL) {
+        WaitForSingleObject(state->writer_thread, INFINITE);
+        CloseHandle(state->writer_thread);
     }
     if (state->pipe_handle != INVALID_HANDLE_VALUE) {
         DisconnectNamedPipe(state->pipe_handle);
@@ -125,7 +176,12 @@ static void windows_close(hasciicam_virtual_camera_device *device) {
     }
     if (state->stop_event != NULL)
         CloseHandle(state->stop_event);
+    if (state->frame_event != NULL)
+        CloseHandle(state->frame_event);
+    if (state->frame_lock_initialized)
+        DeleteCriticalSection(&state->frame_lock);
     free(state->message_buffer);
+    free(state->write_buffer);
     free(state);
 }
 
@@ -169,12 +225,17 @@ int hasciicam_virtual_camera_windows_open(hasciicam_virtual_camera_device **out,
         request->width, request->height, request->width * 2);
     state->message_size = sizeof(hasciicam_virtual_camera_pipe_frame) + state->payload_size;
     state->message_buffer = (unsigned char *)calloc(1, state->message_size);
-    if (state->message_buffer == NULL) {
+    state->write_buffer = (unsigned char *)calloc(1, state->message_size);
+    if (state->message_buffer == NULL || state->write_buffer == NULL) {
         hasciicam_virtual_camera_set_error(
             err, err_size, "unable to allocate virtual camera message buffer");
+        free(state->message_buffer);
+        free(state->write_buffer);
         free(state);
         return 0;
     }
+    InitializeCriticalSection(&state->frame_lock);
+    state->frame_lock_initialized = 1;
     state->pipe_handle = CreateNamedPipeA(state->pipe_name,
                                           PIPE_ACCESS_OUTBOUND,
                                           PIPE_TYPE_BYTE | PIPE_WAIT,
@@ -186,6 +247,8 @@ int hasciicam_virtual_camera_windows_open(hasciicam_virtual_camera_device **out,
     if (state->pipe_handle == INVALID_HANDLE_VALUE) {
         hasciicam_virtual_camera_set_error(err, err_size, "unable to create named pipe");
         free(state->message_buffer);
+        free(state->write_buffer);
+        DeleteCriticalSection(&state->frame_lock);
         free(state);
         return 0;
     }
@@ -195,6 +258,20 @@ int hasciicam_virtual_camera_windows_open(hasciicam_virtual_camera_device **out,
             err, err_size, "unable to create virtual camera stop event");
         CloseHandle(state->pipe_handle);
         free(state->message_buffer);
+        free(state->write_buffer);
+        DeleteCriticalSection(&state->frame_lock);
+        free(state);
+        return 0;
+    }
+    state->frame_event = CreateEventW(NULL, FALSE, FALSE, NULL);
+    if (state->frame_event == NULL) {
+        hasciicam_virtual_camera_set_error(
+            err, err_size, "unable to create virtual camera frame event");
+        CloseHandle(state->stop_event);
+        CloseHandle(state->pipe_handle);
+        free(state->message_buffer);
+        free(state->write_buffer);
+        DeleteCriticalSection(&state->frame_lock);
         free(state);
         return 0;
     }
@@ -202,9 +279,29 @@ int hasciicam_virtual_camera_windows_open(hasciicam_virtual_camera_device **out,
     if (state->accept_thread == NULL) {
         hasciicam_virtual_camera_set_error(
             err, err_size, "unable to create virtual camera accept thread");
+        CloseHandle(state->frame_event);
         CloseHandle(state->stop_event);
         CloseHandle(state->pipe_handle);
         free(state->message_buffer);
+        free(state->write_buffer);
+        DeleteCriticalSection(&state->frame_lock);
+        free(state);
+        return 0;
+    }
+    state->writer_thread = CreateThread(NULL, 0, windows_writer_thread, state, 0, NULL);
+    if (state->writer_thread == NULL) {
+        hasciicam_virtual_camera_set_error(
+            err, err_size, "unable to create virtual camera writer thread");
+        SetEvent(state->stop_event);
+        CancelSynchronousIo(state->accept_thread);
+        WaitForSingleObject(state->accept_thread, INFINITE);
+        CloseHandle(state->accept_thread);
+        CloseHandle(state->frame_event);
+        CloseHandle(state->stop_event);
+        CloseHandle(state->pipe_handle);
+        free(state->message_buffer);
+        free(state->write_buffer);
+        DeleteCriticalSection(&state->frame_lock);
         free(state);
         return 0;
     }
@@ -213,12 +310,19 @@ int hasciicam_virtual_camera_windows_open(hasciicam_virtual_camera_device **out,
         &windows_ops, 1, hasciicam_virtual_camera_windows_name(), state, err, err_size);
     if (*out == NULL) {
         SetEvent(state->stop_event);
+        SetEvent(state->frame_event);
         CancelSynchronousIo(state->accept_thread);
+        CancelSynchronousIo(state->writer_thread);
         WaitForSingleObject(state->accept_thread, INFINITE);
+        WaitForSingleObject(state->writer_thread, INFINITE);
         CloseHandle(state->accept_thread);
+        CloseHandle(state->writer_thread);
+        CloseHandle(state->frame_event);
         CloseHandle(state->stop_event);
         CloseHandle(state->pipe_handle);
         free(state->message_buffer);
+        free(state->write_buffer);
+        DeleteCriticalSection(&state->frame_lock);
         free(state);
         return 0;
     }

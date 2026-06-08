@@ -393,6 +393,71 @@ static void run_windows_backend_roundtrip(void) {
 
     hasciicam_virtual_camera_close(device);
 }
+
+static void run_windows_slow_consumer_smoke(void) {
+    hasciicam_virtual_camera_request request;
+    hasciicam_virtual_camera_device *device = NULL;
+    hasciicam_virtual_camera_source_config config;
+    hasciicam_virtual_camera_frame frame;
+    unsigned char pixels[16] = {
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255
+    };
+    HANDLE client = INVALID_HANDLE_VALUE;
+    ULONGLONG publish_start;
+    ULONGLONG close_start;
+    char err[128];
+    int i;
+
+    hasciicam_virtual_camera_request_init(&request);
+    request.enabled = 1;
+    request.width = 1280;
+    request.height = 720;
+    request.fps = 30;
+    strcpy(request.device, "slow-consumer");
+    expect_true(hasciicam_virtual_camera_open_default(&device, &request, err, sizeof(err)),
+                "slow-consumer backend should open");
+    if (device == NULL)
+        return;
+    expect_true(hasciicam_virtual_camera_source_config_prepare(&request, &config, err, sizeof(err)),
+                "slow-consumer config should prepare");
+    client = CreateFileA(config.pipe_name,
+                         GENERIC_READ,
+                         0,
+                         NULL,
+                         OPEN_EXISTING,
+                         FILE_ATTRIBUTE_NORMAL,
+                         NULL);
+    expect_true(client != INVALID_HANDLE_VALUE, "slow consumer should connect without reading");
+    if (client == INVALID_HANDLE_VALUE) {
+        hasciicam_virtual_camera_close(device);
+        return;
+    }
+    Sleep(50);
+
+    memset(&frame, 0, sizeof(frame));
+    frame.pixels = pixels;
+    frame.width = 2;
+    frame.height = 2;
+    frame.stride_bytes = 8;
+    frame.pixel_format = HASCIICAM_VIRTUAL_CAMERA_PIXFMT_BGRA32;
+    publish_start = GetTickCount64();
+    for (i = 0; i < 20; ++i) {
+        frame.timestamp_100ns = (unsigned long long)i * 333333ULL;
+        expect_true(hasciicam_virtual_camera_publish(device, &frame),
+                    "publishing to a slow consumer should queue or replace the frame");
+    }
+    expect_true(GetTickCount64() - publish_start < 1000,
+                "slow consumer must not block producer publishes");
+
+    close_start = GetTickCount64();
+    hasciicam_virtual_camera_close(device);
+    expect_true(GetTickCount64() - close_start < 1000,
+                "slow consumer must not block producer shutdown");
+    CloseHandle(client);
+}
 #endif
 
 int main(void) {
@@ -790,6 +855,7 @@ cleanup_message:
     run_windows_com_smoke();
     run_windows_pipe_roundtrip();
     run_windows_backend_roundtrip();
+    run_windows_slow_consumer_smoke();
 #endif
 
     if (failures) {
