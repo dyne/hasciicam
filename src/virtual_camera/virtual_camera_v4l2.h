@@ -13,6 +13,14 @@ extern "C" {
 int hasciicam_virtual_camera_v4l2_is_output_capable(unsigned int capabilities);
 
 /**
+ * Format a concise Linux V4L2 failure message for diagnostics.
+ */
+int hasciicam_virtual_camera_v4l2_describe_error(int errnum,
+                                                 const char *operation,
+                                                 char *out,
+                                                 size_t out_size);
+
+/**
  * Return whether a write error should be retried without dropping the frame.
  */
 int hasciicam_virtual_camera_v4l2_should_retry_write(int errnum);

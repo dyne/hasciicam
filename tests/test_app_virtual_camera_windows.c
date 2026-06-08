@@ -18,6 +18,7 @@ static MFVirtualCameraLifetime g_seen_lifetime = (MFVirtualCameraLifetime)-1;
 static MFVirtualCameraAccess g_seen_access = (MFVirtualCameraAccess)-1;
 static wchar_t g_seen_friendly_name[64];
 static wchar_t g_seen_source_id[64];
+static HRESULT g_create_result = S_OK;
 
 typedef struct fake_virtual_camera {
     IMFVirtualCamera iface;
@@ -89,6 +90,8 @@ HRESULT WINAPI MFCreateVirtualCamera(MFVirtualCameraType type,
                                      IMFVirtualCamera **virtualCamera) {
     if (virtualCamera == NULL)
         return E_POINTER;
+    if (FAILED(g_create_result))
+        return g_create_result;
     g_create_calls++;
     g_seen_type = type;
     g_seen_lifetime = lifetime;
@@ -144,6 +147,15 @@ int main(void) {
     expect_true(vc.virtual_camera == NULL, "controller should clear the virtual camera after stop");
     expect_true(vc.windows_com_initialized == 0, "COM initialization flag should be cleared");
     expect_true(vc.windows_mf_initialized == 0, "MF initialization flag should be cleared");
+
+    g_create_result = E_ACCESSDENIED;
+    memset(&vc, 0, sizeof(vc));
+    memset(err, 0, sizeof(err));
+    expect_true(!hasciicam_app_virtual_camera_windows_start(&vc, &request, err, sizeof(err)),
+                "windows helper should report registration failures");
+    expect_true(strstr(err, "access denied") != NULL,
+                "registration failure should name the access denial category");
+    hasciicam_app_virtual_camera_windows_stop(&vc);
 
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);

@@ -12,6 +12,18 @@ static void set_error(char *err, size_t err_size, const char *msg) {
     snprintf(err, err_size, "%s", msg != NULL ? msg : "unknown error");
 }
 
+static const char *describe_start_failure_hresult(HRESULT hr) {
+    if (hr == E_ACCESSDENIED || hr == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED))
+        return "access denied";
+    if (hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) || hr == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND))
+        return "installation missing";
+    if (hr == HRESULT_FROM_WIN32(ERROR_BUSY) || hr == E_INVALIDARG)
+        return "device busy";
+    if (hr == CLASS_E_CLASSNOTAVAILABLE)
+        return "registration missing";
+    return "registration failed";
+}
+
 int hasciicam_app_virtual_camera_windows_start(hasciicam_app_virtual_camera *vc,
                                                const hasciicam_virtual_camera_request *request,
                                                char *err,
@@ -57,7 +69,12 @@ int hasciicam_app_virtual_camera_windows_start(hasciicam_app_virtual_camera *vc,
                                0,
                                &virtual_camera);
     if (FAILED(hr) || virtual_camera == NULL) {
-        set_error(err, err_size, "virtual camera registration failed");
+        char detail[128];
+        snprintf(detail,
+                 sizeof(detail),
+                 "virtual camera registration failed (%s)",
+                 describe_start_failure_hresult(hr));
+        set_error(err, err_size, detail);
         goto fail;
     }
 

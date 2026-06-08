@@ -145,6 +145,39 @@ int hasciicam_virtual_camera_v4l2_is_output_capable(unsigned int capabilities) {
            (capabilities & V4L2_CAP_VIDEO_OUTPUT_MPLANE) != 0;
 }
 
+int hasciicam_virtual_camera_v4l2_describe_error(int errnum,
+                                                 const char *operation,
+                                                 char *out,
+                                                 size_t out_size) {
+    const char *reason = NULL;
+
+    if (out == NULL || out_size == 0)
+        return 0;
+    if (errnum == EACCES || errnum == EPERM) {
+        reason = "access denied";
+    } else if (errnum == ENOENT || errnum == ENODEV || errnum == ENXIO) {
+        reason = "device absent";
+    } else if (errnum == EBUSY) {
+        reason = "device busy";
+    } else if (errnum == EINVAL && operation != NULL && strcmp(operation, "querycap") == 0) {
+        reason = "device is not a V4L2 output node";
+    } else if (errnum == EINVAL && operation != NULL && strcmp(operation, "set format") == 0) {
+        reason = "format rejected";
+    } else if (errnum == EPIPE || errnum == ENOTCONN) {
+        reason = "transport disconnected";
+    }
+    if (reason != NULL) {
+        snprintf(out, out_size, "virtual camera %s", reason);
+        return 1;
+    }
+    if (operation != NULL && operation[0] != '\0') {
+        snprintf(out, out_size, "virtual camera %s failed: %s", operation, strerror(errnum));
+        return 1;
+    }
+    snprintf(out, out_size, "virtual camera operation failed: %s", strerror(errnum));
+    return 1;
+}
+
 int hasciicam_virtual_camera_v4l2_should_retry_write(int errnum) {
     return errnum == EINTR;
 }
@@ -183,13 +216,15 @@ static int linux_v4l2_open_device(const hasciicam_virtual_camera_request *reques
 
     fd = open(request->device, O_WRONLY | O_NONBLOCK);
     if (fd < 0) {
-        return linux_v4l2_set_error(err, err_size, "unable to open virtual camera output device");
+        (void)hasciicam_virtual_camera_v4l2_describe_error(errno, "open output device", err, err_size);
+        return 0;
     }
 
     memset(&cap, 0, sizeof(cap));
     if (ioctl(fd, VIDIOC_QUERYCAP, &cap) < 0) {
         close(fd);
-        return linux_v4l2_set_error(err, err_size, "virtual camera device does not support V4L2 querycap");
+        (void)hasciicam_virtual_camera_v4l2_describe_error(errno, "querycap", err, err_size);
+        return 0;
     }
     if (!hasciicam_virtual_camera_v4l2_is_output_capable(cap.capabilities)) {
         close(fd);
@@ -208,7 +243,8 @@ static int linux_v4l2_open_device(const hasciicam_virtual_camera_request *reques
                                                                              request->width * 2);
     if (ioctl(fd, VIDIOC_S_FMT, &fmt) < 0) {
         close(fd);
-        return linux_v4l2_set_error(err, err_size, "virtual camera rejected YUYV format");
+        (void)hasciicam_virtual_camera_v4l2_describe_error(errno, "set format", err, err_size);
+        return 0;
     }
     if (fmt.fmt.pix.width != (unsigned int)request->width ||
         fmt.fmt.pix.height != (unsigned int)request->height ||
