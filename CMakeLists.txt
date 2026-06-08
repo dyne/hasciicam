@@ -369,12 +369,24 @@ if(HASCIICAM_ENABLE_TESTS)
       src/virtual_camera/virtual_camera_convert.c
     )
     target_include_directories(hasciicam_virtual_camera_source PRIVATE
+      src/virtual_camera/windows/install
       src/virtual_camera/windows/pipe
       src/virtual_camera/windows/source
       src/virtual_camera)
     target_compile_definitions(hasciicam_virtual_camera_source PRIVATE _CRT_SECURE_NO_WARNINGS)
     target_link_libraries(hasciicam_virtual_camera_source PRIVATE
       mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+
+    add_executable(hasciicam_vcamctl
+      src/virtual_camera/windows/tool/hasciicam_vcamctl.c
+      src/virtual_camera/windows/install/hasciicam_virtual_camera_install.c
+    )
+    target_include_directories(hasciicam_vcamctl PRIVATE
+      src/virtual_camera/windows/install)
+    target_compile_definitions(hasciicam_vcamctl PRIVATE _CRT_SECURE_NO_WARNINGS)
+    add_test(NAME hasciicam_vcamctl_help COMMAND hasciicam_vcamctl --help)
+    set_tests_properties(hasciicam_vcamctl_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: hasciicam-vcam")
+    set_tests_properties(hasciicam_vcamctl_help PROPERTIES LABELS "cli")
 
     add_executable(test_app_virtual_camera_windows
       tests/test_app_virtual_camera_windows.c
@@ -406,6 +418,19 @@ if(HASCIICAM_ENABLE_TESTS)
       mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
     add_test(NAME virtual_camera_windows COMMAND test_virtual_camera_windows)
     set_tests_properties(virtual_camera_windows PROPERTIES LABELS "unit;core")
+
+    add_executable(test_virtual_camera_install
+      tests/test_virtual_camera_install.c
+      src/virtual_camera/windows/install/hasciicam_virtual_camera_install.c
+    )
+    target_include_directories(test_virtual_camera_install PRIVATE
+      src/virtual_camera/windows/install)
+    target_compile_definitions(test_virtual_camera_install PRIVATE _CRT_SECURE_NO_WARNINGS)
+    add_test(NAME virtual_camera_install COMMAND test_virtual_camera_install)
+    set_tests_properties(virtual_camera_install PROPERTIES LABELS "unit;core")
+
+    install(TARGETS hasciicam_virtual_camera_source hasciicam_vcamctl
+            RUNTIME DESTINATION bin)
   endif()
 
   add_executable(test_capture_control
