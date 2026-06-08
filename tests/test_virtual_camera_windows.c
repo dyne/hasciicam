@@ -77,6 +77,15 @@ static void run_windows_com_smoke(void) {
     IMFAttributes *source_attributes = NULL;
     IMFAttributes *stream_attributes = NULL;
     IMFGetService *get_service = NULL;
+    IMFMediaEvent *source_event = NULL;
+    IMFMediaEvent *stream_event = NULL;
+    IMFMediaStream *stream = NULL;
+    IMFMediaSource *stream_source = NULL;
+    IMFSample *sample = NULL;
+    PROPVARIANT start_position;
+    MediaEventType event_type;
+    LONGLONG first_sample_time = 0;
+    LONGLONG second_sample_time = 0;
     DWORD characteristics = 0;
     HRESULT hr;
     BOOL com_initialized = FALSE;
@@ -137,14 +146,108 @@ static void run_windows_com_smoke(void) {
         if (get_service != NULL)
             get_service->lpVtbl->Release(get_service);
 
-        hr = source->lpVtbl->Start(source, presentation, NULL, NULL);
+        PropVariantInit(&start_position);
+        hr = source->lpVtbl->Start(source, presentation, NULL, &start_position);
         expect_true(SUCCEEDED(hr), "source should start");
         if (SUCCEEDED(hr)) {
-            expect_true(FAILED(source->lpVtbl->Start(source, presentation, NULL, NULL)),
+            hr = source->lpVtbl->GetEvent(source, MF_EVENT_FLAG_NO_WAIT, &source_event);
+            expect_true(SUCCEEDED(hr) && source_event != NULL,
+                        "source should queue a new-stream event");
+            if (source_event != NULL) {
+                expect_true(SUCCEEDED(source_event->lpVtbl->GetType(source_event, &event_type)) &&
+                            event_type == MENewStream,
+                            "first source event should announce the stream");
+                {
+                    PROPVARIANT event_value;
+                    PropVariantInit(&event_value);
+                    if (SUCCEEDED(source_event->lpVtbl->GetValue(source_event, &event_value)) &&
+                        event_value.vt == VT_UNKNOWN && event_value.punkVal != NULL) {
+                        event_value.punkVal->lpVtbl->QueryInterface(
+                            event_value.punkVal, &IID_IMFMediaStream, (void **)&stream);
+                    }
+                    PropVariantClear(&event_value);
+                }
+                source_event->lpVtbl->Release(source_event);
+                source_event = NULL;
+            }
+            expect_true(stream != NULL, "new-stream event should carry IMFMediaStream");
+            if (stream != NULL) {
+                expect_true(SUCCEEDED(stream->lpVtbl->GetMediaSource(stream, &stream_source)) &&
+                            stream_source != NULL,
+                            "stream should return its owning media source");
+                if (stream_source != NULL) {
+                    stream_source->lpVtbl->Release(stream_source);
+                    stream_source = NULL;
+                }
+                hr = stream->lpVtbl->GetEvent(stream, MF_EVENT_FLAG_NO_WAIT, &stream_event);
+                expect_true(SUCCEEDED(hr) && stream_event != NULL,
+                            "stream should queue a started event");
+                if (stream_event != NULL) {
+                    expect_true(SUCCEEDED(stream_event->lpVtbl->GetType(stream_event, &event_type)) &&
+                                event_type == MEStreamStarted,
+                                "stream should report MEStreamStarted");
+                    stream_event->lpVtbl->Release(stream_event);
+                    stream_event = NULL;
+                }
+            }
+            hr = source->lpVtbl->GetEvent(source, MF_EVENT_FLAG_NO_WAIT, &source_event);
+            expect_true(SUCCEEDED(hr) && source_event != NULL,
+                        "source should queue a started event");
+            if (source_event != NULL) {
+                expect_true(SUCCEEDED(source_event->lpVtbl->GetType(source_event, &event_type)) &&
+                            event_type == MESourceStarted,
+                            "source should report MESourceStarted");
+                source_event->lpVtbl->Release(source_event);
+                source_event = NULL;
+            }
+            if (stream != NULL) {
+                int sample_index;
+                for (sample_index = 0; sample_index < 2; ++sample_index) {
+                    PROPVARIANT event_value;
+                    LONGLONG sample_time = 0;
+
+                    expect_true(SUCCEEDED(stream->lpVtbl->RequestSample(stream, NULL)),
+                                "stream should accept sample requests");
+                    hr = stream->lpVtbl->GetEvent(stream, MF_EVENT_FLAG_NO_WAIT, &stream_event);
+                    expect_true(SUCCEEDED(hr) && stream_event != NULL,
+                                "stream should queue a media sample");
+                    PropVariantInit(&event_value);
+                    if (stream_event != NULL) {
+                        expect_true(SUCCEEDED(stream_event->lpVtbl->GetType(stream_event, &event_type)) &&
+                                    event_type == MEMediaSample,
+                                    "sample request should produce MEMediaSample");
+                        if (SUCCEEDED(stream_event->lpVtbl->GetValue(stream_event, &event_value)) &&
+                            event_value.vt == VT_UNKNOWN && event_value.punkVal != NULL) {
+                            event_value.punkVal->lpVtbl->QueryInterface(
+                                event_value.punkVal, &IID_IMFSample, (void **)&sample);
+                        }
+                    }
+                    expect_true(sample != NULL, "sample event should carry IMFSample");
+                    if (sample != NULL) {
+                        expect_true(SUCCEEDED(sample->lpVtbl->GetSampleTime(sample, &sample_time)),
+                                    "sample should have a timestamp");
+                        if (sample_index == 0)
+                            first_sample_time = sample_time;
+                        else
+                            second_sample_time = sample_time;
+                        sample->lpVtbl->Release(sample);
+                        sample = NULL;
+                    }
+                    PropVariantClear(&event_value);
+                    if (stream_event != NULL) {
+                        stream_event->lpVtbl->Release(stream_event);
+                        stream_event = NULL;
+                    }
+                }
+                expect_true(second_sample_time > first_sample_time,
+                            "consecutive sample timestamps should increase");
+            }
+            expect_true(FAILED(source->lpVtbl->Start(source, presentation, NULL, &start_position)),
                         "starting twice should be rejected");
             expect_true(SUCCEEDED(source->lpVtbl->Stop(source)),
                         "source should stop");
         }
+        PropVariantClear(&start_position);
 
         expect_true(SUCCEEDED(source->lpVtbl->Shutdown(source)),
                     "source should shut down");
@@ -152,6 +255,10 @@ static void run_windows_com_smoke(void) {
 
     if (stream_attributes != NULL)
         stream_attributes->lpVtbl->Release(stream_attributes);
+    if (sample != NULL)
+        sample->lpVtbl->Release(sample);
+    if (stream != NULL)
+        stream->lpVtbl->Release(stream);
     if (source_attributes != NULL)
         source_attributes->lpVtbl->Release(source_attributes);
     if (presentation != NULL)

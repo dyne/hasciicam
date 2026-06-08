@@ -141,13 +141,13 @@ void hasciicam_app_virtual_camera_stop(hasciicam_app_virtual_camera *vc,
     if (vc->active && set_callback != NULL && vc->context != NULL) {
         (void)set_callback(vc->context, NULL, NULL);
     }
-#ifdef _WIN32
-    hasciicam_app_virtual_camera_windows_stop(vc);
-#endif
     if (vc->device != NULL) {
         hasciicam_virtual_camera_close(vc->device);
         vc->device = NULL;
     }
+#ifdef _WIN32
+    hasciicam_app_virtual_camera_windows_stop(vc);
+#endif
     vc->context = NULL;
     vc->active = 0;
 }

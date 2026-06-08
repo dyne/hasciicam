@@ -717,6 +717,10 @@ public:
           type_handler_(NULL),
           attributes_(NULL),
           current_media_type_(NULL),
+          source_(NULL),
+          frame_lock_(NULL),
+          next_sample_time_100ns_(0),
+          sample_clock_started_(FALSE),
           shutdown_(FALSE) {
         InterlockedIncrement(&g_module_refcount);
     }
@@ -737,16 +741,20 @@ public:
 
     HRESULT Init(const hasciicam_virtual_camera_source_config *config,
                  const hasciicam_virtual_camera_source_frame_slot *frame_slot,
-                 const hasciicam_virtual_camera_source_lifecycle *lifecycle) {
+                 const hasciicam_virtual_camera_source_lifecycle *lifecycle,
+                 PSRWLOCK frame_lock,
+                 IMFMediaSource *source) {
         IMFMediaType *media_types[2] = { NULL, NULL };
         size_t media_type_count;
         HRESULT hr;
 
-        if (config == NULL)
+        if (config == NULL || frame_lock == NULL || source == NULL)
             return E_POINTER;
         config_ = *config;
         frame_slot_ = frame_slot;
         lifecycle_ = lifecycle;
+        frame_lock_ = frame_lock;
+        source_ = source;
 
         hr = MFCreateAttributes(&attributes_, 8);
         if (FAILED(hr))
@@ -884,7 +892,13 @@ public:
         if (media_source == NULL)
             return E_POINTER;
         *media_source = NULL;
-        return E_NOTIMPL;
+        if (shutdown_)
+            return MF_E_SHUTDOWN;
+        if (source_ == NULL)
+            return E_UNEXPECTED;
+        source_->AddRef();
+        *media_source = source_;
+        return S_OK;
     }
 
     HRESULT GetStreamDescriptor(IMFStreamDescriptor **stream_descriptor) {
@@ -904,13 +918,15 @@ public:
         IMFSample *sample = NULL;
         unsigned long long start_100ns = 0ULL;
         unsigned long long sequence = 0ULL;
+        unsigned long long sample_time;
+        unsigned long long sample_duration;
         HRESULT hr;
 
-        (void)token;
         if (shutdown_)
             return MF_E_SHUTDOWN;
         if (stream_state_ != MF_STREAM_STATE_RUNNING)
             return MF_E_INVALIDREQUEST;
+        AcquireSRWLockShared(frame_lock_);
         if (lifecycle_ != NULL) {
             start_100ns = lifecycle_->last_timestamp_100ns;
             sequence = lifecycle_->last_sequence;
@@ -926,8 +942,32 @@ public:
                                                          &sample,
                                                          NULL,
                                                          0);
+        ReleaseSRWLockShared(frame_lock_);
         if (FAILED(hr) || sample == NULL)
             return FAILED(hr) ? hr : E_FAIL;
+        sample_duration = hasciicam_virtual_camera_source_sample_duration_100ns(config_.request.fps);
+        sample_time = start_100ns;
+        if (!sample_clock_started_) {
+            next_sample_time_100ns_ = sample_time;
+            sample_clock_started_ = TRUE;
+        }
+        if (sample_time < next_sample_time_100ns_)
+            sample_time = next_sample_time_100ns_;
+        hr = sample->SetSampleTime((LONGLONG)sample_time);
+        if (SUCCEEDED(hr))
+            hr = sample->SetSampleDuration((LONGLONG)sample_duration);
+        if (FAILED(hr)) {
+            sample->Release();
+            return hr;
+        }
+        next_sample_time_100ns_ = sample_time + sample_duration;
+        if (token != NULL) {
+            hr = sample->SetUnknown(MFSampleExtension_Token, token);
+            if (FAILED(hr)) {
+                sample->Release();
+                return hr;
+            }
+        }
         hr = event_queue_->QueueEventParamUnk(MEMediaSample, GUID_NULL, S_OK, sample);
         sample->Release();
         return hr;
@@ -950,6 +990,10 @@ public:
         if (shutdown_)
             return MF_E_SHUTDOWN;
         stream_state_ = state;
+        if (state == MF_STREAM_STATE_RUNNING) {
+            next_sample_time_100ns_ = 0;
+            sample_clock_started_ = FALSE;
+        }
         return S_OK;
     }
 
@@ -997,6 +1041,7 @@ public:
     HRESULT Shutdown(void) {
         shutdown_ = TRUE;
         stream_state_ = MF_STREAM_STATE_STOPPED;
+        source_ = NULL;
         if (event_queue_ != NULL) {
             event_queue_->Shutdown();
             event_queue_->Release();
@@ -1029,9 +1074,13 @@ private:
     IMFMediaTypeHandler *type_handler_;
     IMFAttributes *attributes_;
     IMFMediaType *current_media_type_;
+    IMFMediaSource *source_;
     hasciicam_virtual_camera_source_config config_;
     const hasciicam_virtual_camera_source_frame_slot *frame_slot_;
     const hasciicam_virtual_camera_source_lifecycle *lifecycle_;
+    PSRWLOCK frame_lock_;
+    unsigned long long next_sample_time_100ns_;
+    BOOL sample_clock_started_;
     BOOL shutdown_;
 };
 
@@ -1046,7 +1095,9 @@ public:
           stream_descriptor_(NULL),
           reader_thread_(NULL),
           reader_stop_event_(NULL),
+          stream_announced_(FALSE),
           shutdown_(FALSE) {
+        InitializeSRWLock(&frame_lock_);
         hasciicam_virtual_camera_source_frame_slot_init(&frame_slot_);
         InterlockedIncrement(&g_module_refcount);
     }
@@ -1090,7 +1141,11 @@ public:
         stream_ = new (std::nothrow) HasciiCamVirtualCameraStream();
         if (stream_ == NULL)
             return E_OUTOFMEMORY;
-        hr = stream_->Init(&config_, &frame_slot_, &lifecycle_);
+        hr = stream_->Init(&config_,
+                           &frame_slot_,
+                           &lifecycle_,
+                           &frame_lock_,
+                           static_cast<IMFMediaSource *>(this));
         if (FAILED(hr))
             return hr;
 
@@ -1198,33 +1253,64 @@ public:
     HRESULT Start(IMFPresentationDescriptor *presentation_descriptor,
                   const GUID *time_format,
                   const PROPVARIANT *start_position) {
+        PROPVARIANT start_value;
+        MediaEventType stream_event;
         HRESULT hr;
 
-        (void)presentation_descriptor;
-        (void)time_format;
-        (void)start_position;
         if (shutdown_)
             return MF_E_SHUTDOWN;
+        if (presentation_descriptor == NULL || start_position == NULL)
+            return E_POINTER;
+        if (time_format != NULL && !IsEqualGUID(*time_format, GUID_NULL))
+            return MF_E_UNSUPPORTED_TIME_FORMAT;
+        if (start_position->vt != VT_EMPTY && start_position->vt != VT_I8)
+            return MF_E_UNSUPPORTED_TIME_FORMAT;
         if (lifecycle_.state == HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_STARTED)
             return MF_E_INVALIDREQUEST;
         if (!hasciicam_virtual_camera_source_lifecycle_start(&lifecycle_, NULL, 0))
             return MF_E_INVALIDREQUEST;
-        if (stream_ != NULL)
-            stream_->SetStreamState(MF_STREAM_STATE_RUNNING);
+        if (stream_ == NULL)
+            return E_UNEXPECTED;
+        hr = stream_->SetStreamState(MF_STREAM_STATE_RUNNING);
+        if (FAILED(hr))
+            return hr;
         hr = StartReaderThread();
         if (FAILED(hr))
             return hr;
-        return S_OK;
+
+        stream_event = stream_announced_ ? MEUpdatedStream : MENewStream;
+        hr = event_queue_->QueueEventParamUnk(
+            stream_event, GUID_NULL, S_OK, static_cast<IMFMediaStream *>(stream_));
+        if (FAILED(hr))
+            return hr;
+        stream_announced_ = TRUE;
+
+        PropVariantInit(&start_value);
+        hr = PropVariantCopy(&start_value, start_position);
+        if (SUCCEEDED(hr))
+            hr = event_queue_->QueueEventParamVar(
+                MESourceStarted, GUID_NULL, S_OK, &start_value);
+        if (SUCCEEDED(hr))
+            hr = stream_->QueueEvent(MEStreamStarted, GUID_NULL, S_OK, &start_value);
+        PropVariantClear(&start_value);
+        return hr;
     }
 
     HRESULT Stop(void) {
+        HRESULT hr;
+
         if (shutdown_)
             return MF_E_SHUTDOWN;
         if (!hasciicam_virtual_camera_source_lifecycle_stop(&lifecycle_, NULL, 0))
             return MF_E_INVALIDREQUEST;
-        if (stream_ != NULL)
-            stream_->SetStreamState(MF_STREAM_STATE_STOPPED);
-        return S_OK;
+        if (stream_ == NULL)
+            return E_UNEXPECTED;
+        hr = stream_->SetStreamState(MF_STREAM_STATE_STOPPED);
+        if (SUCCEEDED(hr))
+            hr = stream_->QueueEvent(MEStreamStopped, GUID_NULL, S_OK, NULL);
+        if (SUCCEEDED(hr))
+            hr = event_queue_->QueueEventParamVar(MESourceStopped, GUID_NULL, S_OK, NULL);
+        return hr;
     }
 
     HRESULT Pause(void) {
@@ -1394,21 +1480,31 @@ public:
 
     static DWORD WINAPI ReaderThreadProc(LPVOID param) {
         HasciiCamVirtualCameraSource *self = (HasciiCamVirtualCameraSource *)param;
+        hasciicam_virtual_camera_source_frame_slot incoming;
         char err[128];
 
         if (self == NULL)
             return 0;
+        hasciicam_virtual_camera_source_frame_slot_init(&incoming);
         while (WaitForSingleObject(self->reader_stop_event_, 0) != WAIT_OBJECT_0) {
             if (hasciicam_virtual_camera_source_read_pipe_message(&self->config_,
                                                                   self->config_.pipe_name,
-                                                                  &self->frame_slot_,
+                                                                  &incoming,
                                                                   250,
                                                                   err,
                                                                   sizeof(err))) {
+                AcquireSRWLockExclusive(&self->frame_lock_);
+                {
+                    hasciicam_virtual_camera_source_frame_slot previous = self->frame_slot_;
+                    self->frame_slot_ = incoming;
+                    incoming = previous;
+                }
                 self->lifecycle_.last_sequence = self->frame_slot_.sequence;
                 self->lifecycle_.last_timestamp_100ns = self->frame_slot_.timestamp_100ns;
+                ReleaseSRWLockExclusive(&self->frame_lock_);
             }
         }
+        hasciicam_virtual_camera_source_frame_slot_close(&incoming);
         return 0;
     }
 
@@ -1421,6 +1517,8 @@ private:
     IMFStreamDescriptor *stream_descriptor_;
     HANDLE reader_thread_;
     HANDLE reader_stop_event_;
+    BOOL stream_announced_;
+    SRWLOCK frame_lock_;
     hasciicam_virtual_camera_source_config config_;
     hasciicam_virtual_camera_source_lifecycle lifecycle_;
     hasciicam_virtual_camera_source_frame_slot frame_slot_;

@@ -149,6 +149,7 @@ static int windows_publish(hasciicam_virtual_camera_device *device,
 
 static void windows_close(hasciicam_virtual_camera_device *device) {
     hasciicam_virtual_camera_windows_state *state;
+    HANDLE pipe_handle;
 
     state = (hasciicam_virtual_camera_windows_state *)
         hasciicam_virtual_camera_device_state(device);
@@ -162,6 +163,12 @@ static void windows_close(hasciicam_virtual_camera_device *device) {
         CancelSynchronousIo(state->accept_thread);
     if (state->writer_thread != NULL)
         CancelSynchronousIo(state->writer_thread);
+    pipe_handle = state->pipe_handle;
+    state->pipe_handle = INVALID_HANDLE_VALUE;
+    if (pipe_handle != INVALID_HANDLE_VALUE) {
+        DisconnectNamedPipe(pipe_handle);
+        CloseHandle(pipe_handle);
+    }
     if (state->accept_thread != NULL) {
         WaitForSingleObject(state->accept_thread, INFINITE);
         CloseHandle(state->accept_thread);
@@ -169,10 +176,6 @@ static void windows_close(hasciicam_virtual_camera_device *device) {
     if (state->writer_thread != NULL) {
         WaitForSingleObject(state->writer_thread, INFINITE);
         CloseHandle(state->writer_thread);
-    }
-    if (state->pipe_handle != INVALID_HANDLE_VALUE) {
-        DisconnectNamedPipe(state->pipe_handle);
-        CloseHandle(state->pipe_handle);
     }
     if (state->stop_event != NULL)
         CloseHandle(state->stop_event);
