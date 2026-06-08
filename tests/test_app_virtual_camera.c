@@ -88,6 +88,27 @@ int main(void) {
     expect_true(vc.device == NULL, "device should be released after stop");
     expect_true(unregister_calls == 1, "frame callback should be unregistered exactly once");
 
+#if defined(__linux__)
+    {
+        hasciicam_app_virtual_camera linux_vc;
+        hasciicam_config linux_cfg;
+        char linux_err[128];
+
+        hasciicam_app_virtual_camera_init(&linux_vc);
+        hasciicam_config_init_defaults(&linux_cfg);
+        linux_cfg.virtual_camera = 1;
+        strcpy(linux_cfg.device, "/dev/video10");
+        strcpy(linux_cfg.virtual_camera_device, "/dev/video10");
+        expect_true(!hasciicam_app_virtual_camera_start(&linux_vc,
+                                                        dummy_context,
+                                                        &linux_cfg,
+                                                        fake_set_callback,
+                                                        linux_err,
+                                                        sizeof(linux_err)),
+                    "virtual camera should reject sharing the capture device path");
+    }
+#endif
+
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);
         return 1;

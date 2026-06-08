@@ -158,7 +158,7 @@
 :Notes: `v4l2loopback` creates the device and kernel behavior. HasciiCam should only validate and write to it. Recommend `exclusive_caps=1` for browser/WebRTC compatibility because the device advertises OUTPUT while the producer is attached and CAPTURE to consumers afterward.
 :END:
 
-** TODO [#A] Add the V4L2 output adapter
+** DONE [#A] Add the V4L2 output adapter
 :PROPERTIES:
 :Why: Linux virtual cameras accept frames through the normal V4L2 output API, but this is distinct from the existing V4L2 capture adapter.
 :Change: Add `src/virtual_camera/virtual_camera_v4l2.c`. Open the configured path with `O_WRONLY|O_NONBLOCK`; query capabilities and require `V4L2_CAP_VIDEO_OUTPUT` or `V4L2_CAP_VIDEO_OUTPUT_MPLANE` as implemented. Reject a normal capture-only camera. Configure `V4L2_BUF_TYPE_VIDEO_OUTPUT`, fixed width/height, `V4L2_PIX_FMT_YUYV`, field none, bytes-per-line, size-image, and requested frame interval with `VIDIOC_S_FMT`/`VIDIOC_S_PARM`; read back negotiated values and reject incompatible geometry/format rather than silently mispacking data. Begin with nonblocking `write()` because it is the simplest viable loopback producer; add streaming buffers only if real devices require them.

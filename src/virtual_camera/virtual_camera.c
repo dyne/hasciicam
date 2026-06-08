@@ -8,6 +8,13 @@
 #if defined(_WIN32)
 #include <windows.h>
 #include "windows/pipe/hasciicam_virtual_camera_pipe.h"
+#elif defined(__linux__)
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <linux/videodev2.h>
+#include "virtual_camera_v4l2.h"
 #endif
 
 static void set_error(char *err, size_t err_size, const char *msg) {
@@ -92,6 +99,17 @@ struct hasciicam_virtual_camera_device {
     unsigned char *message_buffer;
     size_t message_size;
     size_t payload_size;
+#elif defined(__linux__)
+    int fd;
+    int requested_width;
+    int requested_height;
+    int requested_fps;
+    int width;
+    int height;
+    int stride_bytes;
+    size_t payload_size;
+    unsigned char *payload_buffer;
+    int disconnected;
 #endif
 };
 
@@ -115,6 +133,143 @@ static const hasciicam_virtual_camera_ops unsupported_ops = {
     unsupported_close,
     unsupported_name
 };
+
+#if defined(__linux__)
+static int linux_v4l2_set_error(char *err, size_t err_size, const char *msg) {
+    set_error(err, err_size, msg);
+    return 0;
+}
+
+int hasciicam_virtual_camera_v4l2_is_output_capable(unsigned int capabilities) {
+    return (capabilities & V4L2_CAP_VIDEO_OUTPUT) != 0 ||
+           (capabilities & V4L2_CAP_VIDEO_OUTPUT_MPLANE) != 0;
+}
+
+static int linux_v4l2_open_device(const hasciicam_virtual_camera_request *request,
+                                  int *fd_out,
+                                  int *width_out,
+                                  int *height_out,
+                                  int *stride_out,
+                                  size_t *payload_out,
+                                  char *err,
+                                  size_t err_size) {
+    int fd;
+    struct v4l2_capability cap;
+    struct v4l2_format fmt;
+    struct v4l2_streamparm parm;
+
+    if (request == NULL || fd_out == NULL || width_out == NULL || height_out == NULL ||
+        stride_out == NULL || payload_out == NULL) {
+        return linux_v4l2_set_error(err, err_size, "virtual camera request is required");
+    }
+
+    fd = open(request->device, O_WRONLY | O_NONBLOCK);
+    if (fd < 0) {
+        return linux_v4l2_set_error(err, err_size, "unable to open virtual camera output device");
+    }
+
+    memset(&cap, 0, sizeof(cap));
+    if (ioctl(fd, VIDIOC_QUERYCAP, &cap) < 0) {
+        close(fd);
+        return linux_v4l2_set_error(err, err_size, "virtual camera device does not support V4L2 querycap");
+    }
+    if (!hasciicam_virtual_camera_v4l2_is_output_capable(cap.capabilities)) {
+        close(fd);
+        return linux_v4l2_set_error(err, err_size, "virtual camera device is not a V4L2 output node");
+    }
+
+    memset(&fmt, 0, sizeof(fmt));
+    fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+    fmt.fmt.pix.width = (unsigned int)request->width;
+    fmt.fmt.pix.height = (unsigned int)request->height;
+    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+    fmt.fmt.pix.field = V4L2_FIELD_NONE;
+    fmt.fmt.pix.bytesperline = (unsigned int)(request->width * 2);
+    fmt.fmt.pix.sizeimage = (unsigned int)hasciicam_virtual_camera_yuy2_size(request->width,
+                                                                             request->height,
+                                                                             request->width * 2);
+    if (ioctl(fd, VIDIOC_S_FMT, &fmt) < 0) {
+        close(fd);
+        return linux_v4l2_set_error(err, err_size, "virtual camera rejected YUYV format");
+    }
+    if (fmt.fmt.pix.width != (unsigned int)request->width ||
+        fmt.fmt.pix.height != (unsigned int)request->height ||
+        fmt.fmt.pix.pixelformat != V4L2_PIX_FMT_YUYV ||
+        fmt.fmt.pix.field != V4L2_FIELD_NONE) {
+        close(fd);
+        return linux_v4l2_set_error(err, err_size, "virtual camera negotiated incompatible format");
+    }
+
+    memset(&parm, 0, sizeof(parm));
+    parm.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+    parm.parm.output.timeperframe.numerator = 1;
+    parm.parm.output.timeperframe.denominator = (request->fps > 0) ? (unsigned int)request->fps : 30U;
+    (void)ioctl(fd, VIDIOC_S_PARM, &parm);
+
+    *fd_out = fd;
+    *width_out = (int)fmt.fmt.pix.width;
+    *height_out = (int)fmt.fmt.pix.height;
+    *stride_out = (int)fmt.fmt.pix.bytesperline;
+    *payload_out = (size_t)fmt.fmt.pix.sizeimage;
+    return 1;
+}
+
+static int linux_v4l2_publish(hasciicam_virtual_camera_device *device,
+                              const hasciicam_virtual_camera_frame *frame) {
+    ssize_t written;
+
+    if (device == NULL || frame == NULL || device->fd < 0 || device->payload_buffer == NULL)
+        return 0;
+    if (device->disconnected)
+        return 1;
+    if (frame->pixel_format != HASCIICAM_VIRTUAL_CAMERA_PIXFMT_BGRA32 || frame->pixels == NULL)
+        return 0;
+    if (!hasciicam_virtual_camera_scale_bgra32_to_yuy2(frame->pixels,
+                                                       frame->width,
+                                                       frame->height,
+                                                       frame->stride_bytes,
+                                                       device->payload_buffer,
+                                                       device->width,
+                                                       device->height,
+                                                       device->stride_bytes,
+                                                       0,
+                                                       0)) {
+        return 0;
+    }
+    for (;;) {
+        written = write(device->fd, device->payload_buffer, device->payload_size);
+        if (written == (ssize_t)device->payload_size)
+            return 1;
+        if (written < 0 && errno == EINTR)
+            continue;
+        if (written < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+            return 1;
+        device->disconnected = 1;
+        close(device->fd);
+        device->fd = -1;
+        return 1;
+    }
+}
+
+static void linux_v4l2_close(hasciicam_virtual_camera_device *device) {
+    if (device == NULL)
+        return;
+    if (device->fd >= 0)
+        close(device->fd);
+    free(device->payload_buffer);
+    free(device);
+}
+
+static const char *linux_v4l2_name(void) {
+    return "v4l2-output";
+}
+
+static const hasciicam_virtual_camera_ops linux_v4l2_ops = {
+    linux_v4l2_publish,
+    linux_v4l2_close,
+    linux_v4l2_name
+};
+#endif
 
 #if defined(_WIN32)
 static DWORD WINAPI windows_accept_thread(LPVOID param) {
@@ -300,6 +455,41 @@ int hasciicam_virtual_camera_open_default(hasciicam_virtual_camera_device **out,
         CloseHandle(device->stop_event);
         CloseHandle(device->pipe_handle);
         free(device->message_buffer);
+        free(device);
+        return 0;
+    }
+#elif defined(__linux__)
+    if (request == NULL || !request->enabled) {
+        device->ops = &unsupported_ops;
+        device->supported = 0;
+        strncpy(device->backend_name, unsupported_name(), sizeof(device->backend_name) - 1);
+        *out = device;
+        return 1;
+    }
+    if (request->device[0] == '\0') {
+        free(device);
+        return 0;
+    }
+    device->ops = &linux_v4l2_ops;
+    device->supported = 1;
+    strncpy(device->backend_name, linux_v4l2_name(), sizeof(device->backend_name) - 1);
+    device->requested_width = request->width;
+    device->requested_height = request->height;
+    device->requested_fps = request->fps;
+    if (!linux_v4l2_open_device(request,
+                                &device->fd,
+                                &device->width,
+                                &device->height,
+                                &device->stride_bytes,
+                                &device->payload_size,
+                                err,
+                                sizeof(err))) {
+        free(device);
+        return 0;
+    }
+    device->payload_buffer = (unsigned char *)calloc(1, device->payload_size);
+    if (device->payload_buffer == NULL) {
+        close(device->fd);
         free(device);
         return 0;
     }

@@ -361,6 +361,16 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME virtual_camera COMMAND test_virtual_camera)
   set_tests_properties(virtual_camera PROPERTIES LABELS "unit;core")
 
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_executable(test_virtual_camera_v4l2
+      tests/test_virtual_camera_v4l2.c
+      src/virtual_camera/virtual_camera.c
+    )
+    target_include_directories(test_virtual_camera_v4l2 PRIVATE src/virtual_camera)
+    add_test(NAME virtual_camera_v4l2 COMMAND test_virtual_camera_v4l2)
+    set_tests_properties(virtual_camera_v4l2 PROPERTIES LABELS "unit;core")
+  endif()
+
   if(WIN32)
     add_library(hasciicam_virtual_camera_source SHARED
       src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c

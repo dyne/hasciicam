@@ -57,6 +57,13 @@ int hasciicam_app_virtual_camera_start(hasciicam_app_virtual_camera *vc,
         set_error(err, err_size, "virtual camera requires SDL callback registration support");
         return 0;
     }
+#if defined(__linux__)
+    if (cfg->device[0] != '\0' && cfg->virtual_camera_device[0] != '\0' &&
+        strcmp(cfg->device, cfg->virtual_camera_device) == 0) {
+        set_error(err, err_size, "virtual camera device must differ from capture device");
+        return 0;
+    }
+#endif
 
     hasciicam_virtual_camera_request_init(&request);
     request.enabled = 1;
