@@ -1617,7 +1617,11 @@ public:
             return MF_E_INVALIDREQUEST;
         if (stream_ == NULL)
             return E_UNEXPECTED;
-        StopReaderThread();
+        /*
+         * Keep the transport connected across transient Frame Server stop/start
+         * cycles. Shutdown owns reader teardown; reconnecting here causes
+         * visible stalls in clients such as Windows Camera.
+         */
         hr = stream_->SetStreamState(MF_STREAM_STATE_STOPPED);
         if (SUCCEEDED(hr))
             hr = stream_->QueueEvent(MEStreamStopped, GUID_NULL, S_OK, NULL);
