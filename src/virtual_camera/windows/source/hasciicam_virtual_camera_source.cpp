@@ -1161,8 +1161,20 @@ public:
     }
 
     HRESULT SetStreamState(MF_STREAM_STATE state) {
+        HRESULT hr;
+
         if (shutdown_)
             return MF_E_SHUTDOWN;
+        if (state == MF_STREAM_STATE_RUNNING && sample_allocator_ != NULL) {
+            if (current_media_type_ == NULL)
+                return MF_E_NOT_INITIALIZED;
+            hr = sample_allocator_->InitializeSampleAllocator(10, current_media_type_);
+            hasciicam_virtual_camera_source_trace(
+                "sample allocator initialized result=0x%08lx",
+                (unsigned long)hr);
+            if (FAILED(hr))
+                return hr;
+        }
         stream_state_ = state;
         if (state == MF_STREAM_STATE_RUNNING) {
             next_sample_time_100ns_ = 0;
@@ -1194,11 +1206,24 @@ public:
     }
 
     HRESULT SetCurrentMediaType(IMFMediaType *media_type) {
+        IMFMediaType *selected_type = NULL;
+        HRESULT hr;
+
         if (shutdown_)
             return MF_E_SHUTDOWN;
         if (type_handler_ == NULL)
             return E_UNEXPECTED;
-        return type_handler_->SetCurrentMediaType(media_type);
+        if (media_type == NULL)
+            return E_POINTER;
+        hr = type_handler_->SetCurrentMediaType(media_type);
+        if (SUCCEEDED(hr))
+            hr = type_handler_->GetCurrentMediaType(&selected_type);
+        if (FAILED(hr))
+            return hr;
+        if (current_media_type_ != NULL)
+            current_media_type_->Release();
+        current_media_type_ = selected_type;
+        return S_OK;
     }
 
     HRESULT GetCurrentMediaType(IMFMediaType **media_type) {
