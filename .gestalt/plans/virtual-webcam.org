@@ -182,7 +182,7 @@
 :Done when: A Linux user can prepare a loopback device and understand why HasciiCam does not invoke privileged setup.
 :END:
 
-* TODO [#A] Integrate configuration, build options, and user documentation
+* DONE [#A] Integrate configuration, build options, and user documentation
 :PROPERTIES:
 :Effort: 1 day
 :Goal: Make the feature discoverable and optional while preserving existing Windows, Linux, macOS, non-SDL, and library-only builds.
