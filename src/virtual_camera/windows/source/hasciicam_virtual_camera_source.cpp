@@ -14,7 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unknwn.h>
+#ifndef NDEBUG
 #include <stdarg.h>
+#endif
 #include <new>
 
 #include "../pipe/hasciicam_virtual_camera_pipe.h"
@@ -28,6 +30,7 @@ static const wchar_t kHasciiCamVirtualCameraSourceClsidString[] =
 static LONG g_module_refcount = 0;
 static HINSTANCE g_module_instance = NULL;
 
+#ifndef NDEBUG
 static void hasciicam_virtual_camera_source_trace(const char *format, ...) {
     char line[512];
     char path[MAX_PATH];
@@ -83,6 +86,9 @@ static void hasciicam_virtual_camera_source_trace(const char *format, ...) {
     WriteFile(file, line, length, &written, NULL);
     CloseHandle(file);
 }
+#else
+#define hasciicam_virtual_camera_source_trace(...) ((void)0)
+#endif
 
 static const hasciicam_virtual_camera_source_media_type kSupportedMediaTypes[] = {
     {

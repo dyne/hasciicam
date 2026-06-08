@@ -63,6 +63,14 @@ int main(void) {
                     "registry key should target InprocServer32");
     }
 
+#ifdef NDEBUG
+    expect_true(!hasciicam_virtual_camera_install_debug_logging_enabled(),
+                "release install should disable source trace logging");
+#else
+    expect_true(hasciicam_virtual_camera_install_debug_logging_enabled(),
+                "debug install should enable source trace logging");
+#endif
+
 #ifdef _WIN32
     {
         wchar_t module_path[MAX_PATH];

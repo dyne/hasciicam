@@ -12,7 +12,9 @@ static const wchar_t kHasciiCamInstallDllName[] = L"hasciicam_virtual_camera_sou
 static const wchar_t kHasciiCamInstallClsid[] = L"{29E1D0B1-0AF8-4D6F-9D5E-0F9A0F0D4F58}";
 static const wchar_t kHasciiCamInstallDirectorySddl[] = L"D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;GRGX;;;LS)";
 static const wchar_t kHasciiCamInstallFileSddl[] = L"D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;LS)";
+#ifndef NDEBUG
 static const wchar_t kHasciiCamLogFileSddl[] = L"D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x00100084;;;LS)";
+#endif
 
 static void set_error(char *err, size_t err_size, const char *msg) {
     if (err == NULL || err_size == 0)
@@ -142,6 +144,14 @@ int hasciicam_virtual_camera_install_registry_key(wchar_t *out,
     return 1;
 }
 
+int hasciicam_virtual_camera_install_debug_logging_enabled(void) {
+#ifndef NDEBUG
+    return 1;
+#else
+    return 0;
+#endif
+}
+
 int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
                                               const wchar_t *dest_path,
                                               char *err,
@@ -149,7 +159,9 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
     wchar_t *dest_dir_end;
     wchar_t dest_dir[MAX_PATH];
     wchar_t log_path[MAX_PATH];
+#ifndef NDEBUG
     HANDLE log_file;
+#endif
 
     if (source_path == NULL || dest_path == NULL) {
         set_error(err, err_size, "source and destination paths are required");
@@ -191,6 +203,7 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
         set_error(err, err_size, "source log path is too long");
         return 0;
     }
+#ifndef NDEBUG
     log_file = CreateFileW(log_path,
                            GENERIC_WRITE,
                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -209,6 +222,9 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
                  (unsigned long)GetLastError());
         return 0;
     }
+#else
+    (void)DeleteFileW(log_path);
+#endif
     if (!apply_sddl_to_path(dest_path, kHasciiCamInstallFileSddl, err, err_size)) {
         snprintf(err, err_size, "unable to set DLL permissions (error=%lu)",
                  (unsigned long)GetLastError());

@@ -41,6 +41,11 @@ int hasciicam_virtual_camera_install_registry_key(wchar_t *out,
                                                   size_t err_size);
 
 /**
+ * Return whether this build creates the Windows source trace log.
+ */
+int hasciicam_virtual_camera_install_debug_logging_enabled(void);
+
+/**
  * Copy the source DLL into the install root.
  */
 int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
