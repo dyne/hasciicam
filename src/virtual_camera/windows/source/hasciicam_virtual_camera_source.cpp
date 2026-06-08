@@ -25,46 +25,6 @@ static const wchar_t kHasciiCamVirtualCameraSourceClsidString[] =
     L"{29E1D0B1-0AF8-4D6F-9D5E-0F9A0F0D4F58}";
 
 static LONG g_module_refcount = 0;
-static LONG g_com_refcount = 0;
-static LONG g_mf_refcount = 0;
-
-static HRESULT hasciicam_virtual_camera_source_com_acquire(void) {
-    LONG previous = InterlockedIncrement(&g_com_refcount);
-    if (previous == 1) {
-        HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-        if (FAILED(hr) && hr != S_FALSE && hr != RPC_E_CHANGED_MODE) {
-            InterlockedDecrement(&g_com_refcount);
-            return hr;
-        }
-        if (hr == RPC_E_CHANGED_MODE)
-            InterlockedDecrement(&g_com_refcount);
-    }
-    return S_OK;
-}
-
-static void hasciicam_virtual_camera_source_com_release(void) {
-    LONG previous = InterlockedDecrement(&g_com_refcount);
-    if (previous == 0)
-        CoUninitialize();
-}
-
-static HRESULT hasciicam_virtual_camera_source_mf_acquire(void) {
-    LONG previous = InterlockedIncrement(&g_mf_refcount);
-    if (previous == 1) {
-        HRESULT hr = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
-        if (FAILED(hr)) {
-            InterlockedDecrement(&g_mf_refcount);
-            return hr;
-        }
-    }
-    return S_OK;
-}
-
-static void hasciicam_virtual_camera_source_mf_release(void) {
-    LONG previous = InterlockedDecrement(&g_mf_refcount);
-    if (previous == 0)
-        MFShutdown();
-}
 
 static const hasciicam_virtual_camera_source_media_type kSupportedMediaTypes[] = {
     {
@@ -1077,8 +1037,6 @@ public:
           stream_descriptor_(NULL),
           reader_thread_(NULL),
           reader_stop_event_(NULL),
-          com_initialized_(FALSE),
-          mf_initialized_(FALSE),
           shutdown_(FALSE) {
         hasciicam_virtual_camera_source_frame_slot_init(&frame_slot_);
         InterlockedIncrement(&g_module_refcount);
@@ -1095,14 +1053,6 @@ public:
         if (event_queue_ != NULL)
             event_queue_->Release();
         hasciicam_virtual_camera_source_frame_slot_close(&frame_slot_);
-        if (com_initialized_) {
-            hasciicam_virtual_camera_source_com_release();
-            com_initialized_ = FALSE;
-        }
-        if (mf_initialized_) {
-            hasciicam_virtual_camera_source_mf_release();
-            mf_initialized_ = FALSE;
-        }
         InterlockedDecrement(&g_module_refcount);
     }
 
@@ -1111,14 +1061,6 @@ public:
 
         if (config == NULL)
             return E_POINTER;
-        hr = hasciicam_virtual_camera_source_com_acquire();
-        if (FAILED(hr))
-            return hr;
-        com_initialized_ = TRUE;
-        hr = hasciicam_virtual_camera_source_mf_acquire();
-        if (FAILED(hr))
-            return hr;
-        mf_initialized_ = TRUE;
         config_ = *config;
         lifecycle_.state = HASCIICAM_VIRTUAL_CAMERA_SOURCE_STATE_CREATED;
         lifecycle_.config = *config;
@@ -1303,14 +1245,6 @@ public:
             event_queue_ = NULL;
         }
         hasciicam_virtual_camera_source_lifecycle_shutdown(&lifecycle_, NULL, 0);
-        if (com_initialized_) {
-            hasciicam_virtual_camera_source_com_release();
-            com_initialized_ = FALSE;
-        }
-        if (mf_initialized_) {
-            hasciicam_virtual_camera_source_mf_release();
-            mf_initialized_ = FALSE;
-        }
         return S_OK;
     }
 
@@ -1477,12 +1411,213 @@ private:
     IMFStreamDescriptor *stream_descriptor_;
     HANDLE reader_thread_;
     HANDLE reader_stop_event_;
-    BOOL com_initialized_;
-    BOOL mf_initialized_;
     hasciicam_virtual_camera_source_config config_;
     hasciicam_virtual_camera_source_lifecycle lifecycle_;
     hasciicam_virtual_camera_source_frame_slot frame_slot_;
     BOOL shutdown_;
+};
+
+class HasciiCamVirtualCameraActivate : public IMFActivate {
+public:
+    HasciiCamVirtualCameraActivate()
+        : refcount_(1),
+          attributes_(NULL),
+          source_(NULL) {
+        InterlockedIncrement(&g_module_refcount);
+    }
+
+    ~HasciiCamVirtualCameraActivate() {
+        if (source_ != NULL)
+            source_->Release();
+        if (attributes_ != NULL)
+            attributes_->Release();
+        InterlockedDecrement(&g_module_refcount);
+    }
+
+    HRESULT Init(void) {
+        return MFCreateAttributes(&attributes_, 4);
+    }
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppv) override {
+        if (ppv == NULL)
+            return E_POINTER;
+        *ppv = NULL;
+        if (IsEqualIID(riid, IID_IUnknown) ||
+            IsEqualIID(riid, IID_IMFAttributes) ||
+            IsEqualIID(riid, IID_IMFActivate)) {
+            *ppv = static_cast<IMFActivate *>(this);
+            AddRef();
+            return S_OK;
+        }
+        return E_NOINTERFACE;
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef(void) override {
+        return (ULONG)InterlockedIncrement(&refcount_);
+    }
+
+    ULONG STDMETHODCALLTYPE Release(void) override {
+        ULONG refcount = (ULONG)InterlockedDecrement(&refcount_);
+        if (refcount == 0)
+            delete this;
+        return refcount;
+    }
+
+    HRESULT STDMETHODCALLTYPE ActivateObject(REFIID riid, void **ppv) override {
+        hasciicam_virtual_camera_request request;
+        hasciicam_virtual_camera_source_config config;
+        HRESULT hr;
+
+        if (ppv == NULL)
+            return E_POINTER;
+        *ppv = NULL;
+        if (source_ == NULL) {
+            hasciicam_virtual_camera_request_init(&request);
+            request.enabled = 1;
+            request.width = 1280;
+            request.height = 720;
+            request.fps = 30;
+            if (!hasciicam_virtual_camera_source_config_prepare(&request, &config, NULL, 0))
+                return E_FAIL;
+
+            source_ = new (std::nothrow) HasciiCamVirtualCameraSource();
+            if (source_ == NULL)
+                return E_OUTOFMEMORY;
+            hr = source_->Init(&config);
+            if (FAILED(hr)) {
+                source_->Release();
+                source_ = NULL;
+                return hr;
+            }
+        }
+        return source_->QueryInterface(riid, ppv);
+    }
+
+    HRESULT STDMETHODCALLTYPE ShutdownObject(void) override {
+        if (source_ == NULL)
+            return S_OK;
+        return source_->Shutdown();
+    }
+
+    HRESULT STDMETHODCALLTYPE DetachObject(void) override {
+        if (source_ != NULL) {
+            source_->Release();
+            source_ = NULL;
+        }
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetItem(REFGUID key, PROPVARIANT *value) override {
+        return attributes_->GetItem(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE GetItemType(REFGUID key, MF_ATTRIBUTE_TYPE *type) override {
+        return attributes_->GetItemType(key, type);
+    }
+    HRESULT STDMETHODCALLTYPE CompareItem(REFGUID key, REFPROPVARIANT value, BOOL *result) override {
+        return attributes_->CompareItem(key, value, result);
+    }
+    HRESULT STDMETHODCALLTYPE Compare(IMFAttributes *theirs,
+                                      MF_ATTRIBUTES_MATCH_TYPE match_type,
+                                      BOOL *result) override {
+        return attributes_->Compare(theirs, match_type, result);
+    }
+    HRESULT STDMETHODCALLTYPE GetUINT32(REFGUID key, UINT32 *value) override {
+        return attributes_->GetUINT32(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE GetUINT64(REFGUID key, UINT64 *value) override {
+        return attributes_->GetUINT64(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE GetDouble(REFGUID key, double *value) override {
+        return attributes_->GetDouble(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE GetGUID(REFGUID key, GUID *value) override {
+        return attributes_->GetGUID(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE GetStringLength(REFGUID key, UINT32 *length) override {
+        return attributes_->GetStringLength(key, length);
+    }
+    HRESULT STDMETHODCALLTYPE GetString(REFGUID key,
+                                        LPWSTR value,
+                                        UINT32 value_size,
+                                        UINT32 *length) override {
+        return attributes_->GetString(key, value, value_size, length);
+    }
+    HRESULT STDMETHODCALLTYPE GetAllocatedString(REFGUID key,
+                                                 LPWSTR *value,
+                                                 UINT32 *length) override {
+        return attributes_->GetAllocatedString(key, value, length);
+    }
+    HRESULT STDMETHODCALLTYPE GetBlobSize(REFGUID key, UINT32 *size) override {
+        return attributes_->GetBlobSize(key, size);
+    }
+    HRESULT STDMETHODCALLTYPE GetBlob(REFGUID key,
+                                      UINT8 *buffer,
+                                      UINT32 buffer_size,
+                                      UINT32 *size) override {
+        return attributes_->GetBlob(key, buffer, buffer_size, size);
+    }
+    HRESULT STDMETHODCALLTYPE GetAllocatedBlob(REFGUID key,
+                                               UINT8 **buffer,
+                                               UINT32 *size) override {
+        return attributes_->GetAllocatedBlob(key, buffer, size);
+    }
+    HRESULT STDMETHODCALLTYPE GetUnknown(REFGUID key, REFIID riid, LPVOID *ppv) override {
+        return attributes_->GetUnknown(key, riid, ppv);
+    }
+    HRESULT STDMETHODCALLTYPE SetItem(REFGUID key, REFPROPVARIANT value) override {
+        return attributes_->SetItem(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE DeleteItem(REFGUID key) override {
+        return attributes_->DeleteItem(key);
+    }
+    HRESULT STDMETHODCALLTYPE DeleteAllItems(void) override {
+        return attributes_->DeleteAllItems();
+    }
+    HRESULT STDMETHODCALLTYPE SetUINT32(REFGUID key, UINT32 value) override {
+        return attributes_->SetUINT32(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE SetUINT64(REFGUID key, UINT64 value) override {
+        return attributes_->SetUINT64(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE SetDouble(REFGUID key, double value) override {
+        return attributes_->SetDouble(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE SetGUID(REFGUID key, REFGUID value) override {
+        return attributes_->SetGUID(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE SetString(REFGUID key, LPCWSTR value) override {
+        return attributes_->SetString(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE SetBlob(REFGUID key,
+                                      const UINT8 *buffer,
+                                      UINT32 buffer_size) override {
+        return attributes_->SetBlob(key, buffer, buffer_size);
+    }
+    HRESULT STDMETHODCALLTYPE SetUnknown(REFGUID key, IUnknown *value) override {
+        return attributes_->SetUnknown(key, value);
+    }
+    HRESULT STDMETHODCALLTYPE LockStore(void) override {
+        return attributes_->LockStore();
+    }
+    HRESULT STDMETHODCALLTYPE UnlockStore(void) override {
+        return attributes_->UnlockStore();
+    }
+    HRESULT STDMETHODCALLTYPE GetCount(UINT32 *count) override {
+        return attributes_->GetCount(count);
+    }
+    HRESULT STDMETHODCALLTYPE GetItemByIndex(UINT32 index,
+                                             GUID *key,
+                                             PROPVARIANT *value) override {
+        return attributes_->GetItemByIndex(index, key, value);
+    }
+    HRESULT STDMETHODCALLTYPE CopyAllItems(IMFAttributes *destination) override {
+        return attributes_->CopyAllItems(destination);
+    }
+
+private:
+    LONG refcount_;
+    IMFAttributes *attributes_;
+    HasciiCamVirtualCameraSource *source_;
 };
 
 class HasciiCamVirtualCameraClassFactory : public IClassFactory {
@@ -1520,42 +1655,23 @@ public:
     }
 
     HRESULT STDMETHODCALLTYPE CreateInstance(IUnknown *outer, REFIID riid, void **ppv) override {
+        HasciiCamVirtualCameraActivate *activate;
+        HRESULT hr;
+
         if (ppv != NULL)
             *ppv = NULL;
+        if (ppv == NULL)
+            return E_POINTER;
         if (outer != NULL)
             return CLASS_E_NOAGGREGATION;
-        if (IsEqualIID(riid, IID_IUnknown) ||
-            IsEqualIID(riid, IID_IMFMediaEventGenerator) ||
-            IsEqualIID(riid, IID_IMFMediaSource) ||
-            IsEqualIID(riid, IID_IMFMediaSourceEx) ||
-            IsEqualIID(riid, IID_IMFGetService)) {
-            hasciicam_virtual_camera_request request;
-            hasciicam_virtual_camera_source_config config;
-            HasciiCamVirtualCameraSource *source = NULL;
-            HRESULT hr;
-
-            hasciicam_virtual_camera_request_init(&request);
-            request.enabled = 1;
-            request.width = 1280;
-            request.height = 720;
-            request.fps = 30;
-            hr = S_OK;
-            if (!hasciicam_virtual_camera_source_config_prepare(&request, &config, NULL, 0))
-                hr = E_FAIL;
-            if (SUCCEEDED(hr)) {
-                source = new (std::nothrow) HasciiCamVirtualCameraSource();
-                if (source == NULL)
-                    hr = E_OUTOFMEMORY;
-            }
-            if (SUCCEEDED(hr))
-                hr = source->Init(&config);
-            if (SUCCEEDED(hr))
-                hr = source->QueryInterface(riid, ppv);
-            if (source != NULL)
-                source->Release();
-            return hr;
-        }
-        return CLASS_E_CLASSNOTAVAILABLE;
+        activate = new (std::nothrow) HasciiCamVirtualCameraActivate();
+        if (activate == NULL)
+            return E_OUTOFMEMORY;
+        hr = activate->Init();
+        if (SUCCEEDED(hr))
+            hr = activate->QueryInterface(riid, ppv);
+        activate->Release();
+        return hr;
     }
 
     HRESULT STDMETHODCALLTYPE LockServer(BOOL lock) override {

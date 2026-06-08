@@ -71,6 +71,7 @@ static void expect_true(int cond, const char *msg) {
 #ifdef _WIN32
 static void run_windows_com_smoke(void) {
     IClassFactory *factory = NULL;
+    IMFActivate *activate = NULL;
     IMFMediaSourceEx *source = NULL;
     IMFPresentationDescriptor *presentation = NULL;
     IMFAttributes *source_attributes = NULL;
@@ -100,8 +101,12 @@ static void run_windows_com_smoke(void) {
     hr = DllGetClassObject(hasciicam_virtual_camera_source_clsid(), &IID_IClassFactory, (void **)&factory);
     expect_true(SUCCEEDED(hr) && factory != NULL, "source class factory should be available");
     if (SUCCEEDED(hr) && factory != NULL) {
-        hr = factory->lpVtbl->CreateInstance(factory, NULL, &IID_IMFMediaSourceEx, (void **)&source);
-        expect_true(SUCCEEDED(hr) && source != NULL, "source object should be created");
+        hr = factory->lpVtbl->CreateInstance(factory, NULL, &IID_IMFActivate, (void **)&activate);
+        expect_true(SUCCEEDED(hr) && activate != NULL, "source activation object should be created");
+    }
+    if (activate != NULL) {
+        hr = activate->lpVtbl->ActivateObject(activate, &IID_IMFMediaSourceEx, (void **)&source);
+        expect_true(SUCCEEDED(hr) && source != NULL, "source object should be activated");
     }
 
     if (source != NULL) {
@@ -153,6 +158,11 @@ static void run_windows_com_smoke(void) {
         presentation->lpVtbl->Release(presentation);
     if (source != NULL)
         source->lpVtbl->Release(source);
+    if (activate != NULL) {
+        activate->lpVtbl->ShutdownObject(activate);
+        activate->lpVtbl->DetachObject(activate);
+        activate->lpVtbl->Release(activate);
+    }
     if (factory != NULL)
         factory->lpVtbl->Release(factory);
 
@@ -163,6 +173,20 @@ static void run_windows_com_smoke(void) {
         MFShutdown();
     if (com_initialized)
         CoUninitialize();
+}
+
+static void run_windows_dll_export_smoke(void) {
+    HMODULE module;
+
+    module = LoadLibraryW(L"hasciicam_virtual_camera_source.dll");
+    expect_true(module != NULL, "source DLL should load from the test binary directory");
+    if (module == NULL)
+        return;
+    expect_true(GetProcAddress(module, "DllGetClassObject") != NULL,
+                "source DLL should export DllGetClassObject");
+    expect_true(GetProcAddress(module, "DllCanUnloadNow") != NULL,
+                "source DLL should export DllCanUnloadNow");
+    FreeLibrary(module);
 }
 
 static void run_windows_pipe_roundtrip(void) {
@@ -762,6 +786,7 @@ cleanup_message:
     }
 
 #ifdef _WIN32
+    run_windows_dll_export_smoke();
     run_windows_com_smoke();
     run_windows_pipe_roundtrip();
     run_windows_backend_roundtrip();

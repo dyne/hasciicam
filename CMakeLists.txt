@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
+if(POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW)
+endif()
 project(hasciicam VERSION 2.0 LANGUAGES C CXX)
 
 if(APPLE)
@@ -395,6 +398,7 @@ if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
     add_library(hasciicam_virtual_camera_source SHARED
       src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c
       src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp
+      src/virtual_camera/windows/source/hasciicam_virtual_camera_source.def
       src/virtual_camera/virtual_camera.c
       src/virtual_camera/virtual_camera_convert.c
     )
@@ -404,6 +408,8 @@ if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
       src/virtual_camera/windows/source
       src/virtual_camera)
     target_compile_definitions(hasciicam_virtual_camera_source PRIVATE _CRT_SECURE_NO_WARNINGS)
+    set_property(TARGET hasciicam_virtual_camera_source PROPERTY
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     target_link_libraries(hasciicam_virtual_camera_source PRIVATE
       mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
 
@@ -447,6 +453,7 @@ if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
     target_compile_definitions(test_virtual_camera_windows PRIVATE _CRT_SECURE_NO_WARNINGS)
     target_link_libraries(test_virtual_camera_windows PRIVATE
       mfplat mf mfreadwrite mfuuid ole32 uuid strmiids oleaut32)
+    add_dependencies(test_virtual_camera_windows hasciicam_virtual_camera_source)
     add_test(NAME virtual_camera_windows COMMAND test_virtual_camera_windows)
     set_tests_properties(virtual_camera_windows PROPERTIES LABELS "unit;core")
 
