@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unknwn.h>
+#include <stdarg.h>
 #include <new>
 
 #include "../pipe/hasciicam_virtual_camera_pipe.h"
@@ -25,6 +26,63 @@ static const wchar_t kHasciiCamVirtualCameraSourceClsidString[] =
     L"{29E1D0B1-0AF8-4D6F-9D5E-0F9A0F0D4F58}";
 
 static LONG g_module_refcount = 0;
+static HINSTANCE g_module_instance = NULL;
+
+static void hasciicam_virtual_camera_source_trace(const char *format, ...) {
+    char line[512];
+    char path[MAX_PATH];
+    char *slash;
+    DWORD length;
+    DWORD written;
+    HANDLE file;
+    va_list args;
+    int prefix_length;
+    int message_length;
+
+    if (g_module_instance == NULL || format == NULL)
+        return;
+    length = GetModuleFileNameA(g_module_instance, path, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH)
+        return;
+    slash = strrchr(path, '\\');
+    if (slash == NULL)
+        return;
+    strcpy(slash + 1, "hasciicam_virtual_camera_source.log");
+    file = CreateFileA(path,
+                       FILE_APPEND_DATA,
+                       FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                       NULL,
+                       OPEN_EXISTING,
+                       FILE_ATTRIBUTE_NORMAL,
+                       NULL);
+    if (file == INVALID_HANDLE_VALUE)
+        return;
+    prefix_length = snprintf(line,
+                             sizeof(line),
+                             "%llu pid=%lu tid=%lu ",
+                             (unsigned long long)GetTickCount64(),
+                             (unsigned long)GetCurrentProcessId(),
+                             (unsigned long)GetCurrentThreadId());
+    if (prefix_length < 0 || (size_t)prefix_length >= sizeof(line)) {
+        CloseHandle(file);
+        return;
+    }
+    va_start(args, format);
+    message_length = vsnprintf(line + prefix_length,
+                               sizeof(line) - (size_t)prefix_length,
+                               format,
+                               args);
+    va_end(args);
+    if (message_length < 0)
+        message_length = 0;
+    length = (DWORD)prefix_length + (DWORD)message_length;
+    if (length > sizeof(line) - 3)
+        length = sizeof(line) - 3;
+    line[length++] = '\r';
+    line[length++] = '\n';
+    WriteFile(file, line, length, &written, NULL);
+    CloseHandle(file);
+}
 
 static const hasciicam_virtual_camera_source_media_type kSupportedMediaTypes[] = {
     {
@@ -703,6 +761,7 @@ public:
           source_(NULL),
           frame_lock_(NULL),
           next_sample_time_100ns_(0),
+          sample_request_count_(0),
           sample_clock_started_(FALSE),
           shutdown_(FALSE) {
         InterlockedIncrement(&g_module_refcount);
@@ -948,7 +1007,7 @@ public:
         if (FAILED(hr) || sample == NULL)
             return FAILED(hr) ? hr : E_FAIL;
         sample_duration = hasciicam_virtual_camera_source_sample_duration_100ns(config_.request.fps);
-        sample_time = start_100ns;
+        sample_time = (unsigned long long)MFGetSystemTime();
         if (!sample_clock_started_) {
             next_sample_time_100ns_ = sample_time;
             sample_clock_started_ = TRUE;
@@ -963,6 +1022,15 @@ public:
             return hr;
         }
         next_sample_time_100ns_ = sample_time + sample_duration;
+        sample_request_count_++;
+        if (sample_request_count_ == 1 || sample_request_count_ % 300 == 0) {
+            hasciicam_virtual_camera_source_trace(
+                "sample request=%llu frame_sequence=%llu time=%llu bytes=%llu",
+                sample_request_count_,
+                sequence,
+                sample_time,
+                (unsigned long long)config_.media_types[0].frame_bytes);
+        }
         if (token != NULL) {
             hr = sample->SetUnknown(MFSampleExtension_Token, token);
             if (FAILED(hr)) {
@@ -1082,6 +1150,7 @@ private:
     const hasciicam_virtual_camera_source_lifecycle *lifecycle_;
     PSRWLOCK frame_lock_;
     unsigned long long next_sample_time_100ns_;
+    unsigned long long sample_request_count_;
     BOOL sample_clock_started_;
     BOOL shutdown_;
 };
@@ -1098,6 +1167,7 @@ public:
           reader_thread_(NULL),
           reader_stop_event_(NULL),
           stream_announced_(FALSE),
+          reader_frame_count_(0),
           shutdown_(FALSE) {
         InitializeSRWLock(&frame_lock_);
         hasciicam_virtual_camera_source_frame_slot_init(&frame_slot_);
@@ -1159,6 +1229,12 @@ public:
         if (FAILED(hr))
             return hr;
 
+        hasciicam_virtual_camera_source_trace(
+            "source initialized pipe=%s size=%dx%d fps=%d",
+            config_.pipe_name,
+            config_.request.width,
+            config_.request.height,
+            config_.request.fps);
         return S_OK;
     }
 
@@ -1315,13 +1391,17 @@ public:
         stream_announced_ = TRUE;
 
         PropVariantInit(&start_value);
-        hr = PropVariantCopy(&start_value, start_position);
+        start_value.vt = VT_I8;
+        start_value.hVal.QuadPart = MFGetSystemTime();
+        hr = event_queue_->QueueEventParamVar(
+            MESourceStarted, GUID_NULL, S_OK, &start_value);
         if (SUCCEEDED(hr))
-            hr = event_queue_->QueueEventParamVar(
-                MESourceStarted, GUID_NULL, S_OK, &start_value);
-        if (SUCCEEDED(hr))
-            hr = stream_->QueueEvent(MEStreamStarted, GUID_NULL, S_OK, &start_value);
+            hr = stream_->QueueEvent(MEStreamStarted, GUID_NULL, S_OK, NULL);
         PropVariantClear(&start_value);
+        hasciicam_virtual_camera_source_trace(
+            "source start selected=%d result=0x%08lx",
+            selected,
+            (unsigned long)hr);
         return hr;
     }
 
@@ -1530,7 +1610,16 @@ public:
                 }
                 self->lifecycle_.last_sequence = self->frame_slot_.sequence;
                 self->lifecycle_.last_timestamp_100ns = self->frame_slot_.timestamp_100ns;
+                self->reader_frame_count_++;
                 ReleaseSRWLockExclusive(&self->frame_lock_);
+                if (self->reader_frame_count_ == 1 ||
+                    self->reader_frame_count_ % 300 == 0) {
+                    hasciicam_virtual_camera_source_trace(
+                        "pipe frame=%llu sequence=%llu timestamp=%llu",
+                        self->reader_frame_count_,
+                        self->lifecycle_.last_sequence,
+                        self->lifecycle_.last_timestamp_100ns);
+                }
             }
         }
         hasciicam_virtual_camera_source_frame_slot_close(&incoming);
@@ -1547,6 +1636,7 @@ private:
     HANDLE reader_thread_;
     HANDLE reader_stop_event_;
     BOOL stream_announced_;
+    unsigned long long reader_frame_count_;
     SRWLOCK frame_lock_;
     hasciicam_virtual_camera_source_config config_;
     hasciicam_virtual_camera_source_lifecycle lifecycle_;
@@ -1609,6 +1699,7 @@ public:
             return E_POINTER;
         *ppv = NULL;
         if (source_ == NULL) {
+            hasciicam_virtual_camera_source_trace("activate object requested");
             hasciicam_virtual_camera_request_init(&request);
             request.enabled = 1;
             request.width = 1280;
@@ -1622,11 +1713,15 @@ public:
                 return E_OUTOFMEMORY;
             hr = source_->Init(&config);
             if (FAILED(hr)) {
+                hasciicam_virtual_camera_source_trace(
+                    "source initialization failed result=0x%08lx",
+                    (unsigned long)hr);
                 source_->Release();
                 source_ = NULL;
                 return hr;
             }
         }
+        hasciicam_virtual_camera_source_trace("activate object ready");
         return source_->QueryInterface(riid, ppv);
     }
 
@@ -1847,6 +1942,7 @@ STDAPI DllGetClassObject(REFCLSID clsid, REFIID riid, LPVOID *ppv) {
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved) {
     (void)reserved;
     if (reason == DLL_PROCESS_ATTACH) {
+        g_module_instance = instance;
         DisableThreadLibraryCalls(instance);
     }
     return TRUE;

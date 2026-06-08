@@ -12,6 +12,7 @@ static const wchar_t kHasciiCamInstallDllName[] = L"hasciicam_virtual_camera_sou
 static const wchar_t kHasciiCamInstallClsid[] = L"{29E1D0B1-0AF8-4D6F-9D5E-0F9A0F0D4F58}";
 static const wchar_t kHasciiCamInstallDirectorySddl[] = L"D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;GRGX;;;LS)";
 static const wchar_t kHasciiCamInstallFileSddl[] = L"D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;LS)";
+static const wchar_t kHasciiCamLogFileSddl[] = L"D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x00100084;;;LS)";
 
 static void set_error(char *err, size_t err_size, const char *msg) {
     if (err == NULL || err_size == 0)
@@ -147,6 +148,8 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
                                               size_t err_size) {
     wchar_t *dest_dir_end;
     wchar_t dest_dir[MAX_PATH];
+    wchar_t log_path[MAX_PATH];
+    HANDLE log_file;
 
     if (source_path == NULL || dest_path == NULL) {
         set_error(err, err_size, "source and destination paths are required");
@@ -181,13 +184,38 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
         }
         return 0;
     }
-    if (!apply_sddl_to_path(dest_dir, kHasciiCamInstallDirectorySddl, err, err_size)) {
-        snprintf(err, err_size, "unable to set install directory permissions (error=%lu)",
+    if (!join_path(log_path,
+                   sizeof(log_path) / sizeof(log_path[0]),
+                   dest_dir,
+                   L"hasciicam_virtual_camera_source.log")) {
+        set_error(err, err_size, "source log path is too long");
+        return 0;
+    }
+    log_file = CreateFileW(log_path,
+                           GENERIC_WRITE,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           NULL,
+                           CREATE_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL,
+                           NULL);
+    if (log_file == INVALID_HANDLE_VALUE) {
+        snprintf(err, err_size, "unable to create source log (error=%lu)",
+                 (unsigned long)GetLastError());
+        return 0;
+    }
+    CloseHandle(log_file);
+    if (!apply_sddl_to_path(log_path, kHasciiCamLogFileSddl, err, err_size)) {
+        snprintf(err, err_size, "unable to set source log permissions (error=%lu)",
                  (unsigned long)GetLastError());
         return 0;
     }
     if (!apply_sddl_to_path(dest_path, kHasciiCamInstallFileSddl, err, err_size)) {
         snprintf(err, err_size, "unable to set DLL permissions (error=%lu)",
+                 (unsigned long)GetLastError());
+        return 0;
+    }
+    if (!apply_sddl_to_path(dest_dir, kHasciiCamInstallDirectorySddl, err, err_size)) {
+        snprintf(err, err_size, "unable to set install directory permissions (error=%lu)",
                  (unsigned long)GetLastError());
         return 0;
     }
