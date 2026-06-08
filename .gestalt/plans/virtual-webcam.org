@@ -174,7 +174,7 @@
 :Done when: Linux publishing remains nonblocking and cleanup releases the loopback producer cleanly.
 :END:
 
-** TODO [#B] Document loopback setup without automating privilege changes
+** DONE [#B] Document loopback setup without automating privilege changes
 :PROPERTIES:
 :Why: Users must install/load a matching kernel module and may need Secure Boot/module-signing work that HasciiCam cannot safely automate.
 :Change: Add copyable examples for common distributions and generic operation, centered on `sudo modprobe v4l2loopback video_nr=10 card_label="HasciiCam" exclusive_caps=1`, device verification with `v4l2-ctl`, and `hasciicam -O SDL --virtual-camera --virtual-camera-device /dev/video10`. State that kernel headers, DKMS, Secure Boot signing, module persistence, and permissions are distribution concerns. Mention `v4l2loopback-ctl set-fps`/`set-caps` only as troubleshooting tools because HasciiCam negotiates format itself.

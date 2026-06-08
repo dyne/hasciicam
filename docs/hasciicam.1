@@ -84,6 +84,19 @@ Use \fB--mirror -x\fP to disable horizontal mirroring, and \fB--mirror y\fP to a
 Loads startup configuration from the given TOML file.
 If omitted, HasciiCam checks for \fBhasciicam.toml\fP in the current working directory and loads it when present.
 .B
+.IP "--virtual-camera"
+Enables the virtual webcam output. The live SDL loop publishes frames to the selected backend while this option is active.
+.B
+.IP "--virtual-camera-device"
+Selects the output device or backend-specific name used for virtual camera publishing.
+On Linux this should point at an existing \fBv4l2loopback\fP device such as \fB/dev/video10\fP.
+.B
+.IP "--virtual-camera-size"
+Sets the fixed virtual camera output size as \fBWxH\fP.
+.B
+.IP "--virtual-camera-fps"
+Sets the fixed virtual camera output frame rate.
+.B
 .IP "--font"
 Selects the bundled AA-lib bitmap font by short name, or prints available fonts with \fB--font list\fP.
 Example names include \fBvga16\fP, \fBvga8\fP, and \fBcourier\fP.
@@ -187,6 +200,16 @@ When using a usb webcam, a supported size needs to be specified. The minimum or 
 In SDL live mode, the right-click GUI can expose camera controls when the active capture backend and camera driver support them. Available controls are device-dependent.
 .IP
 The SDL GUI also shows a small pre-AA preview: the grayscale luminance frame after capture conversion/mirroring and immediately before AA-lib consumes it.
+.IP
+Linux virtual camera output uses an existing \fBv4l2loopback\fP device. HasciiCam does not load the kernel module, create devices, or change system permissions. A common setup is:
+.br
+\fBsudo modprobe v4l2loopback video_nr=10 card_label="HasciiCam" exclusive_caps=1\fP
+.br
+\fBv4l2-ctl --device=/dev/video10 --all\fP
+.br
+\fBhasciicam -d synthetic:// -O SDL --virtual-camera --virtual-camera-device /dev/video10\fP
+.IP
+For normal use, the loopback device must already exist and be writable by the current user.
 .SH BUGS
 Report bugs to hasciicam@dyne.org. Please include a complete, self-contained example that will allow the bug to be reproduced, information about which version of hasciicam you are using, which operative system and the complete device detection output.
 .SH AUTHOR
