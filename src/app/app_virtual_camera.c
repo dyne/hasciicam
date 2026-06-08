@@ -72,6 +72,7 @@ int hasciicam_app_virtual_camera_start(hasciicam_app_virtual_camera *vc,
     request.fps = cfg->virtual_camera_fps;
     strncpy(request.device, cfg->virtual_camera_device, sizeof(request.device) - 1);
     request.device[sizeof(request.device) - 1] = '\0';
+    vc->request = request;
     if (!hasciicam_virtual_camera_open_default(&vc->device, &request)) {
         set_error(err, err_size, "virtual camera backend unavailable");
         return 0;
@@ -124,4 +125,15 @@ unsigned long long hasciicam_app_virtual_camera_accepted_frames(const hasciicam_
 
 unsigned long long hasciicam_app_virtual_camera_dropped_frames(const hasciicam_app_virtual_camera *vc) {
     return vc != NULL ? vc->dropped_frames : 0ULL;
+}
+
+const hasciicam_virtual_camera_request *hasciicam_app_virtual_camera_request(
+    const hasciicam_app_virtual_camera *vc) {
+    return vc != NULL ? &vc->request : NULL;
+}
+
+const char *hasciicam_app_virtual_camera_backend_name(const hasciicam_app_virtual_camera *vc) {
+    if (vc == NULL || vc->device == NULL)
+        return "";
+    return hasciicam_virtual_camera_backend_name(vc->device);
 }

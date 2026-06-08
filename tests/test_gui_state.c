@@ -94,5 +94,32 @@ int main(void) {
     if (!expect_true(state.preview_gray == NULL && state.preview_capacity == 0,
                      "preview reset failed")) return 1;
 
+    hasciicam_gui_state_set_virtual_camera(&state,
+                                           1,
+                                           "linux-v4l2",
+                                           "HasciiCam",
+                                           "/dev/video10",
+                                           1280,
+                                           720,
+                                           30,
+                                           1,
+                                           42ULL,
+                                           7ULL);
+    if (!expect_true(state.virtual_camera_enabled == 1, "virtual camera enabled failed")) return 1;
+    if (!expect_true(strcmp(state.virtual_camera_backend, "linux-v4l2") == 0,
+                     "virtual camera backend failed")) return 1;
+    if (!expect_true(strcmp(state.virtual_camera_name, "HasciiCam") == 0,
+                     "virtual camera name failed")) return 1;
+    if (!expect_true(strcmp(state.virtual_camera_device, "/dev/video10") == 0,
+                     "virtual camera device failed")) return 1;
+    if (!expect_true(state.virtual_camera_width == 1280 && state.virtual_camera_height == 720,
+                     "virtual camera size failed")) return 1;
+    if (!expect_true(state.virtual_camera_fps == 30, "virtual camera fps failed")) return 1;
+    if (!expect_true(state.virtual_camera_connected == 1, "virtual camera connected failed")) return 1;
+    if (!expect_true(state.virtual_camera_accepted_frames == 42ULL,
+                     "virtual camera accepted count failed")) return 1;
+    if (!expect_true(state.virtual_camera_dropped_frames == 7ULL,
+                     "virtual camera dropped count failed")) return 1;
+
     return 0;
 }

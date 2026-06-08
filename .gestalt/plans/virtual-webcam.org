@@ -197,7 +197,7 @@
 :Done when: Optional support is deterministic and unrelated targets do not gain platform-specific link dependencies.
 :END:
 
-** TODO [#A] Extend config, help, TOML, and GUI state
+** DONE [#A] Extend config, help, TOML, and GUI state
 :PROPERTIES:
 :Why: CLI users need activation and advanced settings, while the live GUI should report state without becoming responsible for installation.
 :Change: Add the canonical config fields from the first L1 to defaults, TOML load/save, lowercase environment parsing, CLI long options, and help. In the SDL GUI add a read-only "Virtual Camera" status block showing enabled/backend/name/device, fixed size/fps, connected/disconnected state, and dropped-frame count. Do not add an install button or privileged Linux module controls. Treat size/fps/device changes as restart-required and do not mutate the active media type at runtime.

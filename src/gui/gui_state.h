@@ -46,6 +46,17 @@ typedef struct hasciicam_gui_state {
     char status_message[256];
     int status_is_error;
 
+    int virtual_camera_enabled;
+    char virtual_camera_backend[32];
+    char virtual_camera_name[64];
+    char virtual_camera_device[256];
+    int virtual_camera_width;
+    int virtual_camera_height;
+    int virtual_camera_fps;
+    int virtual_camera_connected;
+    unsigned long long virtual_camera_accepted_frames;
+    unsigned long long virtual_camera_dropped_frames;
+
     int save_requested;
     int load_requested;
     int open_load_dialog_requested;
@@ -68,6 +79,17 @@ void hasciicam_gui_state_set_capture_info(hasciicam_gui_state *state, const capt
 void hasciicam_gui_state_set_capture_controls(hasciicam_gui_state *state,
                                               const capture_control_desc *controls,
                                               int control_count);
+void hasciicam_gui_state_set_virtual_camera(hasciicam_gui_state *state,
+                                            int enabled,
+                                            const char *backend,
+                                            const char *name,
+                                            const char *device,
+                                            int width,
+                                            int height,
+                                            int fps,
+                                            int connected,
+                                            unsigned long long accepted_frames,
+                                            unsigned long long dropped_frames);
 int hasciicam_gui_state_update_preview(hasciicam_gui_state *state,
                                        const unsigned char *gray_frame,
                                        int width,

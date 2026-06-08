@@ -51,6 +51,12 @@ int main(void) {
                 "start should succeed with a fake SDL callback hook");
     expect_true(vc.active == 1, "controller should be active after start");
     expect_true(vc.device != NULL, "controller should own a virtual camera device");
+    expect_true(hasciicam_app_virtual_camera_request(&vc) != NULL,
+                "controller should retain the request");
+    expect_true(hasciicam_app_virtual_camera_request(&vc)->width == 1280,
+                "request width should be stored");
+    expect_true(strcmp(hasciicam_app_virtual_camera_backend_name(&vc), "") != 0,
+                "backend name should be available");
     expect_true(register_calls == 1, "frame callback should be registered exactly once");
     expect_true(seen_context == dummy_context, "callback registration should use the SDL context");
     expect_true(seen_user_data == &vc, "callback registration should hand back the controller");

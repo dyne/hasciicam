@@ -22,6 +22,7 @@ typedef int (*hasciicam_app_virtual_camera_set_callback_fn)(aa_context *context,
 typedef struct hasciicam_app_virtual_camera {
     aa_context *context;
     hasciicam_virtual_camera_device *device;
+    hasciicam_virtual_camera_request request;
 #ifdef _WIN32
     IMFVirtualCamera *virtual_camera;
     int windows_com_initialized;
@@ -64,6 +65,17 @@ unsigned long long hasciicam_app_virtual_camera_accepted_frames(const hasciicam_
  * Return the number of frames dropped by the current publish gate.
  */
 unsigned long long hasciicam_app_virtual_camera_dropped_frames(const hasciicam_app_virtual_camera *vc);
+
+/**
+ * Return the current virtual-camera request stored by the app controller.
+ */
+const hasciicam_virtual_camera_request *hasciicam_app_virtual_camera_request(
+    const hasciicam_app_virtual_camera *vc);
+
+/**
+ * Return the active backend name for diagnostics.
+ */
+const char *hasciicam_app_virtual_camera_backend_name(const hasciicam_app_virtual_camera *vc);
 
 #ifdef _WIN32
 /**

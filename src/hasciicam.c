@@ -110,6 +110,28 @@ static void apply_sdl_runtime_options(const hasciicam_config *cfg) {
     set_process_env("HASCIICAM_SDL_FULLSCREEN", "1");
 }
 
+static void sync_virtual_camera_gui_state(hasciicam_gui_state *gui_state,
+                                          const hasciicam_app_virtual_camera *virtual_camera) {
+  const hasciicam_virtual_camera_request *request;
+  const char *backend_name = "";
+
+  if (gui_state == NULL || virtual_camera == NULL)
+    return;
+  request = hasciicam_app_virtual_camera_request(virtual_camera);
+  backend_name = hasciicam_app_virtual_camera_backend_name(virtual_camera);
+  hasciicam_gui_state_set_virtual_camera(gui_state,
+                                         request != NULL ? request->enabled : 0,
+                                         backend_name,
+                                         "HasciiCam",
+                                         request != NULL ? request->device : "",
+                                         request != NULL ? request->width : 0,
+                                         request != NULL ? request->height : 0,
+                                         request != NULL ? request->fps : 0,
+                                         virtual_camera->active,
+                                         hasciicam_app_virtual_camera_accepted_frames(virtual_camera),
+                                         hasciicam_app_virtual_camera_dropped_frames(virtual_camera));
+}
+
 /* greyscale image is sampled from Y luminance component */
 int YtoRGB[256];
 int xstep=2, ystep=4;
@@ -376,6 +398,7 @@ main (int argc, char **argv) {
       hasciicam_render_session_close(&render_session);
       exit(-1);
     }
+    sync_virtual_camera_gui_state(&gui_state, &virtual_camera);
   }
 
   /* report which driver was actually initialized */
@@ -400,6 +423,7 @@ main (int argc, char **argv) {
   hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
   control_count = hasciicam_session_list_controls(&session, control_descs, CAPTURE_MAX_CONTROLS);
   hasciicam_gui_state_set_capture_controls(&gui_state, control_descs, control_count);
+  sync_virtual_camera_gui_state(&gui_state, &virtual_camera);
   hasciicam_sdl_set_runtime_colors(render_session.context,
                                    gui_state.foreground_rgb,
                                    gui_state.background_rgb,
@@ -489,6 +513,7 @@ main (int argc, char **argv) {
         hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
         control_count = hasciicam_session_list_controls(&session, control_descs, CAPTURE_MAX_CONTROLS);
         hasciicam_gui_state_set_capture_controls(&gui_state, control_descs, control_count);
+        sync_virtual_camera_gui_state(&gui_state, &virtual_camera);
         if (strcmp(previous_font, gui_state.font) != 0)
           gui_state.font_change_requested = 1;
         strncpy(gui_state.active_font, previous_font, sizeof(gui_state.active_font) - 1);
@@ -581,6 +606,9 @@ main (int argc, char **argv) {
       if (max_frames > 0 && rendered_frames >= max_frames) {
         hasciicam_session_request_stop(&session);
       }
+    }
+    if (mode == LIVE && appcfg.virtual_camera) {
+      sync_virtual_camera_gui_state(&gui_state, &virtual_camera);
     }
 
   }
