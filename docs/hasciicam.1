@@ -90,12 +90,15 @@ Enables the virtual webcam output. The live SDL loop publishes frames to the sel
 .IP "--virtual-camera-device"
 Selects the output device or backend-specific name used for virtual camera publishing.
 On Linux this should point at an existing \fBv4l2loopback\fP device such as \fB/dev/video10\fP.
+On Windows the default source must be used.
 .B
 .IP "--virtual-camera-size"
 Sets the fixed virtual camera output size as \fBWxH\fP.
+On Windows the source currently supports only \fB1280x720\fP.
 .B
 .IP "--virtual-camera-fps"
 Sets the fixed virtual camera output frame rate.
+On Windows the source currently supports only \fB30\fP fps.
 .B
 .IP "--font"
 Selects the bundled AA-lib bitmap font by short name, or prints available fonts with \fB--font list\fP.

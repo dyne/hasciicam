@@ -28,6 +28,8 @@ int main(void) {
                 "zero capabilities should not be output capable");
     expect_true(hasciicam_virtual_camera_v4l2_is_output_capable(V4L2_CAP_VIDEO_OUTPUT),
                 "video output capability bit should be accepted");
+    expect_true(!hasciicam_virtual_camera_v4l2_is_output_capable(V4L2_CAP_VIDEO_OUTPUT_MPLANE),
+                "multi-planar output should be rejected until the adapter implements it");
     expect_true(hasciicam_virtual_camera_v4l2_describe_error(EACCES, "open output device", err, sizeof(err)),
                 "access denied message should format");
     expect_contains(err, "access denied", "access denied message should be classified");

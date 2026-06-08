@@ -148,6 +148,15 @@ int main(void) {
     expect_true(vc.windows_com_initialized == 0, "COM initialization flag should be cleared");
     expect_true(vc.windows_mf_initialized == 0, "MF initialization flag should be cleared");
 
+    memset(&vc, 0, sizeof(vc));
+    memset(err, 0, sizeof(err));
+    request.width = 640;
+    expect_true(!hasciicam_app_virtual_camera_windows_start(&vc, &request, err, sizeof(err)),
+                "windows helper should reject a format the source DLL cannot consume");
+    expect_true(strstr(err, "1280x720 at 30 fps") != NULL,
+                "unsupported format error should name the fixed Windows format");
+    request.width = 1280;
+
     g_create_result = E_ACCESSDENIED;
     memset(&vc, 0, sizeof(vc));
     memset(err, 0, sizeof(err));

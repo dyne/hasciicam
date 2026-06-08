@@ -44,6 +44,12 @@ int hasciicam_app_virtual_camera_windows_start(hasciicam_app_virtual_camera *vc,
         set_error(err, err_size, "virtual camera request is required");
         return 0;
     }
+    if (request->width != 1280 || request->height != 720 || request->fps != 30 ||
+        request->device[0] != '\0') {
+        set_error(err, err_size,
+                  "Windows virtual camera currently supports only the default 1280x720 at 30 fps");
+        return 0;
+    }
     if (vc->virtual_camera != NULL)
         return 1;
 

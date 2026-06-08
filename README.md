@@ -117,7 +117,8 @@ or window chrome.
 - Windows: install the project-owned source DLL, run `hasciicam -O SDL --virtual-camera`, and use Windows 11 build 22000 or later.
 - Linux: load an existing `v4l2loopback` device, then run `hasciicam -O SDL --virtual-camera --virtual-camera-device /dev/video10`.
 - The feature is opt-in and only works in live SDL mode.
-- Virtual camera size and fps are configurable; the current defaults are `1280x720` at `30` fps.
+- Linux virtual camera size and fps are configurable; the current defaults are `1280x720` at `30` fps.
+- Windows currently publishes the fixed source format `1280x720` at `30` fps.
 
 # CREDITS
 

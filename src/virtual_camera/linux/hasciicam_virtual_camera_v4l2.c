@@ -22,8 +22,7 @@ typedef struct hasciicam_virtual_camera_v4l2_state {
 } hasciicam_virtual_camera_v4l2_state;
 
 int hasciicam_virtual_camera_v4l2_is_output_capable(unsigned int capabilities) {
-    return (capabilities & V4L2_CAP_VIDEO_OUTPUT) != 0 ||
-           (capabilities & V4L2_CAP_VIDEO_OUTPUT_MPLANE) != 0;
+    return (capabilities & V4L2_CAP_VIDEO_OUTPUT) != 0;
 }
 
 int hasciicam_virtual_camera_v4l2_describe_error(int errnum,
