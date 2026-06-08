@@ -220,7 +220,7 @@
 :Notes: Automated CI must not require a camera, GUI, admin rights, a registered COM DLL, or a kernel module. Keep real virtual-camera tests opt-in and label them clearly.
 :END:
 
-** TODO [#A] Add deterministic core and protocol coverage
+** DONE [#A] Add deterministic core and protocol coverage
 :PROPERTIES:
 :Why: Most correctness risks are in frame conversion, fixed media geometry, timestamping, IPC validation, and lifecycle state, all of which can be tested without a real camera consumer.
 :Change: Add plain C/C++ CTest targets for config validation, cadence, scaling/letterboxing, BGRA-to-YUY2/NV12 conversion, backend wrappers, Windows pipe protocol/parser, Media Foundation source state machine, and Linux capability/error helpers. Use synthetic frames with visible corners and alternating glyph/color patterns to catch stride, orientation, and chroma errors.

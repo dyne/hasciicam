@@ -27,6 +27,7 @@ int main(void) {
         255, 255, 255, 255
     };
     unsigned char yuy2[8 * 2];
+    unsigned char nv12[4 * 2 + 4];
     size_t yuy2_size = 0;
     size_t nv12_size = 0;
 
@@ -96,6 +97,22 @@ int main(void) {
     expect_true(yuy2[8] == 0x10 && yuy2[9] == 0x10, "lower letterbox should stay black");
     expect_true(yuy2[10] == 41, "blue y should be 41");
     expect_true(yuy2[12] == 235, "white y should be 235");
+
+    memset(nv12, 0xAA, sizeof(nv12));
+    expect_true(hasciicam_virtual_camera_scale_bgra32_to_nv12(src, 2, 2, 8,
+                                                              nv12, 4, 2, 0, 0,
+                                                              0, 0),
+                "nv12 conversion should succeed");
+    expect_true(nv12[0] == 0x10, "nv12 left letterbox should stay black");
+    expect_true(nv12[1] == 82, "nv12 red y should be 82");
+    expect_true(nv12[2] == 144, "nv12 green y should be 144");
+    expect_true(nv12[3] == 0x10, "nv12 right letterbox should stay black");
+    expect_true(nv12[4] == 0x10, "nv12 lower left letterbox should stay black");
+    expect_true(nv12[5] == 41, "nv12 blue y should be 41");
+    expect_true(nv12[6] == 235, "nv12 white y should be 235");
+    expect_true(nv12[7] == 0x10, "nv12 lower right letterbox should stay black");
+    expect_true(nv12[9] == 128 && nv12[10] == 128,
+                "nv12 chroma should average to neutral for the test pattern");
 
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);
