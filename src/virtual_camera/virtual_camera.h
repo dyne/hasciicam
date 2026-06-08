@@ -82,6 +82,18 @@ int hasciicam_virtual_camera_scale_bgra32_to_yuy2(const unsigned char *src,
                                                   int mirror_y);
 
 /**
+ * Compute the centered letterbox rectangle for scaling src into dst.
+ */
+int hasciicam_virtual_camera_letterbox_rect(int src_width,
+                                            int src_height,
+                                            int dst_width,
+                                            int dst_height,
+                                            int *out_x,
+                                            int *out_y,
+                                            int *out_width,
+                                            int *out_height);
+
+/**
  * Scale a BGRA32 frame into an NV12 output buffer using nearest-neighbor sampling and letterboxing.
  */
 int hasciicam_virtual_camera_scale_bgra32_to_nv12(const unsigned char *src,

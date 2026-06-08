@@ -18,7 +18,7 @@
 :Done when: The user-visible lifetime, privilege model, supported Windows version, and Linux prerequisite are explicit and represented in config without changing default behavior.
 :END:
 
-** TODO [#A] Define fixed output geometry, rate, and resizing behavior
+** DONE [#A] Define fixed output geometry, rate, and resizing behavior
 :PROPERTIES:
 :Why: SDL content can change size when the window or runtime font changes, but webcam consumers negotiate a media type that must remain stable while streaming.
 :Change: Add canonical keys and CLI options `virtual_camera_size`/`--virtual-camera-size WxH` and `virtual_camera_fps`/`--virtual-camera-fps N`. Default to `1280x720` at `30` fps because it is broadly accepted and maps naturally to an 8x16 ASCII cell grid. Require positive even dimensions so YUY2/NV12 conversion is deterministic. Keep the negotiated webcam media type fixed for the session. Scale each SDL ASCII frame into the fixed output canvas with nearest-neighbor sampling and aspect-preserving black letterboxing; do not resize the SDL window or AA-lib context to satisfy the webcam. The publisher may drop intermediate SDL frames, and the consumer-facing source may repeat the latest frame to maintain its requested cadence.

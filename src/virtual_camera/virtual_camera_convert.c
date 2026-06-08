@@ -21,10 +21,18 @@ static int align_even(int value) {
     return value & ~1;
 }
 
-static int fit_scaled_size(int src_width, int src_height, int dst_width, int dst_height,
-                           int *out_w, int *out_h) {
+int hasciicam_virtual_camera_letterbox_rect(int src_width,
+                                            int src_height,
+                                            int dst_width,
+                                            int dst_height,
+                                            int *out_x,
+                                            int *out_y,
+                                            int *out_width,
+                                            int *out_height) {
     long long scaled_w;
     long long scaled_h;
+    int x_offset;
+    int y_offset;
 
     if (src_width <= 0 || src_height <= 0 || dst_width <= 0 || dst_height <= 0)
         return 0;
@@ -38,14 +46,21 @@ static int fit_scaled_size(int src_width, int src_height, int dst_width, int dst
     if (scaled_w <= 0 || scaled_h <= 0)
         return 0;
 
-    *out_w = (int)scaled_w;
-    *out_h = (int)scaled_h;
+    x_offset = (dst_width - (int)scaled_w) / 2;
+    y_offset = (dst_height - (int)scaled_h) / 2;
+    if (x_offset < 0)
+        x_offset = 0;
+    if (y_offset < 0)
+        y_offset = 0;
+    if (out_x != NULL)
+        *out_x = x_offset;
+    if (out_y != NULL)
+        *out_y = y_offset;
+    if (out_width != NULL)
+        *out_width = (int)scaled_w;
+    if (out_height != NULL)
+        *out_height = (int)scaled_h;
     return 1;
-}
-
-static int fit_offset(int outer, int inner) {
-    int offset = (outer - inner) / 2;
-    return offset < 0 ? 0 : offset;
 }
 
 static int sample_coord(int out_coord, int out_size, int scaled_size, int mirror) {
@@ -123,11 +138,15 @@ int hasciicam_virtual_camera_scale_bgra32_to_yuy2(const unsigned char *src,
     if (src == NULL || dst == NULL || src_width <= 0 || src_height <= 0 ||
         dst_width <= 0 || dst_height <= 0 || src_stride_bytes <= 0 || dst_stride_bytes < 0)
         return 0;
-    if (!fit_scaled_size(src_width, src_height, dst_width, dst_height, &scaled_w, &scaled_h))
+    if (!hasciicam_virtual_camera_letterbox_rect(src_width,
+                                                 src_height,
+                                                 dst_width,
+                                                 dst_height,
+                                                 &x0,
+                                                 &y0,
+                                                 &scaled_w,
+                                                 &scaled_h))
         return 0;
-
-    x0 = fit_offset(dst_width, scaled_w);
-    y0 = fit_offset(dst_height, scaled_h);
     dst_stride = (dst_stride_bytes > 0) ? (size_t)dst_stride_bytes : (size_t)dst_width * 2u;
     memset(dst, 0x10, hasciicam_virtual_camera_yuy2_size(dst_width, dst_height, (int)dst_stride));
 
@@ -187,13 +206,18 @@ int hasciicam_virtual_camera_scale_bgra32_to_nv12(const unsigned char *src,
         dst_width <= 0 || dst_height <= 0 || src_stride_bytes <= 0 ||
         y_stride_bytes < 0 || uv_stride_bytes < 0)
         return 0;
-    if (!fit_scaled_size(src_width, src_height, dst_width, dst_height, &scaled_w, &scaled_h))
+    if (!hasciicam_virtual_camera_letterbox_rect(src_width,
+                                                 src_height,
+                                                 dst_width,
+                                                 dst_height,
+                                                 &x0,
+                                                 &y0,
+                                                 &scaled_w,
+                                                 &scaled_h))
         return 0;
     if ((dst_width & 1) != 0 || (dst_height & 1) != 0)
         return 0;
 
-    x0 = fit_offset(dst_width, scaled_w);
-    y0 = fit_offset(dst_height, scaled_h);
     y_stride = (y_stride_bytes > 0) ? (size_t)y_stride_bytes : (size_t)dst_width;
     uv_stride = (uv_stride_bytes > 0) ? (size_t)uv_stride_bytes : (size_t)dst_width;
     y_plane = dst;

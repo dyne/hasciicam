@@ -19,6 +19,10 @@ int main(void) {
     char err[128];
     int w = 0;
     int h = 0;
+    int rect_x = 0;
+    int rect_y = 0;
+    int rect_w = 0;
+    int rect_h = 0;
     unsigned char pixel[4] = {1, 2, 3, 4};
     unsigned char src[16] = {
         0, 0, 255, 255,
@@ -85,6 +89,14 @@ int main(void) {
     expect_true(yuy2_size == 16, "yuy2 size should be width*2*height");
     nv12_size = hasciicam_virtual_camera_nv12_size(4, 2, 0, 0);
     expect_true(nv12_size == 12, "nv12 size should be width*height*3/2");
+    expect_true(hasciicam_virtual_camera_letterbox_rect(2, 2, 4, 2,
+                                                        &rect_x,
+                                                        &rect_y,
+                                                        &rect_w,
+                                                        &rect_h),
+                "letterbox rectangle should be computable");
+    expect_true(rect_x == 1 && rect_y == 0, "letterbox rectangle should be centered");
+    expect_true(rect_w == 2 && rect_h == 2, "letterbox rectangle should preserve source aspect");
     memset(yuy2, 0xAA, sizeof(yuy2));
     expect_true(hasciicam_virtual_camera_scale_bgra32_to_yuy2(src, 2, 2, 8,
                                                               yuy2, 4, 2, 0,
