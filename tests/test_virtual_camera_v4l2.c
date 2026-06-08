@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "../src/virtual_camera/virtual_camera_v4l2.h"
+#include "../src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.h"
 
 static int failures = 0;
 
@@ -47,6 +47,12 @@ int main(void) {
                 "full writes should not disconnect");
     expect_true(hasciicam_virtual_camera_v4l2_should_disconnect_write(8, 12, 0),
                 "short writes should disconnect");
+    expect_true(!hasciicam_virtual_camera_v4l2_validate_device_pair(
+                    "/dev/video10", "/dev/video10", err, sizeof(err)),
+                "matching capture and output paths should be rejected");
+    expect_true(hasciicam_virtual_camera_v4l2_validate_device_pair(
+                    "/dev/video0", "/dev/video10", err, sizeof(err)),
+                "different capture and output paths should be accepted");
 
     if (failures) {
         fprintf(stderr, "%d test(s) failed\n", failures);

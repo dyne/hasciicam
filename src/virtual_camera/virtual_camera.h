@@ -58,6 +58,19 @@ int hasciicam_virtual_camera_request_validate(const hasciicam_virtual_camera_req
                                               size_t err_size);
 
 /**
+ * Validate platform-specific capture/output device constraints.
+ */
+int hasciicam_virtual_camera_validate_device_pair(const char *capture_device,
+                                                  const char *output_device,
+                                                  char *err,
+                                                  size_t err_size);
+
+/**
+ * Return the default backend name for startup diagnostics.
+ */
+const char *hasciicam_virtual_camera_default_backend_name(void);
+
+/**
  * Return the number of bytes needed for a packed YUY2 frame.
  */
 size_t hasciicam_virtual_camera_yuy2_size(int width, int height, int stride_bytes);

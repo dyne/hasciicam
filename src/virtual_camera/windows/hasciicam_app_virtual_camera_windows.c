@@ -1,6 +1,6 @@
 #ifdef _WIN32
 
-#include "app_virtual_camera.h"
+#include "../../app/app_virtual_camera.h"
 
 #include <mfapi.h>
 #include <mfvirtualcamera.h>

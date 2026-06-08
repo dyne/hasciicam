@@ -39,6 +39,8 @@ int main(void) {
     expect_true(request.enabled == 0, "default enabled should be off");
     expect_true(request.width == 1280 && request.height == 720, "default size should be 1280x720");
     expect_true(request.fps == 30, "default fps should be 30");
+    expect_true(hasciicam_virtual_camera_default_backend_name()[0] != '\0',
+                "default backend name should be available");
 
     expect_true(hasciicam_virtual_camera_parse_size("1920x1080", &w, &h), "parse_size should accept lowercase x");
     expect_true(w == 1920 && h == 1080, "parse_size should return 1920x1080");

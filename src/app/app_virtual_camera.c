@@ -48,13 +48,7 @@ void hasciicam_app_virtual_camera_format_context(const hasciicam_config *cfg,
         height = cfg->virtual_camera_height;
         fps = cfg->virtual_camera_fps;
     }
-#if defined(_WIN32)
-    backend = "windows-pipe";
-#elif defined(__linux__)
-    backend = "v4l2-output";
-#else
-    backend = "unsupported";
-#endif
+    backend = hasciicam_virtual_camera_default_backend_name();
     snprintf(out, out_size, "backend=%s size=%dx%d fps=%d device=%s",
              backend,
              width,
@@ -89,13 +83,12 @@ int hasciicam_app_virtual_camera_start(hasciicam_app_virtual_camera *vc,
         set_error(err, err_size, "virtual camera requires SDL callback registration support");
         return 0;
     }
-#if defined(__linux__)
-    if (cfg->device[0] != '\0' && cfg->virtual_camera_device[0] != '\0' &&
-        strcmp(cfg->device, cfg->virtual_camera_device) == 0) {
-        set_error(err, err_size, "virtual camera device must differ from capture device");
+    if (!hasciicam_virtual_camera_validate_device_pair(cfg->device,
+                                                       cfg->virtual_camera_device,
+                                                       err,
+                                                       err_size)) {
         return 0;
     }
-#endif
 
     hasciicam_virtual_camera_request_init(&request);
     request.enabled = 1;

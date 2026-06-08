@@ -332,8 +332,11 @@ if(HASCIICAM_ENABLE_TESTS)
   if(WIN32)
     target_sources(test_app_config PRIVATE src/compat/getopt.c)
     target_sources(test_app_config PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
+    target_sources(test_app_config PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c)
     target_include_directories(test_app_config PRIVATE src/compat)
     target_compile_definitions(test_app_config PRIVATE _CRT_SECURE_NO_WARNINGS)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_sources(test_app_config PRIVATE src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.c)
   endif()
   add_test(NAME app_config COMMAND test_app_config)
   set_tests_properties(app_config PROPERTIES LABELS "unit;core")
@@ -351,7 +354,10 @@ if(HASCIICAM_ENABLE_TESTS)
   target_link_libraries(test_app_virtual_camera PRIVATE aalib)
   if(WIN32)
     target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
+    target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c)
     target_compile_definitions(test_app_virtual_camera PRIVATE _CRT_SECURE_NO_WARNINGS)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.c)
   endif()
   add_test(NAME app_virtual_camera COMMAND test_app_virtual_camera)
   set_tests_properties(app_virtual_camera PROPERTIES LABELS "unit;core")
@@ -380,6 +386,9 @@ if(HASCIICAM_ENABLE_TESTS)
   target_include_directories(test_virtual_camera PRIVATE src/virtual_camera)
   if(WIN32)
     target_sources(test_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
+    target_sources(test_virtual_camera PRIVATE src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_sources(test_virtual_camera PRIVATE src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.c)
   endif()
   add_test(NAME virtual_camera COMMAND test_virtual_camera)
   set_tests_properties(virtual_camera PROPERTIES LABELS "unit;core")
@@ -389,8 +398,11 @@ if(HASCIICAM_ENABLE_TESTS)
       tests/test_virtual_camera_v4l2.c
       src/virtual_camera/virtual_camera.c
       src/virtual_camera/virtual_camera_convert.c
+      src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.c
     )
-    target_include_directories(test_virtual_camera_v4l2 PRIVATE src/virtual_camera)
+    target_include_directories(test_virtual_camera_v4l2 PRIVATE
+      src/virtual_camera
+      src/virtual_camera/linux)
     add_test(NAME virtual_camera_v4l2 COMMAND test_virtual_camera_v4l2)
     set_tests_properties(virtual_camera_v4l2 PROPERTIES LABELS "unit;core")
   endif()
@@ -398,6 +410,7 @@ if(HASCIICAM_ENABLE_TESTS)
 if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
     add_library(hasciicam_virtual_camera_source SHARED
       src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c
+      src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c
       src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp
       src/virtual_camera/windows/source/hasciicam_virtual_camera_source.def
       src/virtual_camera/virtual_camera.c
@@ -428,7 +441,7 @@ if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
 
     add_executable(test_app_virtual_camera_windows
       tests/test_app_virtual_camera_windows.c
-      src/app/app_virtual_camera_windows.c
+      src/virtual_camera/windows/hasciicam_app_virtual_camera_windows.c
     )
     target_include_directories(test_app_virtual_camera_windows PRIVATE
       src/app
@@ -443,6 +456,7 @@ if(WIN32 AND HASCIICAM_ENABLE_VIRTUAL_CAMERA)
     add_executable(test_virtual_camera_windows
       tests/test_virtual_camera_windows.c
       src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c
+      src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c
       src/virtual_camera/windows/source/hasciicam_virtual_camera_source.cpp
       src/virtual_camera/virtual_camera.c
       src/virtual_camera/virtual_camera_convert.c

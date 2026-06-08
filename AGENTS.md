@@ -408,6 +408,13 @@ The Windows virtual-camera work now also builds a separate source DLL target,
 smoke test that exercises the class factory, Media Foundation startup, source
 creation, presentation descriptor setup, and start/stop/shutdown flow.
 
+Virtual-camera output keeps shared contracts and conversion in
+`src/virtual_camera/`. Platform IO lives below that boundary:
+
+- Linux V4L2 output: `src/virtual_camera/linux/`.
+- Windows session, pipe, source, install, and tooling:
+  `src/virtual_camera/windows/`.
+
 Preferred direction:
 
 - Keep AA-lib and rendering in C.

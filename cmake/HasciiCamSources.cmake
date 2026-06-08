@@ -54,7 +54,6 @@ set(HASCIICAM_APP_SOURCES
     src/app/app_config.c
     src/app/app_live_controls.c
     src/app/app_virtual_camera.c
-    src/app/app_virtual_camera_windows.c
     src/app/app_size.c
     src/app/app_session.c
     src/display/display_size.c
@@ -90,4 +89,8 @@ set(HASCIICAM_CAPTURE_SOURCES
 if(WIN32)
     list(APPEND HASCIICAM_AALIB_SOURCES src/compat/getopt.c)
     list(APPEND HASCIICAM_APP_SOURCES src/virtual_camera/windows/pipe/hasciicam_virtual_camera_pipe.c)
+    list(APPEND HASCIICAM_APP_SOURCES src/virtual_camera/windows/pipe/hasciicam_virtual_camera_windows.c)
+    list(APPEND HASCIICAM_APP_SOURCES src/virtual_camera/windows/hasciicam_app_virtual_camera_windows.c)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND HASCIICAM_APP_SOURCES src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.c)
 endif()
