@@ -55,7 +55,24 @@ int main(void) {
         expect_true(strstr(context, "fps=30") != NULL, "diagnostic context should include fps");
     }
 
-    expect_true(hasciicam_app_virtual_camera_start(&vc, dummy_context, &cfg, fake_set_callback, err, sizeof(err)),
+#if defined(__linux__)
+    expect_true(!hasciicam_app_virtual_camera_start(&vc,
+                                                    dummy_context,
+                                                    &cfg,
+                                                    fake_set_callback,
+                                                    err,
+                                                    sizeof(err)),
+                "start should fail cleanly without a V4L2 loopback device");
+    expect_true(vc.active == 0, "controller should remain inactive after backend failure");
+    expect_true(vc.device == NULL, "backend failure should not retain a device");
+    expect_true(register_calls == 0, "backend failure should not register a frame callback");
+#else
+    expect_true(hasciicam_app_virtual_camera_start(&vc,
+                                                  dummy_context,
+                                                  &cfg,
+                                                  fake_set_callback,
+                                                  err,
+                                                  sizeof(err)),
                 "start should succeed with a fake SDL callback hook");
     expect_true(vc.active == 1, "controller should be active after start");
     expect_true(vc.device != NULL, "controller should own a virtual camera device");
@@ -101,6 +118,7 @@ int main(void) {
     expect_true(vc.active == 0, "controller should be inactive after stop");
     expect_true(vc.device == NULL, "device should be released after stop");
     expect_true(unregister_calls == 1, "frame callback should be unregistered exactly once");
+#endif
 
 #if defined(__linux__)
     {
