@@ -358,7 +358,7 @@ static void run_windows_pipe_roundtrip(void) {
     request.width = 1280;
     request.height = 720;
     request.fps = 30;
-    request.device[0] = '\0';
+    strcpy(request.device, "test-pipe-roundtrip");
     expect_true(hasciicam_virtual_camera_source_config_prepare(&request, &config, err, sizeof(err)),
                 "pipe roundtrip should prepare source config");
     hasciicam_virtual_camera_source_frame_slot_init(&slot);

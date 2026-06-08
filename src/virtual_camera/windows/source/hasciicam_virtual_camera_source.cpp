@@ -983,10 +983,15 @@ public:
         IMFSample *allocated_sample = NULL;
         IMFMediaBuffer *source_buffer = NULL;
         IMFMediaBuffer *destination_buffer = NULL;
+        IMF2DBuffer2 *destination_buffer_2d = NULL;
         BYTE *source_bytes = NULL;
         BYTE *destination_bytes = NULL;
+        BYTE *destination_start = NULL;
         DWORD source_length = 0;
         DWORD destination_capacity = 0;
+        LONG destination_pitch = 0;
+        const char *failure_stage = "build source sample";
+        int destination_locked = 0;
         unsigned long long start_100ns = 0ULL;
         unsigned long long sequence = 0ULL;
         unsigned long long sample_time;
@@ -997,6 +1002,9 @@ public:
             return MF_E_SHUTDOWN;
         if (stream_state_ != MF_STREAM_STATE_RUNNING)
             return MF_E_INVALIDREQUEST;
+        sample_request_count_++;
+        if (sample_request_count_ == 1)
+            hasciicam_virtual_camera_source_trace("first sample request received");
         AcquireSRWLockShared(frame_lock_);
         if (lifecycle_ != NULL) {
             start_100ns = lifecycle_->last_timestamp_100ns;
@@ -1014,30 +1022,77 @@ public:
                                                          NULL,
                                                          0);
         ReleaseSRWLockShared(frame_lock_);
-        if (FAILED(hr) || sample == NULL)
+        if (FAILED(hr) || sample == NULL) {
+            hasciicam_virtual_camera_source_trace(
+                "sample failure stage=%s result=0x%08lx",
+                failure_stage,
+                (unsigned long)(FAILED(hr) ? hr : E_FAIL));
             return FAILED(hr) ? hr : E_FAIL;
+        }
         if (sample_allocator_ != NULL) {
+            failure_stage = "allocate provided sample";
             hr = sample_allocator_->AllocateSample(&allocated_sample);
-            if (SUCCEEDED(hr))
+            if (SUCCEEDED(hr)) {
+                failure_stage = "get source buffer";
                 hr = sample->ConvertToContiguousBuffer(&source_buffer);
-            if (SUCCEEDED(hr))
+            }
+            if (SUCCEEDED(hr)) {
+                failure_stage = "get destination buffer";
                 hr = allocated_sample->GetBufferByIndex(0, &destination_buffer);
-            if (SUCCEEDED(hr))
+            }
+            if (SUCCEEDED(hr)) {
+                failure_stage = "lock source buffer";
                 hr = source_buffer->Lock(&source_bytes, NULL, &source_length);
-            if (SUCCEEDED(hr))
-                hr = destination_buffer->Lock(&destination_bytes, &destination_capacity, NULL);
-            if (SUCCEEDED(hr) && destination_capacity < source_length)
-                hr = MF_E_BUFFERTOOSMALL;
-            if (SUCCEEDED(hr))
-                memcpy(destination_bytes, source_bytes, source_length);
-            if (destination_bytes != NULL)
-                destination_buffer->Unlock();
+            }
+            if (SUCCEEDED(hr)) {
+                failure_stage = "query destination 2D buffer";
+                hr = destination_buffer->QueryInterface(
+                    IID_IMF2DBuffer2, (void **)&destination_buffer_2d);
+            }
+            if (SUCCEEDED(hr)) {
+                failure_stage = "lock destination 2D buffer";
+                hr = destination_buffer_2d->Lock2DSize(
+                    MF2DBuffer_LockFlags_Write,
+                    &destination_bytes,
+                    &destination_pitch,
+                    &destination_start,
+                    &destination_capacity);
+                if (SUCCEEDED(hr))
+                    destination_locked = 1;
+            }
+            if (SUCCEEDED(hr)) {
+                size_t row_bytes = (size_t)config_.media_types[0].stride_bytes;
+                size_t required_size = row_bytes * (size_t)config_.request.height;
+                int row;
+
+                failure_stage = "copy destination rows";
+                if (source_length < required_size ||
+                    destination_capacity < required_size ||
+                    destination_pitch == 0 ||
+                    (size_t)(destination_pitch < 0 ? -destination_pitch : destination_pitch) < row_bytes) {
+                    hr = MF_E_BUFFERTOOSMALL;
+                } else {
+                    for (row = 0; row < config_.request.height; ++row) {
+                        BYTE *destination_row =
+                            destination_bytes + (ptrdiff_t)row * destination_pitch;
+                        memcpy(destination_row,
+                               source_bytes + (size_t)row * row_bytes,
+                               row_bytes);
+                    }
+                }
+            }
+            if (destination_locked)
+                destination_buffer_2d->Unlock2D();
             if (source_bytes != NULL)
                 source_buffer->Unlock();
-            if (SUCCEEDED(hr))
+            if (SUCCEEDED(hr)) {
+                failure_stage = "set destination length";
                 hr = destination_buffer->SetCurrentLength(source_length);
+            }
             if (source_buffer != NULL)
                 source_buffer->Release();
+            if (destination_buffer_2d != NULL)
+                destination_buffer_2d->Release();
             if (destination_buffer != NULL)
                 destination_buffer->Release();
             sample->Release();
@@ -1046,6 +1101,13 @@ public:
             if (FAILED(hr)) {
                 if (sample != NULL)
                     sample->Release();
+                hasciicam_virtual_camera_source_trace(
+                    "sample failure stage=%s result=0x%08lx source_bytes=%lu destination_bytes=%lu pitch=%ld",
+                    failure_stage,
+                    (unsigned long)hr,
+                    (unsigned long)source_length,
+                    (unsigned long)destination_capacity,
+                    (long)destination_pitch);
                 return hr;
             }
         }
@@ -1065,7 +1127,6 @@ public:
             return hr;
         }
         next_sample_time_100ns_ = sample_time + sample_duration;
-        sample_request_count_++;
         if (sample_request_count_ == 1 || sample_request_count_ % 300 == 0) {
             hasciicam_virtual_camera_source_trace(
                 "sample request=%llu frame_sequence=%llu time=%llu bytes=%llu",
