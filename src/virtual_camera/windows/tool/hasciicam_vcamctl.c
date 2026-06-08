@@ -105,7 +105,8 @@ int main(int argc, char **argv) {
             goto fail;
         if (!build_dll_path(root_w, dll_path_w, sizeof(dll_path_w) / sizeof(dll_path_w[0]), err, sizeof(err)))
             goto fail;
-        DeleteFileW(dll_path_w);
+        if (!hasciicam_virtual_camera_install_remove_dll(dll_path_w, err, sizeof(err)))
+            goto fail;
         printf("removed\n");
         return 0;
     }

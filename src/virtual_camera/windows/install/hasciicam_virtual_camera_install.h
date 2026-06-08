@@ -49,6 +49,13 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
                                               size_t err_size);
 
 /**
+ * Remove the installed source DLL after a short wait for Windows Frame Server.
+ */
+int hasciicam_virtual_camera_install_remove_dll(const wchar_t *dll_path,
+                                                char *err,
+                                                size_t err_size);
+
+/**
  * Register the DLL for machine-wide COM activation.
  */
 int hasciicam_virtual_camera_install_register(const wchar_t *dll_path,

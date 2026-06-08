@@ -168,8 +168,17 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
         return 0;
     }
     if (!CopyFileW(source_path, dest_path, FALSE)) {
-        snprintf(err, err_size, "unable to copy DLL into install root (error=%lu)",
-                 (unsigned long)GetLastError());
+        DWORD error = GetLastError();
+        if (error == ERROR_SHARING_VIOLATION || error == ERROR_ACCESS_DENIED) {
+            snprintf(err,
+                     err_size,
+                     "unable to replace source DLL because Windows Frame Server still has it loaded "
+                     "(error=%lu); stop the FrameServer service and retry",
+                     (unsigned long)error);
+        } else {
+            snprintf(err, err_size, "unable to copy DLL into install root (error=%lu)",
+                     (unsigned long)error);
+        }
         return 0;
     }
     if (!apply_sddl_to_path(dest_dir, kHasciiCamInstallDirectorySddl, err, err_size)) {
@@ -183,6 +192,39 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
         return 0;
     }
     return 1;
+}
+
+int hasciicam_virtual_camera_install_remove_dll(const wchar_t *dll_path,
+                                                char *err,
+                                                size_t err_size) {
+    DWORD error;
+    int attempt;
+
+    if (dll_path == NULL) {
+        set_error(err, err_size, "DLL path is required");
+        return 0;
+    }
+    for (attempt = 0; attempt < 20; ++attempt) {
+        if (DeleteFileW(dll_path))
+            return 1;
+        error = GetLastError();
+        if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND)
+            return 1;
+        if (error != ERROR_SHARING_VIOLATION && error != ERROR_ACCESS_DENIED)
+            break;
+        Sleep(100);
+    }
+    if (error == ERROR_SHARING_VIOLATION || error == ERROR_ACCESS_DENIED) {
+        snprintf(err,
+                 err_size,
+                 "unable to remove source DLL because Windows Frame Server still has it loaded "
+                 "(error=%lu); stop the FrameServer service and retry",
+                 (unsigned long)error);
+    } else {
+        snprintf(err, err_size, "unable to remove source DLL (error=%lu)",
+                 (unsigned long)error);
+    }
+    return 0;
 }
 
 static int write_registry_string(HKEY root, const wchar_t *subkey, const wchar_t *name, const wchar_t *value) {

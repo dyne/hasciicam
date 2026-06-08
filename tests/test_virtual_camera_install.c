@@ -71,6 +71,7 @@ int main(void) {
         wchar_t temp_root[MAX_PATH];
         wchar_t dest_dir[MAX_PATH];
         wchar_t dest_path[MAX_PATH];
+        wchar_t removable_path[MAX_PATH];
         wchar_t *slash;
         DWORD length;
 
@@ -129,6 +130,21 @@ int main(void) {
                     if (!copied)
                         fprintf(stderr, "copy helper error: %s\n", err);
                     expect_true(copied, "copy helper should set permissions on a writable temp root");
+                    expect_true(swprintf(removable_path,
+                                         sizeof(removable_path) / sizeof(removable_path[0]),
+                                         L"%ls\\removable.dll",
+                                         temp_root) >= 0,
+                                "removable DLL path formatting should succeed");
+                    if (CopyFileW(dll_path, removable_path, FALSE)) {
+                        expect_true(hasciicam_virtual_camera_install_remove_dll(
+                                        removable_path, err, sizeof(err)),
+                                    "remove helper should delete an unused source DLL");
+                    } else {
+                        expect_true(0, "removable DLL test file should be created");
+                    }
+                    expect_true(hasciicam_virtual_camera_install_remove_dll(
+                                    removable_path, err, sizeof(err)),
+                                "remove helper should accept an absent source DLL");
                     DeleteFileW(dest_path);
                     RemoveDirectoryW(dest_dir);
                 }
