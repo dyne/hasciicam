@@ -77,8 +77,10 @@ int main(void) {
         wchar_t module_dir[MAX_PATH];
         wchar_t source_path[MAX_PATH];
         wchar_t temp_root[MAX_PATH];
+        wchar_t same_root[MAX_PATH];
         wchar_t dest_dir[MAX_PATH];
         wchar_t dest_path[MAX_PATH];
+        wchar_t same_source_path[MAX_PATH];
         wchar_t removable_path[MAX_PATH];
         wchar_t *slash;
         DWORD length;
@@ -138,6 +140,44 @@ int main(void) {
                     if (!copied)
                         fprintf(stderr, "copy helper error: %s\n", err);
                     expect_true(copied, "copy helper should set permissions on a writable temp root");
+                    expect_true(swprintf(same_root,
+                                         sizeof(same_root) / sizeof(same_root[0]),
+                                         L"%lsHasciiCamSame_%lu",
+                                         temp_root,
+                                         (unsigned long)GetCurrentProcessId()) >= 0,
+                                "same-path temp root formatting should succeed");
+                    if (swprintf(same_root,
+                                 sizeof(same_root) / sizeof(same_root[0]),
+                                 L"%lsHasciiCamSame_%lu",
+                                 temp_root,
+                                 (unsigned long)GetCurrentProcessId()) >= 0) {
+                        expect_true(CreateDirectoryW(same_root, NULL) || GetLastError() == ERROR_ALREADY_EXISTS,
+                                    "same-path temp root should be creatable");
+                        expect_true(swprintf(same_source_path,
+                                     sizeof(same_source_path) / sizeof(same_source_path[0]),
+                                     L"%ls\\same-source.dll",
+                                     same_root) >= 0,
+                                    "same-path source DLL path formatting should succeed");
+                        if (swprintf(same_source_path,
+                                     sizeof(same_source_path) / sizeof(same_source_path[0]),
+                                     L"%ls\\same-source.dll",
+                                     same_root) >= 0) {
+                            int copied_same_source = CopyFileW(dll_path, same_source_path, FALSE);
+                            int same_path_install = 0;
+                            if (!copied_same_source)
+                                fprintf(stderr, "same-path source copy error: %lu\n", (unsigned long)GetLastError());
+                            expect_true(copied_same_source,
+                                        "same-path helper test should create its own source copy");
+                            same_path_install = hasciicam_virtual_camera_install_copy_dll(same_source_path,
+                                                                                          same_source_path,
+                                                                                          err,
+                                                                                          sizeof(err));
+                            if (!same_path_install)
+                                fprintf(stderr, "same-path helper error: %s\n", err);
+                            expect_true(same_path_install,
+                                        "copy helper should accept an already-installed source DLL path");
+                        }
+                    }
                     expect_true(swprintf(removable_path,
                                          sizeof(removable_path) / sizeof(removable_path[0]),
                                          L"%ls\\removable.dll",

@@ -182,19 +182,21 @@ int hasciicam_virtual_camera_install_copy_dll(const wchar_t *source_path,
         set_error(err, err_size, "unable to create install directory");
         return 0;
     }
-    if (!CopyFileW(source_path, dest_path, FALSE)) {
-        DWORD error = GetLastError();
-        if (error == ERROR_SHARING_VIOLATION || error == ERROR_ACCESS_DENIED) {
-            snprintf(err,
-                     err_size,
-                     "unable to replace source DLL because Windows Frame Server still has it loaded "
-                     "(error=%lu); stop the FrameServer service and retry",
-                     (unsigned long)error);
-        } else {
-            snprintf(err, err_size, "unable to copy DLL into install root (error=%lu)",
-                     (unsigned long)error);
+    if (_wcsicmp(source_path, dest_path) != 0) {
+        if (!CopyFileW(source_path, dest_path, FALSE)) {
+            DWORD error = GetLastError();
+            if (error == ERROR_SHARING_VIOLATION || error == ERROR_ACCESS_DENIED) {
+                snprintf(err,
+                         err_size,
+                         "unable to replace source DLL because Windows Frame Server still has it loaded "
+                         "(error=%lu); stop the FrameServer service and retry",
+                         (unsigned long)error);
+            } else {
+                snprintf(err, err_size, "unable to copy DLL into install root (error=%lu)",
+                         (unsigned long)error);
+            }
+            return 0;
         }
-        return 0;
     }
     if (!join_path(log_path,
                    sizeof(log_path) / sizeof(log_path[0]),
