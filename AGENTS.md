@@ -87,6 +87,15 @@ cmake --build build-msvc
 SDL2 is optional but is the preferred cross-platform live display backend. If it
 is missing from vcpkg, install it with `vcpkg install sdl2:x64-windows`.
 
+Windows packaging lives under `packaging/windows/`:
+
+- `packaging/windows/build-installer.ps1` stages the Release build and runs
+  `ISCC.exe`.
+- `packaging/windows/hasciicam.iss` defines the installer.
+- The installer is x64-only, machine-wide, and ships the virtual-camera helper
+  as an optional default-on component.
+- `hasciicam_vcamctl.exe` owns virtual-camera install and uninstall actions.
+
 The root `GNUmakefile` is a legacy Linux-oriented path. It assumes Unix linker
 flags such as SDL, X11, ncurses, and `libm`. Do not treat it as the
 cross-platform source of truth.

@@ -107,6 +107,22 @@ Checks:
 - live SDL output stays responsive while the loopback node is attached
 - a consumer application can open `/dev/video10` after the producer starts
 
+## Windows (installer)
+
+Build the installer from a Release Windows build tree:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging/windows/build-installer.ps1 -BuildDir build
+```
+
+Checks:
+
+- an installer appears in `releases/`
+- the installer opens with `Full` selected by default
+- the `Application only` type omits the virtual-camera component
+- a Full install reports `hasciicam_vcamctl status`
+- uninstall removes the PATH entry and the virtual-camera registration
+
 ## Linux (size negotiation)
 
 ```sh

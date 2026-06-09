@@ -33,6 +33,20 @@ cmake --preset windows-vcpkg-ninja
 ```
 Other presets are `linux-ninja`, `macos-ninja`, and `wasm-emscripten`.
 
+## Windows Installer
+
+HasciiCam ships a Windows installer built with Inno Setup 7. The packaging
+entry point is `packaging/windows/build-installer.ps1`; it stages the CMake
+install tree, copies the repository docs and licenses that CMake does not
+install, and then invokes `ISCC.exe`.
+
+The installer is x64-only and machine-wide. The virtual-camera component is
+checked by default, requires administrator rights, and targets Windows 11
+build 22000 or later. The component can be left out by choosing `Application
+only` on the Components page.
+
+More detail lives in `docs/windows-installer.md`.
+
 ## On-Screen GUI (SDL Live Mode)
 
 HasciiCam can show an optional on-screen control panel in live SDL mode.
