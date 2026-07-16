@@ -190,7 +190,7 @@ main (int argc, char **argv) {
       perror ("Couldn't install SIGINT handler"); exit (1); }
   fprintf(stderr,
           "\n%s %s - (h)ascii 4 the masses! - https://ascii.dyne.org\n"
-          "(c)2000-2025 RASTASOFT by Jaromil @ Dyne.org\n\n",
+          "(c)2000-2026 RASTASOFT by Jaromil @ Dyne.org\n\n",
           PACKAGE, VERSION);
 
   hasciicam_config_init_defaults(&appcfg);

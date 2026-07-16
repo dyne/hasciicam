@@ -9,10 +9,9 @@ To see a brief list of command line options:
 ./hasciicam -h
 ```
 
-
 ```
-hasciicam 2.0 - (h)ascii 4 the masses! - https://ascii.dyne.org
-(c)2000-2025 RASTASOFT by Jaromil @ Dyne.org
+hasciicam 2.6.0 - (h)ascii 4 the masses! - https://ascii.dyne.org
+(c)2000-2026 RASTASOFT by Jaromil @ Dyne.org
 
 Usage: hasciicam [options] [rendering options] [aalib options]
 options:
