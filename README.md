@@ -69,6 +69,16 @@ Common CMake options (all `-D<name>=ON|OFF`):
 - `HASCIICAM_ENABLE_GUI` — SDL live-mode ImGui overlay (default ON).
 - `HASCIICAM_ENABLE_VIRTUAL_CAMERA` — build the virtual webcam output.
 
+Versioning:
+
+- CMake takes the release base from `project(hasciicam VERSION ...)` in
+  `CMakeLists.txt` — bump it once per release (matching the git tag `vX.Y.Z`).
+- When building from a git checkout, the CLI banner is overridden with
+  `git describe --tags --match "v*" --always --dirty`, so tag builds report
+  the exact version and branch builds report `X.Y.Z-<n>-g<sha>[-dirty]`.
+- Tarball builds (no `.git`) fall back to the `project(VERSION ...)` literal.
+- Re-run `cmake -B build .` after fetching new tags to refresh the banner.
+
 Quick smoke test after building:
 
 ```sh

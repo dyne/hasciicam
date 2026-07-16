@@ -4,6 +4,28 @@ if(POLICY CMP0091)
 endif()
 project(hasciicam VERSION 2.0 LANGUAGES C CXX)
 
+# Bump the literal above at each release. When building from a git checkout,
+# HASCIICAM_VERSION_STRING is overridden with `git describe` output so builds
+# off a tag report the exact release and builds off a branch report
+# "<tag>-<n>-g<sha>[-dirty]". Tarball builds fall back to PROJECT_VERSION.
+set(HASCIICAM_VERSION_STRING "${PROJECT_VERSION}")
+if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+  find_package(Git QUIET)
+  if(GIT_FOUND)
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} describe --tags --match "v*" --always --dirty
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      OUTPUT_VARIABLE HASCIICAM_GIT_DESCRIBE
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET
+      RESULT_VARIABLE HASCIICAM_GIT_RC)
+    if(HASCIICAM_GIT_RC EQUAL 0 AND HASCIICAM_GIT_DESCRIBE)
+      string(REGEX REPLACE "^v" "" HASCIICAM_VERSION_STRING "${HASCIICAM_GIT_DESCRIBE}")
+    endif()
+  endif()
+endif()
+message(STATUS "hasciicam version string: ${HASCIICAM_VERSION_STRING}")
+
 if(APPLE)
   enable_language(OBJCXX)
 endif()
@@ -113,7 +135,7 @@ endif()
 # Create aalib static library
 add_library(aalib STATIC ${HASCIICAM_AALIB_SOURCES})
 target_include_directories(aalib PUBLIC third_party/aalib)
-target_compile_definitions(aalib PRIVATE HASCIICAM_APP_TITLE="hasciicam ${PROJECT_VERSION}")
+target_compile_definitions(aalib PRIVATE HASCIICAM_APP_TITLE="hasciicam ${HASCIICAM_VERSION_STRING}")
 if(WIN32)
     target_include_directories(aalib PUBLIC src/compat)
     target_compile_definitions(aalib PRIVATE _CRT_SECURE_NO_WARNINGS)
@@ -254,7 +276,7 @@ if(HASCIICAM_BUILD_CLI)
   add_executable(hasciicam src/hasciicam.c)
   target_compile_definitions(hasciicam PRIVATE
       PACKAGE="hasciicam"
-      VERSION="${PROJECT_VERSION}"
+      VERSION="${HASCIICAM_VERSION_STRING}"
   )
   if(WIN32)
       target_include_directories(hasciicam PRIVATE src/compat)
