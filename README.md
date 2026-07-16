@@ -197,6 +197,7 @@ People who contributed to this project:
 - thomas pfau - ftp library
 - blended - wider webcam support
 - dan stowell - v4l2 api support
+- puria nafisi azizi - build/version wiring and macOS AVFoundation adapter
 
 Special thanks to:
 

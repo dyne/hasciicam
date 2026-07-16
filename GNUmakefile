@@ -1,5 +1,5 @@
 PACKAGE := hasciicam
-VERSION ?= 2.0.0
+VERSION ?= 2.6.0
 
 CC ?= gcc
 CFLAGS ?= -O0 -ggdb
