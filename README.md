@@ -19,19 +19,68 @@ plugin, java etc. (which was an issue, back in 2001 when it was done).
 
 # BUILD FROM SOURCE
 
-To compile the sourcecode use CMake
+Prerequisites:
+
+- A C/C++ toolchain (Clang or GCC on Unix, MSVC on Windows).
+- CMake 3.16+.
+- Optional runtime backends discovered at configure time: SDL2 (preferred live
+  display), ncurses (terminal live display), X11 (Linux only).
+- macOS uses the system AVFoundation for capture; Linux uses V4L2; Windows uses
+  Media Foundation with a DirectShow fallback (via vcpkg for SDL2).
+
+Standard build (uses whichever generator CMake picks by default — Unix Makefiles
+on Linux/macOS, Visual Studio on Windows):
+
 ```sh
 cmake -B build .
-cmake --build build
-cmake --install build
+cmake --build build -j
+cmake --install build    # optional; installs to CMAKE_INSTALL_PREFIX
 ```
 
-With presets (recommended for cross-platform maintenance):
+The build produces `build/hasciicam` (the CLI) and `build/libhasciicam_core.a`
+(the reusable core linked by host samples under `examples/`).
+
+Run the tests:
+
+```sh
+ctest --output-on-failure --test-dir build
+```
+
+With presets (recommended for cross-platform maintenance, requires Ninja):
+
 ```sh
 cmake --list-presets
-cmake --preset windows-vcpkg-ninja
+cmake --preset macos-ninja      # or linux-ninja, windows-vcpkg-ninja, wasm-emscripten
+cmake --build --preset macos-ninja
 ```
-Other presets are `linux-ninja`, `macos-ninja`, and `wasm-emscripten`.
+
+The available presets are `linux-ninja`, `macos-ninja`, `windows-vcpkg-ninja`,
+and `wasm-emscripten`. Install Ninja first (`brew install ninja`,
+`apt install ninja-build`, or `choco install ninja`).
+
+Common CMake options (all `-D<name>=ON|OFF`):
+
+- `HASCIICAM_BUILD_CLI` — build the `hasciicam` executable (default ON).
+- `HASCIICAM_ENABLE_TESTS` — build CTest targets (default ON).
+- `HASCIICAM_ENABLE_SDL`, `HASCIICAM_ENABLE_X11`, `HASCIICAM_ENABLE_CURSES` —
+  display backends; each is auto-disabled if its dependency is not found.
+- `HASCIICAM_ENABLE_CAPTURE_V4L2` / `_MF` / `_DSHOW` / `_AVFOUNDATION` —
+  capture backends per platform.
+- `HASCIICAM_ENABLE_GUI` — SDL live-mode ImGui overlay (default ON).
+- `HASCIICAM_ENABLE_VIRTUAL_CAMERA` — build the virtual webcam output.
+
+Quick smoke test after building:
+
+```sh
+./build/hasciicam -h                                   # CLI help
+./build/hasciicam -H                                   # CLI + AA-lib help
+./build/hasciicam -d synthetic:// --frames 2 -O stdout # no-camera pipeline test
+./build/hasciicam -O SDL                               # live ASCII from the default camera
+```
+
+On macOS, live mode triggers a Camera permission prompt on first run; grant it
+in *System Settings → Privacy & Security → Camera* for the terminal that
+launched `hasciicam`.
 
 ## On-Screen GUI (SDL Live Mode)
 
