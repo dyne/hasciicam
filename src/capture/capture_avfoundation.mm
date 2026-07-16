@@ -145,6 +145,21 @@ static int avf_open(capture_device **out, const capture_request *req) {
     dev->queue = dispatch_queue_create("org.dyne.hasciicam.avfoundation", DISPATCH_QUEUE_SERIAL);
     [dev->output setSampleBufferDelegate:dev->delegate queue:dev->queue];
 
+    // Seed geometry from activeFormat: describe() runs before start(), so
+    // the delegate hasn't received a frame yet and its width/height are 0.
+    if (device.activeFormat != nil) {
+        CMFormatDescriptionRef desc = device.activeFormat.formatDescription;
+        if (desc != NULL) {
+            CMVideoDimensions dims = CMVideoFormatDescriptionGetDimensions(desc);
+            if (dims.width > 0 && dims.height > 0) {
+                std::lock_guard<std::mutex> lock(dev->delegate->frame_mutex);
+                dev->delegate->frame_width = dims.width;
+                dev->delegate->frame_height = dims.height;
+                dev->delegate->frame_stride = dims.width * 4;
+            }
+        }
+    }
+
     *out = dev;
     return 1;
 }
