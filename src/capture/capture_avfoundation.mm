@@ -181,6 +181,15 @@ static int avf_start(capture_device *dev) {
     if (dev == NULL || dev->session == nil)
         return 0;
     [dev->session startRunning];
+    // Block for the first sample buffer: the render loop breaks on any
+    // failed read(), and AVFoundation typically delivers frame 0 several
+    // hundred ms after startRunning.
+    if (dev->delegate != nil) {
+        std::unique_lock<std::mutex> lock(dev->delegate->frame_mutex);
+        if (!dev->delegate->has_frame) {
+            dev->delegate->frame_ready.wait_for(lock, std::chrono::milliseconds(2000));
+        }
+    }
     return 1;
 }
 
