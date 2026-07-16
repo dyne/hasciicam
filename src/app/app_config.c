@@ -1319,7 +1319,7 @@ void hasciicam_config_parse(hasciicam_config *cfg,
     if (cfg->show_version) {
         fprintf(stderr,
                 "\n%s %s - (h)ascii 4 the masses! - https://ascii.dyne.org\n"
-                "(c)2000-2025 RASTASOFT by Jaromil @ Dyne.org\n\n",
+                "(c)2000-2026 RASTASOFT by Jaromil @ Dyne.org\n\n",
                 package, version);
         exit(0);
     }
