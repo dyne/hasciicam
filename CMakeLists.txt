@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.12)
 if(POLICY CMP0091)
   cmake_policy(SET CMP0091 NEW)
 endif()
-project(hasciicam VERSION 2.0 LANGUAGES C CXX)
+project(hasciicam VERSION 2.6.0 LANGUAGES C CXX)
 
 # Bump the literal above at each release. When building from a git checkout,
 # HASCIICAM_VERSION_STRING is overridden with `git describe` output so builds
