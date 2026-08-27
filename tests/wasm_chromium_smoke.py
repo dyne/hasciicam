@@ -74,7 +74,7 @@ def main():
     states = dict(re.findall(r'data-([a-z-]+)="([^"]*)"', completed.stdout))
     required = {
         "runtime-ready": "true", "camera-ready": "true", "sdl-webgl-ready": "true",
-        "presentation-observed": "true",
+        "canvas-nonblank": "true", "canvas-changed": "true", "presentation-observed": "true",
     }
     for name, expected in required.items():
         if states.get(name) != expected:
