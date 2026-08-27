@@ -40,6 +40,8 @@ option(HASCIICAM_ENABLE_TESTS "Enable hasciicam unit tests" ON)
 option(HASCIICAM_ENABLE_VISUAL_TESTS "Enable opt-in visual smoke tests" OFF)
 option(HASCIICAM_ENABLE_CAMERA_TESTS "Enable opt-in real camera smoke tests" OFF)
 set(HASCIICAM_TEST_CAMERA_DEVICE "" CACHE STRING "Camera device selector for opt-in camera smoke tests")
+option(HASCIICAM_ENABLE_WASM_BROWSER_TESTS "Enable opt-in Emscripten Chromium browser smoke tests" OFF)
+set(HASCIICAM_TEST_CHROMIUM "" CACHE FILEPATH "Chromium executable for opt-in WASM browser smoke tests")
 option(HASCIICAM_ENABLE_SDL "Enable SDL output driver" ON)
 option(HASCIICAM_ENABLE_X11 "Enable X11 output driver" ON)
 option(HASCIICAM_ENABLE_CURSES "Enable curses output driver" ON)
@@ -323,6 +325,8 @@ message(STATUS "  HASCIICAM_ENABLE_TESTS=${HASCIICAM_ENABLE_TESTS}")
 message(STATUS "  HASCIICAM_ENABLE_VISUAL_TESTS=${HASCIICAM_ENABLE_VISUAL_TESTS}")
 message(STATUS "  HASCIICAM_ENABLE_CAMERA_TESTS=${HASCIICAM_ENABLE_CAMERA_TESTS}")
 message(STATUS "  HASCIICAM_TEST_CAMERA_DEVICE=${HASCIICAM_TEST_CAMERA_DEVICE}")
+message(STATUS "  HASCIICAM_ENABLE_WASM_BROWSER_TESTS=${HASCIICAM_ENABLE_WASM_BROWSER_TESTS}")
+message(STATUS "  HASCIICAM_TEST_CHROMIUM=${HASCIICAM_TEST_CHROMIUM}")
 message(STATUS "  HASCIICAM_ENABLE_SDL=${HASCIICAM_ENABLE_SDL} (found=${HASCIICAM_WITH_SDL})")
 message(STATUS "  HASCIICAM_ENABLE_X11=${HASCIICAM_ENABLE_X11} (found=${HASCIICAM_WITH_X11})")
 message(STATUS "  HASCIICAM_ENABLE_CURSES=${HASCIICAM_ENABLE_CURSES} (found=${HASCIICAM_WITH_CURSES})")
@@ -709,4 +713,24 @@ endif()
 
 if(EMSCRIPTEN)
   add_subdirectory(examples/wasm)
+
+  if(HASCIICAM_ENABLE_WASM_BROWSER_TESTS)
+    if(HASCIICAM_TEST_CHROMIUM STREQUAL "")
+      message(WARNING
+        "HASCIICAM_ENABLE_WASM_BROWSER_TESTS is ON but HASCIICAM_TEST_CHROMIUM is empty; "
+        "the Chromium smoke test is not added.")
+    else()
+      find_package(Python3 REQUIRED COMPONENTS Interpreter)
+      enable_testing()
+      add_test(
+        NAME wasm_chromium_canvas
+        COMMAND ${Python3_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/wasm_chromium_smoke.py
+          --chromium ${HASCIICAM_TEST_CHROMIUM}
+          --root $<TARGET_FILE_DIR:hasciicam_wasm_sample>
+          --artifacts ${CMAKE_CURRENT_BINARY_DIR}/wasm-chromium-smoke
+      )
+      set_tests_properties(wasm_chromium_canvas PROPERTIES LABELS "wasm" TIMEOUT 60)
+    endif()
+  endif()
 endif()

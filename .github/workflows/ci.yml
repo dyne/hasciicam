@@ -10,6 +10,53 @@ permissions:
   contents: read
 
 jobs:
+  wasm-browser:
+    name: WASM browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Emscripten 4.0.1
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.1
+
+      - name: Install Ninja and Chromium
+        run: sudo apt-get update && sudo apt-get install -y ninja-build chromium
+
+      - name: Record WASM tool versions
+        run: |
+          emcc --version
+          /usr/bin/chromium --version
+
+      - name: Restore Emscripten port cache
+        uses: actions/cache@v4
+        with:
+          path: build/presets/wasm-emscripten/.emscripten-cache
+          key: wasm-emscripten-4.0.1-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'examples/wasm/CMakeLists.txt') }}
+
+      - name: Configure WASM browser test
+        run: >
+          cmake --preset wasm-emscripten
+          -DHASCIICAM_ENABLE_WASM_BROWSER_TESTS=ON
+          -DHASCIICAM_TEST_CHROMIUM=/usr/bin/chromium
+
+      - name: Build browser sample
+        run: cmake --build --preset wasm-emscripten --target hasciicam_wasm_sample --verbose
+
+      - name: Run Chromium canvas smoke
+        run: ctest --output-on-failure --test-dir build/presets/wasm-emscripten -L wasm
+
+      - name: Upload WASM browser artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: wasm-browser-artifacts
+          path: |
+            build/presets/wasm-emscripten/examples/wasm/
+            build/presets/wasm-emscripten/wasm-chromium-smoke/
+          if-no-files-found: warn
+
   build-and-test:
     name: ${{ matrix.name }}
     strategy:
@@ -129,8 +176,8 @@ jobs:
 
   release:
     name: Release
-    needs: build-and-test
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.build-and-test.result == 'success' }}
+    needs: [build-and-test, wasm-browser]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.build-and-test.result == 'success' && needs.wasm-browser.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
