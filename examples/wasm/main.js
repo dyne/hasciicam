@@ -130,7 +130,12 @@
   function completeErrorAutotest(kind) {
     const clean = diagnostics.activeRenderLoops === 0 && diagnostics.activeStreams === 0 &&
       transferPtr === 0 && !sessionInitialized;
-    updateDiagnostics({ errorKind: kind, testComplete: true, testPassed: clean });
+    finishAutotest({ errorKind: kind, testComplete: true, testPassed: clean });
+  }
+
+  function finishAutotest(changes) {
+    updateDiagnostics(changes);
+    window.setTimeout(() => window.close(), 0);
   }
 
   function scheduleFrame() {
@@ -218,7 +223,7 @@
           diagnostics.maxActiveRenderLoops === 1 && diagnostics.maxActiveStreams === 1 &&
           diagnostics.activeRenderLoops === 0 && diagnostics.activeStreams === 0 &&
           diagnostics.shutdownCount === 2 && diagnostics.restartCount === 1;
-        updateDiagnostics({ testComplete: true, testPassed: passed });
+        finishAutotest({ testComplete: true, testPassed: passed });
         return;
       }
     }
