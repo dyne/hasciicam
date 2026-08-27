@@ -12,6 +12,9 @@ import sys
 import threading
 
 
+LIFECYCLE_TIMEOUT_SECONDS = 90
+
+
 class QuietStaticServer(http.server.SimpleHTTPRequestHandler):
     def log_message(self, _format, *_args):
         pass
@@ -41,20 +44,22 @@ def run_scenario(chromium, root, artifacts, scenario):
             "--disable-gpu", "--no-first-run", "--no-default-browser-check",
             f"--user-data-dir={profile_dir}",
             "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream",
-            "--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl",
+            "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
+            "--enable-webgl",
             "--ignore-gpu-blocklist", "--run-all-compositor-stages-before-draw",
             "--virtual-time-budget=15000", "--window-size=1280,800",
             f"--screenshot={screenshot_path}", "--dump-dom", url,
         ]
         try:
             completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                       text=True, timeout=45, check=False)
+                                       text=True, timeout=LIFECYCLE_TIMEOUT_SECONDS, check=False)
         except subprocess.TimeoutExpired as error:
             output = error.stdout or "Chromium timed out.\n"
             if isinstance(output, bytes):
                 output = output.decode("utf-8", errors="replace")
             log_path.write_text(output, encoding="utf-8")
-            raise RuntimeError(f"Chromium {scenario} timed out after 45 seconds") from error
+            raise RuntimeError(
+                f"Chromium {scenario} timed out after {LIFECYCLE_TIMEOUT_SECONDS} seconds") from error
         finally:
             server.shutdown()
             thread.join(timeout=5)
