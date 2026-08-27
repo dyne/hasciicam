@@ -23,6 +23,7 @@
   let presentationPending = false;
   let sessionFrames = 0;
   let lifecyclePhase = 0;
+  let autotestPixels = null;
 
   const diagnostics = window.hasciicamWasmState = {
     runtimeReady: false,
@@ -121,8 +122,11 @@
     setStatus(message, state);
   }
 
-  function fatal(message) {
+  function fatal(message, kind = "runtime") {
     stop(message, "error");
+    if (autotestMode && autotestScenario === "lifecycle") {
+      finishAutotest({ errorKind: kind, testComplete: true, testPassed: false });
+    }
   }
 
   function completeErrorAutotest(kind) {
@@ -161,31 +165,53 @@
                         presentationCount: diagnostics.presentationCount + (observed ? 1 : 0) });
   }
 
+  function getAutotestPixels() {
+    if (!autotestPixels) {
+      autotestPixels = new Uint8Array(SOURCE_WIDTH * SOURCE_HEIGHT * 4);
+    }
+    const phase = diagnostics.successfulFrames * 17;
+    for (let y = 0; y < SOURCE_HEIGHT; y += 1) {
+      for (let x = 0; x < SOURCE_WIDTH; x += 1) {
+        const offset = (y * SOURCE_WIDTH + x) * 4;
+        autotestPixels[offset] = (x + phase) & 0xff;
+        autotestPixels[offset + 1] = (y * 2 + phase) & 0xff;
+        autotestPixels[offset + 2] = (x + y + phase * 2) & 0xff;
+        autotestPixels[offset + 3] = 0xff;
+      }
+    }
+    return autotestPixels;
+  }
+
   async function frame() {
     rafId = 0;
     updateDiagnostics({ activeRenderLoops: 0 });
     if (!running) return;
     observePresentation();
     if (!running) return;
-    sourceContext.drawImage(video, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
-    const pixels = sourceContext.getImageData(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT).data;
+    let pixels;
+    if (autotestMode) {
+      pixels = getAutotestPixels();
+    } else {
+      sourceContext.drawImage(video, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
+      pixels = sourceContext.getImageData(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT).data;
+    }
     if (pixels.byteLength > transferSize) {
       freeTransfer();
       transferPtr = window.Module._malloc(pixels.byteLength);
       transferSize = pixels.byteLength;
       if (!transferPtr) {
-        fatal("The renderer could not reserve frame memory.");
+        fatal("The renderer could not reserve frame memory.", "allocation");
         return;
       }
       updateDiagnostics({ allocationCount: diagnostics.allocationCount + 1 });
     }
     window.Module.HEAPU8.set(pixels, transferPtr);
     if (!api.submit(transferPtr, pixels.byteLength, SOURCE_WIDTH, SOURCE_HEIGHT, SOURCE_WIDTH * 4)) {
-      fatal("The renderer rejected a camera frame.");
+      fatal("The renderer rejected a camera frame.", "frame-submit");
       return;
     }
     if (!api.render()) {
-      fatal("The SDL renderer stopped while drawing a frame.");
+      fatal("The SDL renderer stopped while drawing a frame.", "frame-render");
       return;
     }
     updateDiagnostics({ successfulFrames: diagnostics.successfulFrames + 1 });
@@ -218,12 +244,12 @@
   async function start() {
     if (!diagnostics.runtimeReady || running || starting) return;
     if (!window.isSecureContext) {
-      fatal("Camera access requires HTTPS or localhost.");
+      fatal("Camera access requires HTTPS or localhost.", "insecure-context");
       return;
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia ||
         (autotestMode && autotestScenario === "missing-media")) {
-      fatal("No camera is available in this browser.");
+      fatal("No camera is available in this browser.", "missing-media");
       if (autotestMode && autotestScenario === "missing-media") completeErrorAutotest("missing-media");
       return;
     }
@@ -255,12 +281,12 @@
                           canvasChanged: false, presentationObserved: false });
       sessionInitialized = true;
       if (!api.init(SOURCE_WIDTH, SOURCE_HEIGHT, 80, 30)) {
-        fatal("SDL could not initialize the visible canvas.");
+        fatal("SDL could not initialize the visible canvas.", "sdl-init");
         return;
       }
       const webgl = visibleCanvas.getContext("webgl");
       if (!webgl || !(webgl instanceof WebGLRenderingContext)) {
-        fatal("SDL did not create the required WebGL canvas renderer.");
+        fatal("SDL did not create the required WebGL canvas renderer.", "webgl-init");
         return;
       }
       running = true;
@@ -273,7 +299,8 @@
       if (token !== startToken) return;
       starting = false;
       const denied = error && (error.name === "NotAllowedError" || error.name === "SecurityError");
-      fatal(denied ? "Camera permission was denied. Allow access and try again." : "No camera could be started. Check that one is connected and not in use.");
+      fatal(denied ? "Camera permission was denied. Allow access and try again." : "No camera could be started. Check that one is connected and not in use.",
+            denied ? "camera-denied" : "camera-start");
       if (autotestMode && autotestScenario === "denied") completeErrorAutotest("denied");
     }
   }

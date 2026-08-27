@@ -36,8 +36,12 @@ close release every camera track. The page does not send frames to a server.
 The CTest browser gate is deliberately opt-in and does not use real hardware.
 It starts an ephemeral localhost server, opens Chromium headlessly with fake
 media and permission flags, and records browser logs under the build tree.
-The gate avoids full-canvas readback because software WebGL runners can stall
-on it. Provide the browser executable explicitly:
+After acquiring the fake stream, the automated path generates deterministic
+RGBA frames directly in JavaScript memory. This preserves camera lifecycle and
+frame-transfer coverage without a headless video/canvas readback, which can
+stall software WebGL runners. The interactive real-camera path still reads the
+video through its hidden source canvas. Provide the browser executable
+explicitly:
 
 ```sh
 cmake --preset wasm-emscripten \\
