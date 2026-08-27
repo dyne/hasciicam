@@ -94,14 +94,24 @@ def run_scenario(chromium, root, artifacts, scenario):
             thread.join(timeout=5)
 
     log_path.write_text(output, encoding="utf-8")
+    completion = server.completion
+    completion_path = artifacts / f"completion-{scenario}.json"
+    completion_path.write_text(
+        json.dumps(completion, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8")
     if "Uncaught" in output or "ERROR:CONSOLE" in output:
         raise RuntimeError(f"Chromium {scenario} reported a page exception; see {log_path}")
-    completion = server.completion
     if not isinstance(completion, dict) or completion.get("scenario") != scenario:
-        raise RuntimeError(f"browser scenario {scenario} sent an invalid completion signal; see {log_path}")
+        raise RuntimeError(
+            f"browser scenario {scenario} sent an invalid completion signal: "
+            f"{completion!r}; see {completion_path}")
     states = completion.get("states", {})
     if states.get("test-complete") != "true" or states.get("test-passed") != "true":
-        raise RuntimeError(f"browser scenario {scenario} did not complete successfully; see {log_path}")
+        raise RuntimeError(
+            f"browser scenario {scenario} did not complete successfully "
+            f"(error-kind={states.get('error-kind')!r}, "
+            f"successful-frames={states.get('successful-frames')!r}); "
+            f"see {completion_path}")
     if scenario == "lifecycle":
         expected = {
             "allocation-count": "2", "free-count": "2", "active-render-loops": "0",
