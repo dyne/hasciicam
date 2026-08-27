@@ -126,6 +126,28 @@ static int test_bgra_luma_for_red_pixel(void) {
     return dst[0] == 76;
 }
 
+static int test_rgb32_luma_for_rgba_pixels(void) {
+    /* Browser ImageData is R, G, B, A. */
+    unsigned char src[12] = {
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+        0, 0, 255, 255
+    };
+    unsigned char dst[3] = {0, 0, 0};
+    capture_frame frame;
+    memset(&frame, 0, sizeof(frame));
+    frame.data = src;
+    frame.data_size = sizeof(src);
+    frame.width = 3;
+    frame.height = 1;
+    frame.stride_bytes = 12;
+    frame.pixel_format = CAPTURE_PIXFMT_RGB32;
+
+    if (!capture_frame_to_gray_scaled(&frame, dst, 3, 1))
+        return 0;
+    return dst[0] == 76 && dst[1] == 149 && dst[2] == 28;
+}
+
 static int test_invalid_format_fails(void) {
     unsigned char src[1] = {0};
     unsigned char dst[1] = {0};
@@ -148,6 +170,7 @@ int main(void) {
     if (!test_gray8_mirror_x()) return 1;
     if (!test_gray8_mirror_y()) return 1;
     if (!test_bgra_luma_for_red_pixel()) return 1;
+    if (!test_rgb32_luma_for_rgba_pixels()) return 1;
     if (!test_invalid_format_fails()) return 1;
     printf("frame_convert tests passed\n");
     return 0;

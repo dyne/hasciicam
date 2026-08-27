@@ -1,53 +1,196 @@
-const video = document.getElementById("cam");
-const canvas = document.getElementById("src");
-const ascii = document.getElementById("ascii");
-const ctx = canvas.getContext("2d");
+(() => {
+  "use strict";
 
-function bootstrap(Module) {
-  const init = Module.cwrap("hasciicam_wasm_init", "number", ["number", "number", "number", "number"]);
-  const submit = Module.cwrap("hasciicam_wasm_submit_rgba", "number", ["number", "number", "number", "number", "number"]);
-  const render = Module.cwrap("hasciicam_wasm_render", "number", []);
-  const textPtr = Module.cwrap("hasciicam_wasm_ascii_text", "number", []);
-  const textW = Module.cwrap("hasciicam_wasm_ascii_width", "number", []);
-  const textH = Module.cwrap("hasciicam_wasm_ascii_height", "number", []);
+  const SOURCE_WIDTH = 320;
+  const SOURCE_HEIGHT = 240;
+  const app = document.getElementById("hasciicam-app");
+  const video = document.getElementById("camera-video");
+  const sourceCanvas = document.getElementById("source-canvas");
+  const visibleCanvas = document.getElementById("canvas");
+  const startButton = document.getElementById("start");
+  const stopButton = document.getElementById("stop");
+  const status = document.getElementById("status");
+  const sourceContext = sourceCanvas.getContext("2d", { willReadFrequently: true });
+  let api = null;
+  let stream = null;
+  let transferPtr = 0;
+  let transferSize = 0;
+  let rafId = 0;
+  let running = false;
+  let starting = false;
+  let startToken = 0;
+  let sessionInitialized = false;
+  let presentationPending = false;
 
-  async function start() {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    video.srcObject = stream;
-    await video.play();
-    canvas.width = 320;
-    canvas.height = 240;
-    if (!init(canvas.width, canvas.height, 80, 40)) {
+  const diagnostics = window.hasciicamWasmState = {
+    runtimeReady: false,
+    cameraReady: false,
+    successfulFrames: 0,
+    sdlWebglReady: false,
+    presentationObserved: false
+  };
+
+  function updateDiagnostics(changes) {
+    Object.assign(diagnostics, changes);
+    app.dataset.runtimeReady = String(diagnostics.runtimeReady);
+    app.dataset.cameraReady = String(diagnostics.cameraReady);
+    app.dataset.successfulFrames = String(diagnostics.successfulFrames);
+    app.dataset.sdlWebglReady = String(diagnostics.sdlWebglReady);
+    app.dataset.presentationObserved = String(diagnostics.presentationObserved);
+  }
+
+  function setStatus(message, state = "ready") {
+    status.textContent = message;
+    status.dataset.state = state;
+  }
+
+  function setControls() {
+    startButton.disabled = !diagnostics.runtimeReady || running || starting;
+    stopButton.disabled = !running && !starting;
+  }
+
+  function stopTracks() {
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+    stream = null;
+    video.srcObject = null;
+  }
+
+  function freeTransfer() {
+    if (transferPtr) window.Module._free(transferPtr);
+    transferPtr = 0;
+    transferSize = 0;
+  }
+
+  function shutdownSession() {
+    if (!sessionInitialized) return;
+    sessionInitialized = false;
+    api.shutdown();
+  }
+
+  function stop(message = "Camera stopped.", state = "stopped") {
+    startToken += 1;
+    starting = false;
+    running = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+    stopTracks();
+    shutdownSession();
+    freeTransfer();
+    presentationPending = false;
+    updateDiagnostics({ cameraReady: false, sdlWebglReady: false, presentationObserved: false });
+    setControls();
+    setStatus(message, state);
+  }
+
+  function fatal(message) {
+    stop(message, "error");
+  }
+
+  function schedulePresentationObservation() {
+    if (presentationPending) return;
+    presentationPending = true;
+    requestAnimationFrame(() => {
+      presentationPending = false;
+      if (running) updateDiagnostics({ presentationObserved: true });
+    });
+  }
+
+  function frame() {
+    if (!running) return;
+    sourceContext.drawImage(video, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
+    const pixels = sourceContext.getImageData(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT).data;
+    if (pixels.byteLength > transferSize) {
+      freeTransfer();
+      transferPtr = window.Module._malloc(pixels.byteLength);
+      transferSize = pixels.byteLength;
+      if (!transferPtr) {
+        fatal("The renderer could not reserve frame memory.");
+        return;
+      }
+    }
+    window.Module.HEAPU8.set(pixels, transferPtr);
+    if (!api.submit(transferPtr, pixels.byteLength, SOURCE_WIDTH, SOURCE_HEIGHT, SOURCE_WIDTH * 4)) {
+      fatal("The renderer rejected a camera frame.");
       return;
     }
-    tick();
-  }
-
-  function tick() {
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const ptr = Module._malloc(image.data.length);
-    Module.HEAPU8.set(image.data, ptr);
-    submit(ptr, image.data.length, canvas.width, canvas.height, canvas.width * 4);
-    Module._free(ptr);
-    if (render()) {
-      const p = textPtr();
-      const w = textW();
-      const h = textH();
-      const raw = Module.UTF8ToString(p);
-      ascii.textContent = raw.slice(0, w * h);
+    if (!api.render()) {
+      fatal("The SDL renderer stopped while drawing a frame.");
+      return;
     }
-    requestAnimationFrame(tick);
+    updateDiagnostics({ successfulFrames: diagnostics.successfulFrames + 1 });
+    schedulePresentationObservation();
+    rafId = requestAnimationFrame(frame);
   }
 
-  start().catch((err) => {
-    ascii.textContent = String(err);
-  });
-}
+  async function start() {
+    if (!diagnostics.runtimeReady || running || starting) return;
+    if (!window.isSecureContext) {
+      fatal("Camera access requires HTTPS or localhost.");
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      fatal("No camera is available in this browser.");
+      return;
+    }
+    const token = ++startToken;
+    starting = true;
+    setControls();
+    setStatus("Requesting camera permission…", "loading");
+    try {
+      const acquired = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      if (token !== startToken) {
+        acquired.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      stream = acquired;
+      video.srcObject = stream;
+      await new Promise((resolve) => video.addEventListener("loadedmetadata", resolve, { once: true }));
+      if (token !== startToken) return;
+      await video.play();
+      if (token !== startToken) return;
+      updateDiagnostics({ cameraReady: true, successfulFrames: 0, presentationObserved: false });
+      sessionInitialized = true;
+      if (!api.init(SOURCE_WIDTH, SOURCE_HEIGHT, 80, 30)) {
+        fatal("SDL could not initialize the visible canvas.");
+        return;
+      }
+      running = true;
+      starting = false;
+      updateDiagnostics({ sdlWebglReady: true });
+      setControls();
+      setStatus("Camera is running. Rendering locally.");
+      rafId = requestAnimationFrame(frame);
+    } catch (error) {
+      if (token !== startToken) return;
+      starting = false;
+      const denied = error && (error.name === "NotAllowedError" || error.name === "SecurityError");
+      fatal(denied ? "Camera permission was denied. Allow access and try again." : "No camera could be started. Check that one is connected and not in use.");
+    }
+  }
 
-if (typeof Module === "undefined") {
-  window.Module = {};
-}
-window.Module.onRuntimeInitialized = function () {
-  bootstrap(window.Module);
-};
+  function runtimeFailure(message) {
+    updateDiagnostics({ runtimeReady: false });
+    fatal(message);
+  }
+
+  startButton.addEventListener("click", start);
+  stopButton.addEventListener("click", () => stop());
+  window.addEventListener("pagehide", () => stop("Camera stopped because this page is closing.", "stopped"));
+
+  window.Module = {
+    canvas: visibleCanvas,
+    printErr: (message) => setStatus(`Renderer message: ${message}`, "error"),
+    onAbort: (message) => runtimeFailure(`Renderer failed to load: ${message}`),
+    onRuntimeInitialized() {
+      api = {
+        init: window.Module.cwrap("hasciicam_wasm_init", "number", ["number", "number", "number", "number"]),
+        submit: window.Module.cwrap("hasciicam_wasm_submit_rgba", "number", ["number", "number", "number", "number", "number"]),
+        render: window.Module.cwrap("hasciicam_wasm_render", "number", []),
+        shutdown: window.Module.cwrap("hasciicam_wasm_shutdown", null, [])
+      };
+      updateDiagnostics({ runtimeReady: true });
+      setControls();
+      setStatus("Renderer ready. Start the camera when you are ready.");
+    }
+  };
+})();
