@@ -14,9 +14,15 @@ This sample demonstrates a browser host around the shared HasciiCam core.
 Use the project preset:
 
 ```sh
+source /opt/emsdk/emsdk_env.sh
+EMSDK=/opt/emsdk EM_CACHE="$PWD/build/presets/wasm-emscripten/.emscripten-cache" \\
 cmake --preset wasm-emscripten
 cmake --build --preset wasm-emscripten --target hasciicam_wasm_sample
 ```
+
+The preset keeps Emscripten's SDL2 port cache under the build tree. The sample
+output directory contains `hasciicam.js`, `hasciicam.wasm`, `index.html`, and
+`main.js`; the HTML shell is source-controlled rather than Emscripten-generated.
 
 ## Runtime model
 
