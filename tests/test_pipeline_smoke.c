@@ -17,7 +17,8 @@ int main(void) {
     }
 
     if (hasciicam_start_external(instance, 0, 32, 32, 16) ||
-        hasciicam_start_external_live(instance, 64, 32, 32, 16, NULL)) {
+        hasciicam_start_external_live(instance, 64, 32, 32, 16, NULL) ||
+        hasciicam_start_external_live(instance, 64, 32, 32, 16, "missing-driver")) {
         fprintf(stderr, "invalid external start unexpectedly succeeded\n");
         hasciicam_destroy(instance);
         return 2;

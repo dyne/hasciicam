@@ -40,6 +40,8 @@ int hasciicam_render_session_open(hasciicam_render_session *session,
                                   int mode,
                                   const char *aadriver,
                                   int quiet);
+int hasciicam_render_session_open_exact_driver(hasciicam_render_session *session,
+                                               const char *aadriver);
 void hasciicam_render_session_apply_tuning(hasciicam_render_session *session,
                                            int bright,
                                            int contrast,

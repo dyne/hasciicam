@@ -73,3 +73,13 @@ void aa_flush(aa_context * c)
 	   aa_showmouse(c);
     }
 }
+
+int aa_flush_checked(aa_context *c)
+{
+    if (c == NULL || c->driver == NULL)
+        return 0;
+    aa_flush(c);
+    if (c->driver->flush_status != NULL)
+        return c->driver->flush_status(c);
+    return 1;
+}

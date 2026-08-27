@@ -122,6 +122,21 @@ int hasciicam_render_session_open(hasciicam_render_session *session,
     return session->context != NULL;
 }
 
+int hasciicam_render_session_open_exact_driver(hasciicam_render_session *session,
+                                               const char *aadriver) {
+    int i;
+    if (session == NULL || aadriver == NULL || aadriver[0] == '\0')
+        return 0;
+    for (i = 0; aa_drivers[i] != NULL; i++) {
+        if (strcmp(aadriver, aa_drivers[i]->name) == 0 ||
+            strcmp(aadriver, aa_drivers[i]->shortname) == 0) {
+            session->context = aa_init(aa_drivers[i], &session->hwparams, NULL);
+            return session->context != NULL;
+        }
+    }
+    return 0;
+}
+
 void hasciicam_render_session_apply_tuning(hasciicam_render_session *session,
                                            int bright,
                                            int contrast,

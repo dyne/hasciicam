@@ -23,6 +23,7 @@ struct sdldriverdata {
     int x_offset_px;
     int y_offset_px;
     int force_clear;
+    int last_flush_succeeded;
     
     int black_color;
     int dim_color;
