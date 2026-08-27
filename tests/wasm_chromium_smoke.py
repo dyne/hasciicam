@@ -70,7 +70,7 @@ def run_scenario(chromium, root, artifacts, scenario):
             "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
             "--enable-webgl",
             "--ignore-gpu-blocklist", "--run-all-compositor-stages-before-draw",
-            "--virtual-time-budget=15000", "--window-size=1280,800", url,
+            "--window-size=1280,800", url,
         ]
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                    text=True)
