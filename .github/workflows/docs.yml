@@ -6,6 +6,12 @@ on:
       - master
     paths:
       - docs/**
+      - CMakeLists.txt
+      - CMakePresets.json
+      - examples/wasm/**
+      - include/**
+      - src/**
+      - third_party/aalib/**
   workflow_dispatch:
 
 permissions:
@@ -37,6 +43,15 @@ jobs:
           cache: npm
           cache-dependency-path: docs/package-lock.json
 
+      - name: Setup Emscripten 4.0.1
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.1
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+        working-directory: ${{ github.workspace }}
+
       - name: Setup Pages
         uses: actions/configure-pages@v6
 
@@ -47,6 +62,15 @@ jobs:
         run: npm run build
         env:
           BASE_PATH: /hasciicam/
+
+      - name: Build browser demo
+        run: |
+          cmake --preset wasm-emscripten
+          cmake --build --preset wasm-emscripten --target hasciicam_wasm_sample
+          cmake -E copy_directory \
+            build/presets/wasm-emscripten/examples/wasm \
+            docs/.vitepress/dist/demo
+        working-directory: ${{ github.workspace }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
