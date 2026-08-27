@@ -75,21 +75,38 @@ if(HASCIICAM_ENABLE_VIRTUAL_CAMERA AND NOT HASCIICAM_ENABLE_SDL)
 endif()
 
 set(HASCIICAM_WITH_SDL OFF)
+set(HASCIICAM_SDL_TARGETS)
 set(HASCIICAM_WITH_X11 OFF)
 set(HASCIICAM_WITH_CURSES OFF)
 set(HASCIICAM_WITH_VIRTUAL_CAMERA OFF)
 
 if(HASCIICAM_ENABLE_SDL)
-  find_package(SDL2 QUIET)
-  if(TARGET SDL2::SDL2)
+  if(EMSCRIPTEN)
+    # Emscripten provides SDL2 as a packaged port rather than a CMake package.
+    # Keep the port request target-local so native SDL discovery remains unchanged.
+    add_library(hasciicam_emscripten_sdl2 INTERFACE)
+    target_compile_options(hasciicam_emscripten_sdl2 INTERFACE
+      "SHELL:--use-port=sdl2"
+    )
+    target_link_options(hasciicam_emscripten_sdl2 INTERFACE
+      "SHELL:--use-port=sdl2"
+    )
+    target_compile_definitions(hasciicam_emscripten_sdl2 INTERFACE SDL_DRIVER)
+    set(HASCIICAM_WITH_SDL ON)
+    list(APPEND HASCIICAM_SDL_TARGETS hasciicam_emscripten_sdl2)
+  else()
+    find_package(SDL2 QUIET)
+    if(TARGET SDL2::SDL2)
     set(HASCIICAM_WITH_SDL ON)
     add_compile_definitions(SDL_DRIVER)
-  else()
-    message(FATAL_ERROR
-      "HASCIICAM_ENABLE_SDL is ON, but CMake could not find SDL2. "
-      "Install SDL2 or pass -DHASCIICAM_ENABLE_SDL=OFF. "
-      "On Windows with vcpkg, configure with "
-      "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake.")
+      list(APPEND HASCIICAM_SDL_TARGETS SDL2::SDL2 SDL2::SDL2main)
+    else()
+      message(FATAL_ERROR
+        "HASCIICAM_ENABLE_SDL is ON, but CMake could not find SDL2. "
+        "Install SDL2 or pass -DHASCIICAM_ENABLE_SDL=OFF. "
+        "On Windows with vcpkg, configure with "
+        "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake.")
+    endif()
   endif()
 endif()
 
@@ -143,7 +160,13 @@ endif()
 
 # Link libraries to aalib
 if(HASCIICAM_WITH_SDL)
+  target_link_libraries(aalib PRIVATE ${HASCIICAM_SDL_TARGETS})
+  # aasdl.c uses the non-GUI bridge declarations even when the GUI overlay is
+  # disabled, so keep its narrow support headers available independently.
+  target_include_directories(aalib PRIVATE src/gui src/virtual_camera)
+  if(NOT EMSCRIPTEN)
     target_include_directories(aalib PRIVATE ${SDL2_INCLUDE_DIRS})
+  endif()
 endif()
 
 if(HASCIICAM_WITH_X11)
@@ -240,7 +263,7 @@ endif()
 
 # Link optional libraries to hasciicam core
 if(HASCIICAM_WITH_SDL)
-  target_link_libraries(hasciicam_core PUBLIC SDL2::SDL2 SDL2::SDL2main)
+  target_link_libraries(hasciicam_core PUBLIC ${HASCIICAM_SDL_TARGETS})
 endif()
 
 if(HASCIICAM_WITH_X11)
@@ -416,6 +439,7 @@ if(HASCIICAM_ENABLE_TESTS)
     target_compile_definitions(test_app_virtual_camera PRIVATE _CRT_SECURE_NO_WARNINGS)
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_sources(test_app_virtual_camera PRIVATE src/virtual_camera/linux/hasciicam_virtual_camera_v4l2.c)
+    target_compile_definitions(test_app_virtual_camera PRIVATE HASCIICAM_ENABLE_VIRTUAL_CAMERA=1)
   endif()
   add_test(NAME app_virtual_camera COMMAND test_app_virtual_camera)
   set_tests_properties(app_virtual_camera PROPERTIES LABELS "unit;core")

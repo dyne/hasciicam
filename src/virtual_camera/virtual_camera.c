@@ -110,7 +110,7 @@ int hasciicam_virtual_camera_validate_device_pair(const char *capture_device,
                                                   const char *output_device,
                                                   char *err,
                                                   size_t err_size) {
-#if defined(__linux__)
+#if defined(HASCIICAM_ENABLE_VIRTUAL_CAMERA) && defined(__linux__)
     return hasciicam_virtual_camera_v4l2_validate_device_pair(
         capture_device, output_device, err, err_size);
 #else

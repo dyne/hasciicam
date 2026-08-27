@@ -60,17 +60,23 @@
       "displayName": "WASM + Emscripten",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/presets/wasm-emscripten",
+      "environment": {
+        "EM_CACHE": "${sourceDir}/build/presets/wasm-emscripten/.emscripten-cache"
+      },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
         "HASCIICAM_BUILD_CLI": "OFF",
         "HASCIICAM_ENABLE_TESTS": "OFF",
-        "HASCIICAM_ENABLE_SDL": "OFF",
+        "HASCIICAM_ENABLE_SDL": "ON",
         "HASCIICAM_ENABLE_X11": "OFF",
         "HASCIICAM_ENABLE_CURSES": "OFF",
         "HASCIICAM_ENABLE_CAPTURE_V4L2": "OFF",
         "HASCIICAM_ENABLE_CAPTURE_MF": "OFF",
-        "HASCIICAM_ENABLE_CAPTURE_DSHOW": "OFF"
+        "HASCIICAM_ENABLE_CAPTURE_DSHOW": "OFF",
+        "HASCIICAM_ENABLE_CAPTURE_AVFOUNDATION": "OFF",
+        "HASCIICAM_ENABLE_GUI": "OFF",
+        "HASCIICAM_ENABLE_VIRTUAL_CAMERA": "OFF"
       }
     }
   ],

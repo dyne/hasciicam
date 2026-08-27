@@ -201,9 +201,11 @@ static void SDL_process_events(struct sdldriverdata *d)
 {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+#if defined(HASCIICAM_ENABLE_GUI)
         if (d != NULL && d->gui_ready) {
             hasciicam_gui_overlay_process_event(&event);
         }
+#endif
         if (event.type == SDL_QUIT) {
             raise(SIGINT);
             return;
@@ -213,6 +215,7 @@ static void SDL_process_events(struct sdldriverdata *d)
             raise(SIGINT);
             return;
         }
+#if defined(HASCIICAM_ENABLE_GUI)
         if (event.type == SDL_MOUSEBUTTONDOWN &&
             event.button.button == SDL_BUTTON_RIGHT &&
             d != NULL && d->gui_ready) {
@@ -223,12 +226,15 @@ static void SDL_process_events(struct sdldriverdata *d)
             }
             continue;
         }
+#endif
         if (event.type == SDL_KEYDOWN && d != NULL) {
             SDL_Keycode sym = event.key.keysym.sym;
             SDL_Keymod mod = event.key.keysym.mod;
+#if defined(HASCIICAM_ENABLE_GUI)
             if (d->gui_ready && d->gui_visible && hasciicam_gui_overlay_wants_keyboard()) {
                 continue;
             }
+#endif
             if (sym == SDLK_q ||
                 ((mod & KMOD_CTRL) && (sym == SDLK_q || sym == SDLK_c))) {
                 raise(SIGINT);
@@ -531,10 +537,12 @@ static void SDL_uninit(aa_context *c)
     if (!d)
         return;
     
+#if defined(HASCIICAM_ENABLE_GUI)
     if (d->gui_ready) {
         hasciicam_gui_overlay_shutdown();
         d->gui_ready = 0;
     }
+#endif
 
     if (d->previoust) {
         free(d->previoust);
@@ -777,11 +785,13 @@ static void SDL_flush(aa_context *c)
         SDL_RenderFillRect(d->renderer, &cursor_rect);
     }
 
+#if defined(HASCIICAM_ENABLE_GUI)
     if (d->gui_ready && d->gui_visible && d->gui_state != NULL) {
         hasciicam_gui_overlay_new_frame();
         hasciicam_gui_overlay_draw(d->gui_state);
         hasciicam_gui_overlay_render(d->renderer);
     }
+#endif
     SDL_RenderPresent(d->renderer);
     d->force_clear = 0;
 }
