@@ -194,6 +194,7 @@ struct aa_driver {
     void (*gotoxy) (struct aa_context *, int, int);
     void (*flush) (struct aa_context *);
     void (*cursormode) (struct aa_context *, int);
+    int (*flush_status) (struct aa_context *);
 };
 
 /*
@@ -648,6 +649,8 @@ void aa_renderpalette(aa_context * c, __AA_CONST aa_palette table,
 	       __AA_CONST aa_renderparams * p, int x1, int y1, int x2, int y2);
 aa_renderparams *aa_getrenderparams(void);
 void aa_flush(aa_context * c);
+/* Flush and report whether the selected driver completed its output operation. */
+int aa_flush_checked(aa_context *c);
 
 /* output string to AA-lib output buffers.
    Output given string to AA-lib output buffers.  To see the effect you need to

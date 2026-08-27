@@ -658,6 +658,7 @@ static void SDL_flush(aa_context *c)
     int new_x_offset;
     int new_y_offset;
 
+    d->last_flush_succeeded = 0;
     SDL_process_events(d);
 
     int scrwidth = aa_scrwidth(c);
@@ -770,7 +771,10 @@ static void SDL_flush(aa_context *c)
     }
 
     SDL_SetRenderDrawColor(d->renderer, 0, 0, 0, 255);
-    SDL_RenderClear(d->renderer);
+    if (SDL_RenderClear(d->renderer) != 0) {
+        fprintf(stderr, "SDL_RenderClear failed: %s\n", SDL_GetError());
+        return;
+    }
     {
         SDL_Rect dst = {
             d->x_offset_px,
@@ -778,7 +782,10 @@ static void SDL_flush(aa_context *c)
             content_px_w,
             content_px_h
         };
-        SDL_RenderCopy(d->renderer, d->stream_texture, NULL, &dst);
+        if (SDL_RenderCopy(d->renderer, d->stream_texture, NULL, &dst) != 0) {
+            fprintf(stderr, "SDL_RenderCopy failed: %s\n", SDL_GetError());
+            return;
+        }
     }
     if (d->cvisible) {
         SDL_SetRenderDrawColor(d->renderer, 255, 255, 255, 255);
@@ -800,6 +807,16 @@ static void SDL_flush(aa_context *c)
 #endif
     SDL_RenderPresent(d->renderer);
     d->force_clear = 0;
+    d->last_flush_succeeded = 1;
+}
+
+static int SDL_flush_status(aa_context *c)
+{
+    struct sdldriverdata *d;
+    if (c == NULL || c->driverdata == NULL)
+        return 0;
+    d = (struct sdldriverdata *)c->driverdata;
+    return d->last_flush_succeeded;
 }
 
 static void SDL_cursor(aa_context *c, int mode)
@@ -817,7 +834,8 @@ __AA_CONST struct aa_driver SDL_d = {
     NULL,
     SDL_gotoxy,
     SDL_flush,
-    SDL_cursor
+    SDL_cursor,
+    SDL_flush_status
 };
 
 static unsigned int clamp_rgb24(unsigned int rgb) {

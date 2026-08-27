@@ -405,6 +405,12 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME render_font COMMAND test_render_font)
   set_tests_properties(render_font PROPERTIES LABELS "unit;core")
 
+  add_executable(test_aa_flush_checked tests/test_aa_flush_checked.c)
+  target_include_directories(test_aa_flush_checked PRIVATE third_party/aalib)
+  target_link_libraries(test_aa_flush_checked PRIVATE aalib)
+  add_test(NAME aa_flush_checked COMMAND test_aa_flush_checked)
+  set_tests_properties(aa_flush_checked PROPERTIES LABELS "unit;core")
+
   add_executable(test_app_config
     tests/test_app_config.c
     src/app/app_config.c
@@ -730,7 +736,7 @@ if(EMSCRIPTEN)
           --root $<TARGET_FILE_DIR:hasciicam_wasm_sample>
           --artifacts ${CMAKE_CURRENT_BINARY_DIR}/wasm-chromium-smoke
       )
-      set_tests_properties(wasm_chromium_canvas PROPERTIES LABELS "wasm" TIMEOUT 60)
+      set_tests_properties(wasm_chromium_canvas PROPERTIES LABELS "wasm" TIMEOUT 120)
     endif()
   endif()
 endif()

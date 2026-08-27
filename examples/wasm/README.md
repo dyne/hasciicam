@@ -48,8 +48,10 @@ ctest --output-on-failure --test-dir build/presets/wasm-emscripten -L wasm
 
 The test's localhost-only `?autotest=1` mode clicks through its fake camera
 path and checks runtime readiness, camera transfer, multiple rendered frames,
-SDL/WebGL initialization, and presentation after a callback boundary. It is
-not real-camera coverage.
+SDL/WebGL initialization, and presentation after a callback boundary. It also
+checks stop/restart/page-hide cleanup, steady-state allocation reuse, and the
+permission-denied and missing-media-device error paths. It is not real-camera
+coverage.
 
 ## Manual real-camera checklist
 

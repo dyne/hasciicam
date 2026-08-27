@@ -80,7 +80,7 @@ static int hasciicam_start_external_common(hasciicam_instance *instance,
     instance->render.hwparams.height = ascii_height;
     if (live_output) {
         if (aa_driver == NULL || aa_driver[0] == '\0' ||
-            !hasciicam_render_session_open(&instance->render, 0, aa_driver, 1)) {
+            !hasciicam_render_session_open_exact_driver(&instance->render, aa_driver)) {
             hasciicam_session_stop(&instance->session);
             return 0;
         }
@@ -159,8 +159,8 @@ int hasciicam_render_frame(hasciicam_instance *instance) {
     aa_fastrender(instance->render.context, 0, 0,
                   aa_imgwidth(instance->render.context) / 2,
                   aa_imgheight(instance->render.context) / 2);
-    if (instance->live_output)
-        aa_flush(instance->render.context);
+    if (instance->live_output && !aa_flush_checked(instance->render.context))
+        return 0;
     return 1;
 }
 
