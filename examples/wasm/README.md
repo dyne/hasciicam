@@ -1,33 +1,68 @@
-# WASM browser sample
+# WASM SDL2 browser camera sample
 
-This sample demonstrates a browser host around the shared HasciiCam core.
+This sample renders live camera luminance as ASCII in SDL2's visible
+`<canvas id="canvas">`. JavaScript owns the one `requestAnimationFrame` loop:
+it transfers RGBA pixels from a hidden source canvas to the shared C core, then
+returns to the browser after each SDL presentation. SDL's `SDL_Window *` maps
+to `#canvas`; its GLES2 renderer maps to browser WebGL.
 
-## Layout
+## Build and serve
 
-- `wasm_entry.c`: C exports used by JavaScript host code.
-- `index.html`: browser UI shell.
-- `main.js`: acquires camera frames and submits them to core.
-- `CMakeLists.txt`: Emscripten build wiring.
-
-## Build
-
-Use the project preset:
+Emscripten 4.0.1 and Ninja are required. The verified SDK location in this
+repository is `/opt/emsdk`; retain the build-local cache because the shared SDK
+cache may not be writable.
 
 ```sh
 source /opt/emsdk/emsdk_env.sh
-EMSDK=/opt/emsdk EM_CACHE="$PWD/build/presets/wasm-emscripten/.emscripten-cache" \\
+export EMSDK=/opt/emsdk
+export EM_CACHE="$PWD/build/presets/wasm-emscripten/.emscripten-cache"
 cmake --preset wasm-emscripten
 cmake --build --preset wasm-emscripten --target hasciicam_wasm_sample
+python3 -m http.server --directory build/presets/wasm-emscripten/examples/wasm 8000
 ```
 
-The preset keeps Emscripten's SDL2 port cache under the build tree. The sample
-output directory contains `hasciicam.js`, `hasciicam.wasm`, `index.html`, and
-`main.js`; the HTML shell is source-controlled rather than Emscripten-generated.
+Open `http://127.0.0.1:8000/` in a current Chrome/Chromium or Firefox build.
+Do not open the page with `file://`: Emscripten assets and camera permissions
+need a served origin. Loopback is a secure development context; use HTTPS when
+hosting elsewhere. The output directory contains source-controlled `index.html`
+and `main.js` plus generated `hasciicam.js` and `hasciicam.wasm`.
 
-## Runtime model
+Select **Start camera**, grant video permission, and confirm that the 640×480
+canvas shows moving ASCII. Select **Stop camera** before leaving; Stop and page
+close release every camera track. The page does not send frames to a server.
 
-1. Browser `getUserMedia` captures camera frames.
-2. JavaScript reads RGBA pixels from a hidden canvas.
-3. JS passes RGBA bytes to C exports.
-4. Core renders ASCII from the submitted frame.
-5. JS prints ASCII into a `<pre>` tag.
+## Automated Chromium smoke
+
+The CTest browser gate is deliberately opt-in and does not use real hardware.
+It starts an ephemeral localhost server, opens Chromium headlessly with fake
+media and permission flags, and records a log plus screenshot under the build
+tree. Provide the browser executable explicitly:
+
+```sh
+cmake --preset wasm-emscripten \\
+  -DHASCIICAM_ENABLE_WASM_BROWSER_TESTS=ON \\
+  -DHASCIICAM_TEST_CHROMIUM="$(command -v chromium)"
+cmake --build --preset wasm-emscripten --target hasciicam_wasm_sample
+ctest --output-on-failure --test-dir build/presets/wasm-emscripten -L wasm
+```
+
+The test's localhost-only `?autotest=1` mode clicks through its fake camera
+path and checks runtime readiness, camera transfer, multiple rendered frames,
+SDL/WebGL initialization, and presentation after a callback boundary. It is
+not real-camera coverage.
+
+## Manual real-camera checklist
+
+- Serve the generated directory from localhost or HTTPS, then use Chrome or
+  Firefox with a real camera attached.
+- Start with keyboard focus on **Start camera**; allow the permission request.
+- Verify live ASCII updates on the 640×480 SDL canvas and browser DevTools has
+  no WebGL errors.
+- Select **Stop camera**, then close the page; verify the browser's camera-use
+  indicator turns off.
+
+If permission is denied, reset the site's camera permission and retry. For a
+blank canvas, confirm WebGL is enabled and inspect the browser log produced by
+the CTest. For cache permission errors, export the build-local `EM_CACHE`
+above. A server must return `.wasm` as `application/wasm`; Python's standard
+library server does so on supported Python installations.

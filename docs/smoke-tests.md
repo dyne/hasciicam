@@ -2,6 +2,28 @@
 
 This file collects short manual checks for supported host paths.
 
+## WASM SDL2 browser camera
+
+Build with the Emscripten preset and serve the generated sample; do not use
+`file://` for WASM or camera testing:
+
+```sh
+source /opt/emsdk/emsdk_env.sh
+export EMSDK=/opt/emsdk
+export EM_CACHE="$PWD/build/presets/wasm-emscripten/.emscripten-cache"
+cmake --preset wasm-emscripten
+cmake --build --preset wasm-emscripten --target hasciicam_wasm_sample
+python3 -m http.server --directory build/presets/wasm-emscripten/examples/wasm 8000
+```
+
+Open `http://127.0.0.1:8000/`, start a real camera, verify live ASCII on the
+640×480 SDL canvas, then Stop or close the page and confirm camera release.
+For deterministic fake-camera coverage, configure with
+`-DHASCIICAM_ENABLE_WASM_BROWSER_TESTS=ON` and
+`-DHASCIICAM_TEST_CHROMIUM="$(command -v chromium)"`, build the sample, then
+run `ctest --output-on-failure --test-dir build/presets/wasm-emscripten -L wasm`.
+The Chromium test is automated presentation coverage, not a real-camera test.
+
 ## Deterministic CLI (no camera required)
 
 Build and run full deterministic CLI suite:

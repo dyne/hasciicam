@@ -29,6 +29,8 @@
     sdlWebglReady: false,
     presentationObserved: false
   };
+  const autotestMode = new URLSearchParams(window.location.search).get("autotest") === "1" &&
+    ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname);
 
   function updateDiagnostics(changes) {
     Object.assign(diagnostics, changes);
@@ -191,6 +193,7 @@
       updateDiagnostics({ runtimeReady: true });
       setControls();
       setStatus("Renderer ready. Start the camera when you are ready.");
+      if (autotestMode) window.setTimeout(start, 0);
     }
   };
 })();
