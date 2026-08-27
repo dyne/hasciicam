@@ -12,6 +12,7 @@ struct hasciicam_instance {
     hasciicam_session session;
     hasciicam_render_session render;
     int started;
+    int live_output;
 };
 
 static capture_pixel_format map_pixel_format(hasciicam_pixel_format format) {
@@ -52,11 +53,13 @@ void hasciicam_destroy(hasciicam_instance *instance) {
     free(instance);
 }
 
-int hasciicam_start_external(hasciicam_instance *instance,
-                             int camera_width,
-                             int camera_height,
-                             int ascii_width,
-                             int ascii_height) {
+static int hasciicam_start_external_common(hasciicam_instance *instance,
+                                           int camera_width,
+                                           int camera_height,
+                                           int ascii_width,
+                                           int ascii_height,
+                                           int live_output,
+                                           const char *aa_driver) {
     capture_request req;
     if (instance == NULL || camera_width <= 0 || camera_height <= 0 ||
         ascii_width <= 0 || ascii_height <= 0)
@@ -75,14 +78,42 @@ int hasciicam_start_external(hasciicam_instance *instance,
     hasciicam_render_session_configure_geometry(&instance->render, ascii_width, ascii_height);
     instance->render.hwparams.width = ascii_width;
     instance->render.hwparams.height = ascii_height;
-    instance->render.context = aa_init(&mem_d, &instance->render.hwparams, NULL);
+    if (live_output) {
+        if (aa_driver == NULL || aa_driver[0] == '\0' ||
+            !hasciicam_render_session_open(&instance->render, 0, aa_driver, 1)) {
+            hasciicam_session_stop(&instance->session);
+            return 0;
+        }
+    } else {
+        instance->render.context = aa_init(&mem_d, &instance->render.hwparams, NULL);
+    }
     if (instance->render.context == NULL) {
         hasciicam_session_stop(&instance->session);
         return 0;
     }
 
     instance->started = 1;
+    instance->live_output = live_output;
     return 1;
+}
+
+int hasciicam_start_external(hasciicam_instance *instance,
+                             int camera_width,
+                             int camera_height,
+                             int ascii_width,
+                             int ascii_height) {
+    return hasciicam_start_external_common(instance, camera_width, camera_height,
+                                           ascii_width, ascii_height, 0, NULL);
+}
+
+int hasciicam_start_external_live(hasciicam_instance *instance,
+                                  int camera_width,
+                                  int camera_height,
+                                  int ascii_width,
+                                  int ascii_height,
+                                  const char *aa_driver) {
+    return hasciicam_start_external_common(instance, camera_width, camera_height,
+                                           ascii_width, ascii_height, 1, aa_driver);
 }
 
 void hasciicam_stop(hasciicam_instance *instance) {
@@ -91,6 +122,7 @@ void hasciicam_stop(hasciicam_instance *instance) {
     hasciicam_session_stop(&instance->session);
     hasciicam_render_session_close(&instance->render);
     instance->started = 0;
+    instance->live_output = 0;
 }
 
 int hasciicam_submit_frame(hasciicam_instance *instance,
@@ -127,6 +159,8 @@ int hasciicam_render_frame(hasciicam_instance *instance) {
     aa_fastrender(instance->render.context, 0, 0,
                   aa_imgwidth(instance->render.context) / 2,
                   aa_imgheight(instance->render.context) / 2);
+    if (instance->live_output)
+        aa_flush(instance->render.context);
     return 1;
 }
 

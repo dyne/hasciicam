@@ -28,6 +28,13 @@ int hasciicam_start_external(hasciicam_instance *instance,
                              int camera_height,
                              int ascii_width,
                              int ascii_height);
+/* Start an externally-fed session that presents through an AA-lib display driver. */
+int hasciicam_start_external_live(hasciicam_instance *instance,
+                                  int camera_width,
+                                  int camera_height,
+                                  int ascii_width,
+                                  int ascii_height,
+                                  const char *aa_driver);
 void hasciicam_stop(hasciicam_instance *instance);
 
 int hasciicam_submit_frame(hasciicam_instance *instance,

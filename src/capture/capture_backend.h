@@ -8,5 +8,6 @@ int capture_open_default(const capture_request *req,
                          capture_device **out_dev,
                          const capture_ops **out_ops);
 const char *capture_last_error(void);
+int hasciicam_capture_is_quiet(void);
 
 #endif
