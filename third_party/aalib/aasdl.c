@@ -432,7 +432,13 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     
     int win_width = d->width * d->char_width;
     int win_height = d->height * d->char_height;
+    Uint32 window_flags = SDL_WINDOW_SHOWN;
     SDL_Rect usable_bounds;
+
+#if !defined(__EMSCRIPTEN__)
+    /* Browser CSS scales the fixed AA grid; native windows remain resizable. */
+    window_flags |= SDL_WINDOW_RESIZABLE;
+#endif
 
     /* Keep initial window inside primary usable display bounds. */
     if (SDL_GetDisplayUsableBounds(0, &usable_bounds) == 0 &&
@@ -446,7 +452,7 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     d->window = SDL_CreateWindow(HASCIICAM_APP_TITLE,
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
         win_width, win_height,
-        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+        window_flags);
     
     if (!d->window) {
         fprintf(stderr, "SDL window creation failed: %s\n", SDL_GetError());
