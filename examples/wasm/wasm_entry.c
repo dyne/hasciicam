@@ -24,7 +24,7 @@ int hasciicam_wasm_submit_rgba(const unsigned char *data, size_t data_size, int 
     if (g_instance == NULL) {
         return 0;
     }
-    return hasciicam_submit_frame(g_instance, data, data_size, width, height, stride, HASCIICAM_PIXFMT_BGRA32);
+    return hasciicam_submit_frame(g_instance, data, data_size, width, height, stride, HASCIICAM_PIXFMT_RGB32);
 }
 
 int hasciicam_wasm_render(void) {

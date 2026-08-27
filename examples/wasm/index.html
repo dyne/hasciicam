@@ -3,13 +3,42 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HasciiCam WASM Sample</title>
+  <title>HasciiCam camera</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101418; color: #f4f7fa; }
+    body { margin: 0; }
+    main { box-sizing: border-box; display: grid; gap: 1rem; margin: 0 auto; max-width: 52rem; padding: 1.5rem; }
+    h1 { font-size: 1.5rem; margin: 0; }
+    p { color: #c6d0d9; line-height: 1.5; margin: 0; max-width: 65ch; }
+    .controls { display: flex; flex-wrap: wrap; gap: .75rem; }
+    button { background: #3d8bff; border: 1px solid #3d8bff; border-radius: .4rem; color: #07111f; cursor: pointer; font: inherit; font-weight: 700; padding: .6rem .9rem; }
+    button:hover:not(:disabled) { background: #75aaff; border-color: #75aaff; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    button.secondary { background: transparent; color: #f4f7fa; }
+    button:focus-visible { outline: 3px solid #f6c94c; outline-offset: 3px; }
+    #status { background: #1b242c; border-radius: .4rem; color: #e6edf3; min-height: 1.5rem; padding: .6rem .75rem; }
+    #status[data-state="error"] { color: #ffd4d1; }
+    #canvas { background: #000; display: block; height: auto; max-width: 100%; width: 100%; aspect-ratio: 4 / 3; }
+    .visually-hidden { height: 1px; margin: -1px; overflow: hidden; position: absolute; width: 1px; clip: rect(0 0 0 0); white-space: nowrap; }
+    @media (max-width: 32rem) { main { padding: 1rem; } }
+  </style>
 </head>
 <body>
-  <video id="cam" autoplay playsinline style="display:none"></video>
-  <canvas id="src" width="320" height="240" style="display:none"></canvas>
-  <pre id="ascii"></pre>
-  <script src="hasciicam.js"></script>
+  <main id="hasciicam-app" data-runtime-ready="false" data-camera-ready="false" data-successful-frames="0" data-sdl-webgl-ready="false" data-presentation-observed="false">
+    <header>
+      <h1>HasciiCam camera</h1>
+      <p>Your camera stays in this browser tab. Frames are rendered locally into the canvas below.</p>
+    </header>
+    <div class="controls" aria-label="Camera controls">
+      <button id="start" type="button" disabled>Start camera</button>
+      <button id="stop" class="secondary" type="button" disabled>Stop camera</button>
+    </div>
+    <p id="status" role="status" aria-live="polite" data-state="loading">Loading the renderer…</p>
+    <canvas id="canvas" width="640" height="480" aria-label="Live ASCII camera output"></canvas>
+    <video id="camera-video" class="visually-hidden" autoplay muted playsinline></video>
+    <canvas id="source-canvas" class="visually-hidden" width="320" height="240" aria-hidden="true"></canvas>
+  </main>
   <script src="main.js"></script>
+  <script src="hasciicam.js"></script>
 </body>
 </html>
