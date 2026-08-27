@@ -21,12 +21,15 @@
   let startToken = 0;
   let sessionInitialized = false;
   let presentationPending = false;
+  let initialCanvasSnapshot = "";
 
   const diagnostics = window.hasciicamWasmState = {
     runtimeReady: false,
     cameraReady: false,
     successfulFrames: 0,
     sdlWebglReady: false,
+    canvasNonblank: false,
+    canvasChanged: false,
     presentationObserved: false
   };
   const autotestMode = new URLSearchParams(window.location.search).get("autotest") === "1" &&
@@ -38,6 +41,8 @@
     app.dataset.cameraReady = String(diagnostics.cameraReady);
     app.dataset.successfulFrames = String(diagnostics.successfulFrames);
     app.dataset.sdlWebglReady = String(diagnostics.sdlWebglReady);
+    app.dataset.canvasNonblank = String(diagnostics.canvasNonblank);
+    app.dataset.canvasChanged = String(diagnostics.canvasChanged);
     app.dataset.presentationObserved = String(diagnostics.presentationObserved);
   }
 
@@ -79,7 +84,8 @@
     shutdownSession();
     freeTransfer();
     presentationPending = false;
-    updateDiagnostics({ cameraReady: false, sdlWebglReady: false, presentationObserved: false });
+    initialCanvasSnapshot = "";
+    updateDiagnostics({ cameraReady: false, sdlWebglReady: false, canvasNonblank: false, canvasChanged: false, presentationObserved: false });
     setControls();
     setStatus(message, state);
   }
@@ -89,11 +95,35 @@
   }
 
   function schedulePresentationObservation() {
-    if (presentationPending) return;
+    if (presentationPending || diagnostics.presentationObserved) return;
     presentationPending = true;
-    requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
       presentationPending = false;
-      if (running) updateDiagnostics({ presentationObserved: true });
+      if (!running) return;
+      try {
+        const snapshot = visibleCanvas.toDataURL("image/png");
+        const changed = snapshot !== initialCanvasSnapshot;
+        const bitmap = await createImageBitmap(visibleCanvas);
+        const probe = document.createElement("canvas");
+        probe.width = bitmap.width;
+        probe.height = bitmap.height;
+        const probeContext = probe.getContext("2d");
+        probeContext.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        const pixels = probeContext.getImageData(0, 0, probe.width, probe.height).data;
+        let nonblank = false;
+        for (let offset = 4; offset < pixels.length; offset += 4) {
+          if (pixels[offset] !== pixels[0] || pixels[offset + 1] !== pixels[1] ||
+              pixels[offset + 2] !== pixels[2] || pixels[offset + 3] !== pixels[3]) {
+            nonblank = true;
+            break;
+          }
+        }
+        updateDiagnostics({ canvasNonblank: nonblank, canvasChanged: changed,
+                            presentationObserved: changed && nonblank });
+      } catch (error) {
+        fatal("The browser could not verify canvas presentation.");
+      }
     });
   }
 
@@ -150,12 +180,19 @@
       if (token !== startToken) return;
       await video.play();
       if (token !== startToken) return;
-      updateDiagnostics({ cameraReady: true, successfulFrames: 0, presentationObserved: false });
+      updateDiagnostics({ cameraReady: true, successfulFrames: 0, canvasNonblank: false,
+                          canvasChanged: false, presentationObserved: false });
       sessionInitialized = true;
       if (!api.init(SOURCE_WIDTH, SOURCE_HEIGHT, 80, 30)) {
         fatal("SDL could not initialize the visible canvas.");
         return;
       }
+      const webgl = visibleCanvas.getContext("webgl");
+      if (!webgl || !(webgl instanceof WebGLRenderingContext)) {
+        fatal("SDL did not create the required WebGL canvas renderer.");
+        return;
+      }
+      initialCanvasSnapshot = visibleCanvas.toDataURL("image/png");
       running = true;
       starting = false;
       updateDiagnostics({ sdlWebglReady: true });
