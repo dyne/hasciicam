@@ -106,27 +106,27 @@ def run_scenario(chromium, root, artifacts, scenario):
             f"browser scenario {scenario} sent an invalid completion signal: "
             f"{completion!r}; see {completion_path}")
     states = completion.get("states", {})
-    if states.get("test-complete") != "true" or states.get("test-passed") != "true":
+    if states.get("testComplete") != "true" or states.get("testPassed") != "true":
         raise RuntimeError(
             f"browser scenario {scenario} did not complete successfully "
-            f"(error-kind={states.get('error-kind')!r}, "
-            f"successful-frames={states.get('successful-frames')!r}); "
+            f"(error-kind={states.get('errorKind')!r}, "
+            f"successful-frames={states.get('successfulFrames')!r}); "
             f"see {completion_path}")
     if scenario == "lifecycle":
         expected = {
-            "allocation-count": "2", "free-count": "2", "active-render-loops": "0",
-            "max-active-render-loops": "1", "active-streams": "0", "max-active-streams": "1",
-            "shutdown-count": "2", "restart-count": "1", "error-kind": "none",
+            "allocationCount": "2", "freeCount": "2", "activeRenderLoops": "0",
+            "maxActiveRenderLoops": "1", "activeStreams": "0", "maxActiveStreams": "1",
+            "shutdownCount": "2", "restartCount": "1", "errorKind": "none",
         }
         for name, value in expected.items():
             if states.get(name) != value:
                 raise RuntimeError(f"browser state {name}={states.get(name)!r}, expected {value!r}; see {log_path}")
-        if int(states.get("successful-frames", "0")) < 6:
+        if int(states.get("successfulFrames", "0")) < 6:
             raise RuntimeError(f"browser did not render both lifecycle sessions; see {log_path}")
-        if int(states.get("presentation-count", "0")) < 1:
+        if int(states.get("presentationCount", "0")) < 1:
             raise RuntimeError(f"browser did not observe SDL canvas presentation; see {log_path}")
-    elif states.get("error-kind") != scenario:
-        raise RuntimeError(f"browser error-kind={states.get('error-kind')!r}, expected {scenario!r}; see {log_path}")
+    elif states.get("errorKind") != scenario:
+        raise RuntimeError(f"browser error-kind={states.get('errorKind')!r}, expected {scenario!r}; see {log_path}")
 
 
 def main():
