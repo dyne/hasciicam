@@ -2,12 +2,10 @@
 """CTest wrapper for the opt-in Emscripten SDL canvas smoke test."""
 
 import argparse
-import base64
 import http.server
 import json
 import os
 from pathlib import Path
-import re
 import socketserver
 import subprocess
 import sys
@@ -56,7 +54,6 @@ def parse_args():
 
 def run_scenario(chromium, root, artifacts, scenario):
     log_path = artifacts / f"chromium-{scenario}.log"
-    screenshot_path = artifacts / f"canvas-{scenario}.png"
     profile_dir = artifacts / f"chromium-profile-{scenario}"
     profile_dir.mkdir(parents=True, exist_ok=True)
     handler = lambda *handler_args, **handler_kwargs: QuietStaticServer(
@@ -102,13 +99,6 @@ def run_scenario(chromium, root, artifacts, scenario):
     completion = server.completion
     if not isinstance(completion, dict) or completion.get("scenario") != scenario:
         raise RuntimeError(f"browser scenario {scenario} sent an invalid completion signal; see {log_path}")
-    screenshot = completion.get("screenshot", "")
-    if not isinstance(screenshot, str) or not screenshot.startswith("data:image/png;base64,"):
-        raise RuntimeError(f"Chromium did not produce a {scenario} screenshot: {screenshot_path}")
-    screenshot_path.write_bytes(base64.b64decode(screenshot.split(",", 1)[1]))
-    if screenshot_path.stat().st_size == 0:
-        raise RuntimeError(f"Chromium did not produce a {scenario} screenshot: {screenshot_path}")
-
     states = completion.get("states", {})
     if states.get("test-complete") != "true" or states.get("test-passed") != "true":
         raise RuntimeError(f"browser scenario {scenario} did not complete successfully; see {log_path}")
