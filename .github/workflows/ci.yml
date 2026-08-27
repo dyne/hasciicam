@@ -47,6 +47,16 @@ jobs:
       - name: Run Chromium canvas smoke
         run: ctest --output-on-failure --test-dir build/presets/wasm-emscripten -L wasm
 
+      - name: Show Chromium smoke diagnostics
+        if: ${{ failure() }}
+        run: |
+          log=build/presets/wasm-emscripten/wasm-chromium-smoke/chromium-lifecycle.log
+          if [ -f "$log" ]; then
+            echo "::group::Chromium lifecycle log"
+            cat "$log"
+            echo "::endgroup::"
+          fi
+
       - name: Upload WASM browser artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
