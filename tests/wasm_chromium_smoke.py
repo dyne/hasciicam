@@ -50,7 +50,10 @@ def run_scenario(chromium, root, artifacts, scenario):
             completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                        text=True, timeout=45, check=False)
         except subprocess.TimeoutExpired as error:
-            log_path.write_text(error.stdout or "Chromium timed out.\n", encoding="utf-8")
+            output = error.stdout or "Chromium timed out.\n"
+            if isinstance(output, bytes):
+                output = output.decode("utf-8", errors="replace")
+            log_path.write_text(output, encoding="utf-8")
             raise RuntimeError(f"Chromium {scenario} timed out after 45 seconds") from error
         finally:
             server.shutdown()
