@@ -28,6 +28,8 @@ def parse_args():
 def run_scenario(chromium, root, artifacts, scenario):
     log_path = artifacts / f"chromium-{scenario}.log"
     screenshot_path = artifacts / f"canvas-{scenario}.png"
+    profile_dir = artifacts / f"chromium-profile-{scenario}"
+    profile_dir.mkdir(parents=True, exist_ok=True)
     handler = lambda *handler_args, **handler_kwargs: QuietStaticServer(
         *handler_args, directory=str(root), **handler_kwargs)
     with socketserver.TCPServer(("127.0.0.1", 0), handler) as server:
@@ -36,6 +38,8 @@ def run_scenario(chromium, root, artifacts, scenario):
         url = f"http://127.0.0.1:{server.server_address[1]}/index.html?autotest=1&scenario={scenario}"
         command = [
             str(chromium), "--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
+            "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+            f"--user-data-dir={profile_dir}",
             "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream",
             "--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl",
             "--ignore-gpu-blocklist", "--run-all-compositor-stages-before-draw",
