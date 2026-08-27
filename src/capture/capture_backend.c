@@ -19,6 +19,10 @@
 int quiet = 0;
 static char g_capture_last_error[160];
 
+int hasciicam_capture_is_quiet(void) {
+    return quiet;
+}
+
 static void capture_set_last_error(const char *message) {
     if (message == NULL || message[0] == '\0') {
         g_capture_last_error[0] = '\0';

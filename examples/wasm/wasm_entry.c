@@ -16,7 +16,8 @@ int hasciicam_wasm_init(int camera_width, int camera_height, int ascii_width, in
     if (g_instance == NULL) {
         return 0;
     }
-    return hasciicam_start_external(g_instance, camera_width, camera_height, ascii_width, ascii_height);
+    return hasciicam_start_external_live(g_instance, camera_width, camera_height,
+                                         ascii_width, ascii_height, "SDL");
 }
 
 int hasciicam_wasm_submit_rgba(const unsigned char *data, size_t data_size, int width, int height, int stride) {

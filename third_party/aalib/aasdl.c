@@ -9,6 +9,7 @@
 #include "aaint.h"
 #include "aasdlint.h"
 #include "gui_bridge.h"
+#include "../../src/capture/capture_backend.h"
 #include "../../src/virtual_camera/virtual_camera.h"
 #include "../render/render_font.h"
 #if defined(HASCIICAM_ENABLE_GUI)
@@ -16,7 +17,6 @@
 #endif
 
 __AA_CONST struct aa_driver SDL_d;
-extern int quiet;
 
 #ifndef HASCIICAM_APP_TITLE
 #define HASCIICAM_APP_TITLE "hasciicam"
@@ -33,6 +33,12 @@ static void SDL_apply_runtime_colors(struct sdldriverdata *d,
 static int SDL_env_is(const char *value, const char *expected)
 {
     return value != NULL && expected != NULL && SDL_strcasecmp(value, expected) == 0;
+}
+
+/* The SDL driver is also linked by embedders that do not build the CLI. */
+static int SDL_quiet(void)
+{
+    return hasciicam_capture_is_quiet();
 }
 
 static Uint32 SDL_renderer_flags_from_env(void)
@@ -69,7 +75,7 @@ static int SDL_fullscreen_from_env(void)
 static void SDL_log_renderer_info(SDL_Renderer *renderer, Uint32 requested_flags)
 {
     SDL_RendererInfo info;
-    if (renderer == NULL || quiet)
+    if (renderer == NULL || SDL_quiet())
         return;
     if (SDL_GetRendererInfo(renderer, &info) == 0) {
         fprintf(stderr,
@@ -466,7 +472,7 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     dest->width = d->width;
     dest->height = d->height;
 
-    if (!quiet) {
+    if (!SDL_quiet()) {
         fprintf(stderr,
                 "SDL window size: %dx%d px (cell %dx%d px, grid %dx%d chars)\n",
                 actual_width, actual_height,

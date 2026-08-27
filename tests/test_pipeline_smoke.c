@@ -16,6 +16,20 @@ int main(void) {
         return 1;
     }
 
+    if (hasciicam_start_external(instance, 0, 32, 32, 16) ||
+        hasciicam_start_external_live(instance, 64, 32, 32, 16, NULL)) {
+        fprintf(stderr, "invalid external start unexpectedly succeeded\n");
+        hasciicam_destroy(instance);
+        return 2;
+    }
+
+    if (!hasciicam_start_external(instance, 64, 32, 32, 16)) {
+        fprintf(stderr, "zero-frame start failed\n");
+        hasciicam_destroy(instance);
+        return 2;
+    }
+    hasciicam_stop(instance);
+
     for (i = 0; i < (int)sizeof(frame); i++) {
         frame[i] = (unsigned char)((i * 13) & 0xFF);
     }
@@ -32,6 +46,16 @@ int main(void) {
     }
     if (!hasciicam_render_frame(instance)) {
         fprintf(stderr, "render failed\n");
+        hasciicam_destroy(instance);
+        return 4;
+    }
+    if (!hasciicam_submit_frame(instance, frame, sizeof(frame), 64, 32, 64, HASCIICAM_PIXFMT_GRAY8)) {
+        fprintf(stderr, "second submit failed\n");
+        hasciicam_destroy(instance);
+        return 4;
+    }
+    if (!hasciicam_render_frame(instance)) {
+        fprintf(stderr, "repeated render failed\n");
         hasciicam_destroy(instance);
         return 4;
     }
