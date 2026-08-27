@@ -42,6 +42,7 @@
     maxActiveStreams: 0,
     shutdownCount: 0,
     restartCount: 0,
+    rendererMessage: "",
     errorKind: "none",
     testComplete: false,
     testPassed: false
@@ -68,6 +69,7 @@
     app.dataset.maxActiveStreams = String(diagnostics.maxActiveStreams);
     app.dataset.shutdownCount = String(diagnostics.shutdownCount);
     app.dataset.restartCount = String(diagnostics.restartCount);
+    app.dataset.rendererMessage = diagnostics.rendererMessage;
     app.dataset.errorKind = diagnostics.errorKind;
     app.dataset.testComplete = String(diagnostics.testComplete);
     app.dataset.testPassed = String(diagnostics.testPassed);
@@ -316,7 +318,11 @@
 
   window.Module = {
     canvas: visibleCanvas,
-    printErr: (message) => setStatus(`Renderer message: ${message}`, "error"),
+    printErr(message) {
+      const rendererMessage = String(message);
+      updateDiagnostics({ rendererMessage });
+      setStatus(`Renderer message: ${rendererMessage}`, "error");
+    },
     onAbort: (message) => runtimeFailure(`Renderer failed to load: ${message}`),
     onRuntimeInitialized() {
       api = {

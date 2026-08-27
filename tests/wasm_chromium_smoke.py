@@ -110,7 +110,8 @@ def run_scenario(chromium, root, artifacts, scenario):
         raise RuntimeError(
             f"browser scenario {scenario} did not complete successfully "
             f"(error-kind={states.get('errorKind')!r}, "
-            f"successful-frames={states.get('successfulFrames')!r}); "
+            f"successful-frames={states.get('successfulFrames')!r}, "
+            f"renderer-message={states.get('rendererMessage')!r}); "
             f"see {completion_path}")
     if scenario == "lifecycle":
         expected = {
