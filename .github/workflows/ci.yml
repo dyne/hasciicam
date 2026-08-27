@@ -21,13 +21,13 @@ jobs:
         with:
           version: 4.0.1
 
-      - name: Install Ninja and Chromium
-        run: sudo apt-get update && sudo apt-get install -y ninja-build chromium
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
       - name: Record WASM tool versions
         run: |
           emcc --version
-          /usr/bin/chromium --version
+          /usr/bin/google-chrome --version
 
       - name: Restore Emscripten port cache
         uses: actions/cache@v4
@@ -39,7 +39,7 @@ jobs:
         run: >
           cmake --preset wasm-emscripten
           -DHASCIICAM_ENABLE_WASM_BROWSER_TESTS=ON
-          -DHASCIICAM_TEST_CHROMIUM=/usr/bin/chromium
+          -DHASCIICAM_TEST_CHROMIUM=/usr/bin/google-chrome
 
       - name: Build browser sample
         run: cmake --build --preset wasm-emscripten --target hasciicam_wasm_sample --verbose
