@@ -46,6 +46,9 @@ jobs:
 
       - name: Run Chromium canvas smoke
         run: ctest --output-on-failure --test-dir build/presets/wasm-emscripten -L wasm
+        env:
+          XDG_CONFIG_HOME: ${{ runner.temp }}/chromium-config
+          XDG_CACHE_HOME: ${{ runner.temp }}/chromium-cache
 
       - name: Show Chromium smoke diagnostics
         if: ${{ failure() }}

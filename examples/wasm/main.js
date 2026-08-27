@@ -135,7 +135,16 @@
 
   function finishAutotest(changes) {
     updateDiagnostics(changes);
-    window.setTimeout(() => window.close(), 0);
+    const completion = {
+      scenario: autotestScenario,
+      states: Object.fromEntries(Object.entries(app.dataset)),
+      screenshot: visibleCanvas.toDataURL("image/png")
+    };
+    window.fetch("/_hasciicam_test_complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(completion)
+    }).finally(() => window.close());
   }
 
   function scheduleFrame() {

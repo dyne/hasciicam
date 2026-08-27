@@ -2,7 +2,9 @@
 """CTest wrapper for the opt-in Emscripten SDL canvas smoke test."""
 
 import argparse
+import base64
 import http.server
+import json
 import os
 from pathlib import Path
 import re
@@ -10,14 +12,38 @@ import socketserver
 import subprocess
 import sys
 import threading
+from urllib.parse import urlparse
 
 
 LIFECYCLE_TIMEOUT_SECONDS = 90
 
 
+class SmokeServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
+    def __init__(self, address, handler):
+        super().__init__(address, handler)
+        self.completion = None
+        self.completion_event = threading.Event()
+
+
 class QuietStaticServer(http.server.SimpleHTTPRequestHandler):
     def log_message(self, _format, *_args):
         pass
+
+    def do_POST(self):
+        if urlparse(self.path).path != "/_hasciicam_test_complete":
+            self.send_error(404)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            self.server.completion = json.loads(self.rfile.read(length))
+        except (ValueError, json.JSONDecodeError):
+            self.send_error(400)
+            return
+        self.server.completion_event.set()
+        self.send_response(204)
+        self.end_headers()
 
 
 def parse_args():
@@ -35,7 +61,7 @@ def run_scenario(chromium, root, artifacts, scenario):
     profile_dir.mkdir(parents=True, exist_ok=True)
     handler = lambda *handler_args, **handler_kwargs: QuietStaticServer(
         *handler_args, directory=str(root), **handler_kwargs)
-    with socketserver.TCPServer(("127.0.0.1", 0), handler) as server:
+    with SmokeServer(("127.0.0.1", 0), handler) as server:
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         url = f"http://127.0.0.1:{server.server_address[1]}/index.html?autotest=1&scenario={scenario}"
@@ -47,32 +73,43 @@ def run_scenario(chromium, root, artifacts, scenario):
             "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
             "--enable-webgl",
             "--ignore-gpu-blocklist", "--run-all-compositor-stages-before-draw",
-            "--virtual-time-budget=15000", "--window-size=1280,800",
-            f"--screenshot={screenshot_path}", "--dump-dom", url,
+            "--virtual-time-budget=15000", "--window-size=1280,800", url,
         ]
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   text=True)
         try:
-            completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                       text=True, timeout=LIFECYCLE_TIMEOUT_SECONDS, check=False)
+            if not server.completion_event.wait(LIFECYCLE_TIMEOUT_SECONDS):
+                process.terminate()
+                output, _ = process.communicate(timeout=5)
+                log_path.write_text(output or "Chromium timed out.\n", encoding="utf-8")
+                raise RuntimeError(
+                    f"Chromium {scenario} timed out after {LIFECYCLE_TIMEOUT_SECONDS} seconds")
+            process.terminate()
+            output, _ = process.communicate(timeout=5)
         except subprocess.TimeoutExpired as error:
-            output = error.stdout or "Chromium timed out.\n"
-            if isinstance(output, bytes):
-                output = output.decode("utf-8", errors="replace")
-            log_path.write_text(output, encoding="utf-8")
+            process.kill()
+            output, _ = process.communicate()
+            log_path.write_text(output or "Chromium did not terminate.\n", encoding="utf-8")
             raise RuntimeError(
-                f"Chromium {scenario} timed out after {LIFECYCLE_TIMEOUT_SECONDS} seconds") from error
+                f"Chromium {scenario} did not terminate after completion") from error
         finally:
             server.shutdown()
             thread.join(timeout=5)
 
-    log_path.write_text(completed.stdout, encoding="utf-8")
-    if completed.returncode:
-        raise RuntimeError(f"Chromium {scenario} exited with status {completed.returncode}; see {log_path}")
-    if "Uncaught" in completed.stdout or "ERROR:CONSOLE" in completed.stdout:
+    log_path.write_text(output, encoding="utf-8")
+    if "Uncaught" in output or "ERROR:CONSOLE" in output:
         raise RuntimeError(f"Chromium {scenario} reported a page exception; see {log_path}")
-    if not screenshot_path.is_file() or screenshot_path.stat().st_size == 0:
+    completion = server.completion
+    if not isinstance(completion, dict) or completion.get("scenario") != scenario:
+        raise RuntimeError(f"browser scenario {scenario} sent an invalid completion signal; see {log_path}")
+    screenshot = completion.get("screenshot", "")
+    if not isinstance(screenshot, str) or not screenshot.startswith("data:image/png;base64,"):
+        raise RuntimeError(f"Chromium did not produce a {scenario} screenshot: {screenshot_path}")
+    screenshot_path.write_bytes(base64.b64decode(screenshot.split(",", 1)[1]))
+    if screenshot_path.stat().st_size == 0:
         raise RuntimeError(f"Chromium did not produce a {scenario} screenshot: {screenshot_path}")
 
-    states = dict(re.findall(r'data-([a-z-]+)="([^"]*)"', completed.stdout))
+    states = completion.get("states", {})
     if states.get("test-complete") != "true" or states.get("test-passed") != "true":
         raise RuntimeError(f"browser scenario {scenario} did not complete successfully; see {log_path}")
     if scenario == "lifecycle":
