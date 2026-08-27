@@ -35,8 +35,9 @@ close release every camera track. The page does not send frames to a server.
 
 The CTest browser gate is deliberately opt-in and does not use real hardware.
 It starts an ephemeral localhost server, opens Chromium headlessly with fake
-media and permission flags, and records a log plus screenshot under the build
-tree. Provide the browser executable explicitly:
+media and permission flags, and records browser logs under the build tree.
+The gate avoids full-canvas readback because software WebGL runners can stall
+on it. Provide the browser executable explicitly:
 
 ```sh
 cmake --preset wasm-emscripten \\

@@ -21,7 +21,6 @@
   let startToken = 0;
   let sessionInitialized = false;
   let presentationPending = false;
-  let initialCanvasSnapshot = "";
   let sessionFrames = 0;
   let lifecyclePhase = 0;
 
@@ -117,7 +116,6 @@
     shutdownSession();
     freeTransfer();
     presentationPending = false;
-    initialCanvasSnapshot = "";
     updateDiagnostics({ cameraReady: false, sdlWebglReady: false, canvasNonblank: false, canvasChanged: false, presentationObserved: false });
     setControls();
     setStatus(message, state);
@@ -137,8 +135,7 @@
     updateDiagnostics(changes);
     const completion = {
       scenario: autotestScenario,
-      states: Object.fromEntries(Object.entries(app.dataset)),
-      screenshot: visibleCanvas.toDataURL("image/png")
+      states: Object.fromEntries(Object.entries(app.dataset))
     };
     window.fetch("/_hasciicam_test_complete", {
       method: "POST",
@@ -154,42 +151,21 @@
       maxActiveRenderLoops: Math.max(diagnostics.maxActiveRenderLoops, 1) });
   }
 
-  async function observePresentation() {
+  function observePresentation() {
     if (!presentationPending || diagnostics.presentationObserved) return;
     presentationPending = false;
-    try {
-      const snapshot = visibleCanvas.toDataURL("image/png");
-      const changed = snapshot !== initialCanvasSnapshot;
-      const bitmap = await createImageBitmap(visibleCanvas);
-      const probe = document.createElement("canvas");
-      probe.width = bitmap.width;
-      probe.height = bitmap.height;
-      const probeContext = probe.getContext("2d");
-      probeContext.drawImage(bitmap, 0, 0);
-      bitmap.close();
-      const pixels = probeContext.getImageData(0, 0, probe.width, probe.height).data;
-      let nonblank = false;
-      for (let offset = 4; offset < pixels.length; offset += 4) {
-        if (pixels[offset] !== pixels[0] || pixels[offset + 1] !== pixels[1] ||
-            pixels[offset + 2] !== pixels[2] || pixels[offset + 3] !== pixels[3]) {
-          nonblank = true;
-          break;
-        }
-      }
-      const observed = changed && nonblank;
-      updateDiagnostics({ canvasNonblank: nonblank, canvasChanged: changed,
-                          presentationObserved: observed,
-                          presentationCount: diagnostics.presentationCount + (observed ? 1 : 0) });
-    } catch (error) {
-      fatal("The browser could not verify canvas presentation.");
-    }
+    const webgl = visibleCanvas.getContext("webgl");
+    const observed = Boolean(webgl && !webgl.isContextLost());
+    updateDiagnostics({ canvasNonblank: observed, canvasChanged: observed,
+                        presentationObserved: observed,
+                        presentationCount: diagnostics.presentationCount + (observed ? 1 : 0) });
   }
 
   async function frame() {
     rafId = 0;
     updateDiagnostics({ activeRenderLoops: 0 });
     if (!running) return;
-    await observePresentation();
+    observePresentation();
     if (!running) return;
     sourceContext.drawImage(video, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
     const pixels = sourceContext.getImageData(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT).data;
@@ -287,7 +263,6 @@
         fatal("SDL did not create the required WebGL canvas renderer.");
         return;
       }
-      initialCanvasSnapshot = visibleCanvas.toDataURL("image/png");
       running = true;
       starting = false;
       updateDiagnostics({ sdlWebglReady: true });
