@@ -1,13 +1,15 @@
 #include <hasciicam/hasciicam.h>
 
 #include <stddef.h>
+#include <stdlib.h>
 
 static hasciicam_instance *g_instance = NULL;
 static const char *g_last_text = NULL;
 static int g_last_width = 0;
 static int g_last_height = 0;
 
-int hasciicam_wasm_init(int camera_width, int camera_height, int ascii_width, int ascii_height) {
+int hasciicam_wasm_init(int camera_width, int camera_height, int ascii_width, int ascii_height,
+                        int software_renderer) {
     if (g_instance != NULL) {
         hasciicam_destroy(g_instance);
         g_instance = NULL;
@@ -15,6 +17,13 @@ int hasciicam_wasm_init(int camera_width, int camera_height, int ascii_width, in
     g_instance = hasciicam_create();
     if (g_instance == NULL) {
         return 0;
+    }
+    if (software_renderer) {
+        setenv("HASCIICAM_SDL_RENDERER", "software", 1);
+        setenv("HASCIICAM_SDL_VSYNC", "off", 1);
+    } else {
+        setenv("HASCIICAM_SDL_RENDERER", "accelerated", 1);
+        setenv("HASCIICAM_SDL_VSYNC", "on", 1);
     }
     return hasciicam_start_external_live(g_instance, camera_width, camera_height,
                                          ascii_width, ascii_height, "SDL");

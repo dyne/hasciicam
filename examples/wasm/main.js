@@ -6,7 +6,7 @@
   const app = document.getElementById("hasciicam-app");
   const video = document.getElementById("camera-video");
   const sourceCanvas = document.getElementById("source-canvas");
-  const visibleCanvas = document.getElementById("canvas");
+  let visibleCanvas = document.getElementById("canvas");
   const startButton = document.getElementById("start");
   const stopButton = document.getElementById("stop");
   const status = document.getElementById("status");
@@ -24,6 +24,7 @@
   let sessionFrames = 0;
   let lifecyclePhase = 0;
   let autotestPixels = null;
+  let rendererBackend = "none";
 
   const diagnostics = window.hasciicamWasmState = {
     runtimeReady: false,
@@ -43,6 +44,7 @@
     shutdownCount: 0,
     restartCount: 0,
     rendererMessage: "",
+    rendererBackend: "none",
     errorKind: "none",
     testComplete: false,
     testPassed: false
@@ -70,6 +72,7 @@
     app.dataset.shutdownCount = String(diagnostics.shutdownCount);
     app.dataset.restartCount = String(diagnostics.restartCount);
     app.dataset.rendererMessage = diagnostics.rendererMessage;
+    app.dataset.rendererBackend = diagnostics.rendererBackend;
     app.dataset.errorKind = diagnostics.errorKind;
     app.dataset.testComplete = String(diagnostics.testComplete);
     app.dataset.testPassed = String(diagnostics.testPassed);
@@ -119,7 +122,8 @@
     shutdownSession();
     freeTransfer();
     presentationPending = false;
-    updateDiagnostics({ cameraReady: false, sdlWebglReady: false, canvasNonblank: false, canvasChanged: false, presentationObserved: false });
+    updateDiagnostics({ cameraReady: false, sdlWebglReady: false, canvasNonblank: false,
+                        canvasChanged: false, presentationObserved: false });
     setControls();
     setStatus(message, state);
   }
@@ -160,8 +164,10 @@
   function observePresentation() {
     if (!presentationPending || diagnostics.presentationObserved) return;
     presentationPending = false;
-    const webgl = visibleCanvas.getContext("webgl");
-    const observed = Boolean(webgl && !webgl.isContextLost());
+    const context = rendererBackend === "software" ?
+      visibleCanvas.getContext("2d") : visibleCanvas.getContext("webgl");
+    const observed = Boolean(context &&
+      (rendererBackend === "software" || !context.isContextLost()));
     updateDiagnostics({ canvasNonblank: observed, canvasChanged: observed,
                         presentationObserved: observed,
                         presentationCount: diagnostics.presentationCount + (observed ? 1 : 0) });
@@ -282,20 +288,39 @@
       updateDiagnostics({ cameraReady: true, canvasNonblank: false,
                           canvasChanged: false, presentationObserved: false });
       sessionInitialized = true;
-      if (!api.init(SOURCE_WIDTH, SOURCE_HEIGHT, 80, 30)) {
+      const rendererOption = new URLSearchParams(window.location.search).get("renderer");
+      const rendererRequest = rendererOption === "software" || rendererOption === "accelerated" ?
+        rendererOption : "auto";
+      rendererBackend = rendererRequest === "software" ? "software" : "accelerated";
+      let initialized = api.init(SOURCE_WIDTH, SOURCE_HEIGHT, 80, 30,
+                                 rendererBackend === "software");
+      if (!initialized && rendererRequest === "auto") {
+        const replacement = visibleCanvas.cloneNode(false);
+        visibleCanvas.replaceWith(replacement);
+        visibleCanvas = replacement;
+        window.Module.canvas = visibleCanvas;
+        rendererBackend = "software";
+        initialized = api.init(SOURCE_WIDTH, SOURCE_HEIGHT, 80, 30, 1);
+      }
+      if (!initialized) {
         fatal("SDL could not initialize the visible canvas.", "sdl-init");
         return;
       }
-      const webgl = visibleCanvas.getContext("webgl");
-      if (!webgl || !(webgl instanceof WebGLRenderingContext)) {
-        fatal("SDL did not create the required WebGL canvas renderer.", "webgl-init");
+      const rendererContext = rendererBackend === "software" ?
+        visibleCanvas.getContext("2d") : visibleCanvas.getContext("webgl");
+      if (!rendererContext ||
+          (rendererBackend === "accelerated" && rendererContext.isContextLost())) {
+        fatal("SDL did not create a usable canvas renderer.", "canvas-init");
         return;
       }
       running = true;
       starting = false;
-      updateDiagnostics({ sdlWebglReady: true });
+      updateDiagnostics({ sdlWebglReady: rendererBackend === "accelerated",
+                          rendererBackend, rendererMessage: "" });
       setControls();
-      setStatus("Camera is running. Rendering locally.");
+      setStatus(rendererBackend === "software" ?
+        "Camera is running. Using the software canvas renderer." :
+        "Camera is running. Rendering locally.");
       scheduleFrame();
     } catch (error) {
       if (token !== startToken) return;
@@ -326,7 +351,7 @@
     onAbort: (message) => runtimeFailure(`Renderer failed to load: ${message}`),
     onRuntimeInitialized() {
       api = {
-        init: window.Module.cwrap("hasciicam_wasm_init", "number", ["number", "number", "number", "number"]),
+        init: window.Module.cwrap("hasciicam_wasm_init", "number", ["number", "number", "number", "number", "number"]),
         submit: window.Module.cwrap("hasciicam_wasm_submit_rgba", "number", ["number", "number", "number", "number", "number"]),
         render: window.Module.cwrap("hasciicam_wasm_render", "number", []),
         shutdown: window.Module.cwrap("hasciicam_wasm_shutdown", null, [])
