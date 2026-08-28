@@ -52,26 +52,33 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_scenario(chromium, root, artifacts, scenario):
-    log_path = artifacts / f"chromium-{scenario}.log"
-    profile_dir = artifacts / f"chromium-profile-{scenario}"
+def run_scenario(chromium, root, artifacts, scenario, renderer="auto"):
+    case_name = scenario if renderer == "auto" else f"{scenario}-{renderer}"
+    renderer_request = "auto" if renderer == "fallback" else renderer
+    log_path = artifacts / f"chromium-{case_name}.log"
+    profile_dir = artifacts / f"chromium-profile-{case_name}"
     profile_dir.mkdir(parents=True, exist_ok=True)
     handler = lambda *handler_args, **handler_kwargs: QuietStaticServer(
         *handler_args, directory=str(root), **handler_kwargs)
     with SmokeServer(("127.0.0.1", 0), handler) as server:
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
-        url = f"http://127.0.0.1:{server.server_address[1]}/index.html?autotest=1&scenario={scenario}"
+        url = (f"http://127.0.0.1:{server.server_address[1]}/index.html"
+               f"?autotest=1&scenario={scenario}&renderer={renderer_request}")
         command = [
             str(chromium), "--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
             "--no-first-run", "--no-default-browser-check",
             f"--user-data-dir={profile_dir}",
             "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream",
-            "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
-            "--enable-webgl",
-            "--ignore-gpu-blocklist", "--run-all-compositor-stages-before-draw",
-            "--window-size=1280,800", url,
         ]
+        if renderer == "fallback":
+            command.append("--disable-webgl")
+        else:
+            command.extend([
+                "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
+                "--enable-webgl", "--ignore-gpu-blocklist",
+            ])
+        command.extend(["--run-all-compositor-stages-before-draw", "--window-size=1280,800", url])
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                    text=True)
         try:
@@ -95,7 +102,7 @@ def run_scenario(chromium, root, artifacts, scenario):
 
     log_path.write_text(output, encoding="utf-8")
     completion = server.completion
-    completion_path = artifacts / f"completion-{scenario}.json"
+    completion_path = artifacts / f"completion-{case_name}.json"
     completion_path.write_text(
         json.dumps(completion, indent=2, sort_keys=True) + "\n",
         encoding="utf-8")
@@ -126,6 +133,11 @@ def run_scenario(chromium, root, artifacts, scenario):
             raise RuntimeError(f"browser did not render both lifecycle sessions; see {log_path}")
         if int(states.get("presentationCount", "0")) < 1:
             raise RuntimeError(f"browser did not observe SDL canvas presentation; see {log_path}")
+        expected_renderer = "software" if renderer in ("software", "fallback") else "accelerated"
+        if states.get("rendererBackend") != expected_renderer:
+            raise RuntimeError(
+                f"browser renderer={states.get('rendererBackend')!r}, "
+                f"expected {expected_renderer!r}; see {log_path}")
     elif states.get("errorKind") != scenario:
         raise RuntimeError(f"browser error-kind={states.get('errorKind')!r}, expected {scenario!r}; see {log_path}")
 
@@ -139,7 +151,10 @@ def main():
         raise RuntimeError(f"WASM sample assets are unavailable: {args.root}")
 
     args.artifacts.mkdir(parents=True, exist_ok=True)
-    for scenario in ("lifecycle", "denied", "missing-media"):
+    run_scenario(chromium, args.root, args.artifacts, "lifecycle")
+    run_scenario(chromium, args.root, args.artifacts, "lifecycle", "software")
+    run_scenario(chromium, args.root, args.artifacts, "lifecycle", "fallback")
+    for scenario in ("denied", "missing-media"):
         run_scenario(chromium, args.root, args.artifacts, scenario)
 
 

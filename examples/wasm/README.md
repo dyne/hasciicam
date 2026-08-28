@@ -4,7 +4,9 @@ This sample renders live camera luminance as ASCII in SDL2's visible
 `<canvas id="canvas">`. JavaScript owns the one `requestAnimationFrame` loop:
 it transfers RGBA pixels from a hidden source canvas to the shared C core, then
 returns to the browser after each SDL presentation. SDL's `SDL_Window *` maps
-to `#canvas`; its GLES2 renderer maps to browser WebGL.
+to `#canvas`. It prefers SDL's GLES2/WebGL renderer and automatically retries
+with SDL's software 2D-canvas renderer when WebGL initialization fails. Append
+`?renderer=software` to select the compatibility path explicitly.
 
 ## Build and serve
 

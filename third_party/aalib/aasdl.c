@@ -55,8 +55,10 @@ static Uint32 SDL_renderer_flags_from_env(void)
         flags = SDL_RENDERER_ACCELERATED;
     }
 
-    if (vsync == NULL || SDL_env_is(vsync, "on") || SDL_env_is(vsync, "1") ||
-        SDL_env_is(vsync, "true") || SDL_env_is(vsync, "yes")) {
+    /* SDL's software driver does not advertise vsync during driver selection. */
+    if (!(flags & SDL_RENDERER_SOFTWARE) &&
+        (vsync == NULL || SDL_env_is(vsync, "on") || SDL_env_is(vsync, "1") ||
+         SDL_env_is(vsync, "true") || SDL_env_is(vsync, "yes"))) {
         flags |= SDL_RENDERER_PRESENTVSYNC;
     }
 
