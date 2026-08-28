@@ -291,25 +291,36 @@
       const rendererOption = new URLSearchParams(window.location.search).get("renderer");
       const rendererRequest = rendererOption === "software" || rendererOption === "accelerated" ?
         rendererOption : "auto";
+      const simulateLostContext = autotestMode && rendererOption === "fallback-lost";
       rendererBackend = rendererRequest === "software" ? "software" : "accelerated";
       let initialized = api.init(SOURCE_WIDTH, SOURCE_HEIGHT, 80, 30,
                                  rendererBackend === "software");
-      if (!initialized && rendererRequest === "auto") {
+      let rendererContext = initialized ? (rendererBackend === "software" ?
+        visibleCanvas.getContext("2d") : visibleCanvas.getContext("webgl")) : null;
+      let rendererUsable = Boolean(rendererContext &&
+        (rendererBackend === "software" || !rendererContext.isContextLost()));
+      if (simulateLostContext && rendererBackend === "accelerated" && rendererUsable) {
+        const loseContext = rendererContext.getExtension("WEBGL_lose_context");
+        if (loseContext) loseContext.loseContext();
+        rendererUsable = false;
+      }
+      if ((!initialized || !rendererUsable) && rendererRequest === "auto") {
+        api.shutdown();
         const replacement = visibleCanvas.cloneNode(false);
         visibleCanvas.replaceWith(replacement);
         visibleCanvas = replacement;
         window.Module.canvas = visibleCanvas;
         rendererBackend = "software";
         initialized = api.init(SOURCE_WIDTH, SOURCE_HEIGHT, 80, 30, 1);
+        rendererContext = initialized ? visibleCanvas.getContext("2d") : null;
+        rendererUsable = Boolean(rendererContext);
       }
       if (!initialized) {
-        fatal("SDL could not initialize the visible canvas.", "sdl-init");
+        const detail = diagnostics.rendererMessage ? ` ${diagnostics.rendererMessage}` : "";
+        fatal(`SDL could not initialize the visible canvas.${detail}`, "sdl-init");
         return;
       }
-      const rendererContext = rendererBackend === "software" ?
-        visibleCanvas.getContext("2d") : visibleCanvas.getContext("webgl");
-      if (!rendererContext ||
-          (rendererBackend === "accelerated" && rendererContext.isContextLost())) {
+      if (!rendererUsable) {
         fatal("SDL did not create a usable canvas renderer.", "canvas-init");
         return;
       }

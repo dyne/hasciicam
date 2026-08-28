@@ -133,7 +133,7 @@ def run_scenario(chromium, root, artifacts, scenario, renderer="auto"):
             raise RuntimeError(f"browser did not render both lifecycle sessions; see {log_path}")
         if int(states.get("presentationCount", "0")) < 1:
             raise RuntimeError(f"browser did not observe SDL canvas presentation; see {log_path}")
-        expected_renderer = "software" if renderer in ("software", "fallback") else "accelerated"
+        expected_renderer = "software" if renderer in ("software", "fallback", "fallback-lost") else "accelerated"
         if states.get("rendererBackend") != expected_renderer:
             raise RuntimeError(
                 f"browser renderer={states.get('rendererBackend')!r}, "
@@ -154,6 +154,7 @@ def main():
     run_scenario(chromium, args.root, args.artifacts, "lifecycle")
     run_scenario(chromium, args.root, args.artifacts, "lifecycle", "software")
     run_scenario(chromium, args.root, args.artifacts, "lifecycle", "fallback")
+    run_scenario(chromium, args.root, args.artifacts, "lifecycle", "fallback-lost")
     for scenario in ("denied", "missing-media"):
         run_scenario(chromium, args.root, args.artifacts, scenario)
 
