@@ -45,7 +45,6 @@ void hasciicam_render_session_configure_geometry(hasciicam_render_session *sessi
                                                  int rec_height) {
     if (session == NULL)
         return;
-    session->hwparams.font = NULL;
     session->hwparams.width = 0;
     session->hwparams.height = 0;
     session->hwparams.recwidth = rec_width;

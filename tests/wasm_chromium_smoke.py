@@ -63,8 +63,9 @@ def run_scenario(chromium, root, artifacts, scenario, renderer="auto"):
     with SmokeServer(("127.0.0.1", 0), handler) as server:
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
+        renderer_query = "" if renderer == "auto" else f"&renderer={renderer_request}"
         url = (f"http://127.0.0.1:{server.server_address[1]}/index.html"
-               f"?autotest=1&scenario={scenario}&renderer={renderer_request}")
+               f"?autotest=1&scenario={scenario}{renderer_query}")
         command = [
             str(chromium), "--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
             "--no-first-run", "--no-default-browser-check",
@@ -156,6 +157,8 @@ def main():
         raise RuntimeError(f"Chromium executable is unavailable: {chromium}")
     if not (args.root / "index.html").is_file():
         raise RuntimeError(f"WASM sample assets are unavailable: {args.root}")
+    if 'id="renderer"' in (args.root / "index.html").read_text(encoding="utf-8"):
+        raise RuntimeError("WASM sample still exposes a renderer selector")
 
     args.artifacts.mkdir(parents=True, exist_ok=True)
     run_scenario(chromium, args.root, args.artifacts, "lifecycle")

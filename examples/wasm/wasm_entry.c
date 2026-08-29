@@ -24,6 +24,11 @@ int hasciicam_wasm_init(int camera_width, int camera_height, int ascii_width, in
     if (g_instance == NULL) {
         return 0;
     }
+    if (!hasciicam_set_font(g_instance, "vga9")) {
+        hasciicam_destroy(g_instance);
+        g_instance = NULL;
+        return 0;
+    }
     if (renderer == HASCIICAM_WASM_RENDERER_CANVAS_2D) {
         return hasciicam_start_external(g_instance, camera_width, camera_height,
                                         ascii_width, ascii_height);

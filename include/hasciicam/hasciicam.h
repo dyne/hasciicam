@@ -23,6 +23,9 @@ typedef enum hasciicam_pixel_format {
 hasciicam_instance *hasciicam_create(void);
 void hasciicam_destroy(hasciicam_instance *instance);
 
+/* Select an AA bitmap font before starting a render session. */
+int hasciicam_set_font(hasciicam_instance *instance, const char *font_name);
+
 int hasciicam_start_external(hasciicam_instance *instance,
                              int camera_width,
                              int camera_height,
