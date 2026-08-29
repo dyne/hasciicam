@@ -16,6 +16,13 @@ int main(void) {
         return 1;
     }
 
+    if (hasciicam_set_font(instance, "missing-font") ||
+        !hasciicam_set_font(instance, "vga9")) {
+        fprintf(stderr, "font selection failed\n");
+        hasciicam_destroy(instance);
+        return 2;
+    }
+
     if (hasciicam_start_external(instance, 0, 32, 32, 16) ||
         hasciicam_start_external_live(instance, 64, 32, 32, 16, NULL) ||
         hasciicam_start_external_live(instance, 64, 32, 32, 16, "missing-driver")) {
@@ -26,6 +33,11 @@ int main(void) {
 
     if (!hasciicam_start_external(instance, 64, 32, 32, 16)) {
         fprintf(stderr, "zero-frame start failed\n");
+        hasciicam_destroy(instance);
+        return 2;
+    }
+    if (hasciicam_set_font(instance, "vga9")) {
+        fprintf(stderr, "active-session font change unexpectedly succeeded\n");
         hasciicam_destroy(instance);
         return 2;
     }

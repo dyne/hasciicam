@@ -4,9 +4,9 @@
   const SOURCE_WIDTH = 320;
   const SOURCE_HEIGHT = 240;
   const CANVAS_WIDTH = 640;
-  const CANVAS_HEIGHT = 480;
+  const CANVAS_HEIGHT = 477;
   const ASCII_WIDTH = 80;
-  const ASCII_HEIGHT = 30;
+  const ASCII_HEIGHT = 53;
   const RENDERER_MODES = { accelerated: 0, software: 1, canvas2d: 2 };
   const app = document.getElementById("hasciicam-app");
   const video = document.getElementById("camera-video");
@@ -14,7 +14,6 @@
   let visibleCanvas = document.getElementById("canvas");
   const startButton = document.getElementById("start");
   const stopButton = document.getElementById("stop");
-  const rendererSelect = document.getElementById("renderer");
   const status = document.getElementById("status");
   const sourceContext = sourceCanvas.getContext("2d", { willReadFrequently: true });
   let api = null;
@@ -60,10 +59,7 @@
   const autotestMode = urlParams.get("autotest") === "1" &&
     ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname);
   const autotestScenario = urlParams.get("scenario") || "lifecycle";
-  const rendererOption = urlParams.get("renderer");
-  if (["auto", "canvas2d", "accelerated", "software"].includes(rendererOption)) {
-    rendererSelect.value = rendererOption;
-  }
+  const rendererOption = autotestMode ? urlParams.get("renderer") : null;
 
   function updateDiagnostics(changes) {
     Object.assign(diagnostics, changes);
@@ -99,7 +95,6 @@
   function setControls() {
     startButton.disabled = !diagnostics.runtimeReady || running || starting;
     stopButton.disabled = !running && !starting;
-    rendererSelect.disabled = running || starting;
   }
 
   function stopTracks() {
@@ -353,9 +348,9 @@
       const simulateLostContext = autotestMode && rendererOption === "fallback-lost";
       const simulateNativeFallback = autotestMode && rendererOption === "fallback-native";
       const simulateFallback = simulateLostContext || simulateNativeFallback;
-      const rendererRequest = simulateFallback ? "auto" :
-        (["auto", "canvas2d", "accelerated", "software"].includes(rendererOption) ?
-          rendererOption : rendererSelect.value);
+      const rendererRequest = !simulateFallback && autotestMode &&
+        ["canvas2d", "accelerated", "software"].includes(rendererOption) ?
+        rendererOption : "auto";
       const attempts = rendererRequest === "auto" ?
         ["accelerated", "software", "canvas2d"] : [rendererRequest];
       let initialized = false;

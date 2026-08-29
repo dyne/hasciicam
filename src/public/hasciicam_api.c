@@ -1,6 +1,7 @@
 #include "../../include/hasciicam/hasciicam.h"
 
 #include "../app/app_session.h"
+#include "../render/render_font.h"
 #include "../render/render_session.h"
 #include "../capture/capture.h"
 
@@ -51,6 +52,17 @@ void hasciicam_destroy(hasciicam_instance *instance) {
         return;
     hasciicam_stop(instance);
     free(instance);
+}
+
+int hasciicam_set_font(hasciicam_instance *instance, const char *font_name) {
+    hasciicam_font_desc font;
+    if (instance == NULL || instance->started)
+        return 0;
+    font = hasciicam_font_find(font_name);
+    if (font.font == NULL)
+        return 0;
+    instance->render.hwparams.font = font.font;
+    return 1;
 }
 
 static int hasciicam_start_external_common(hasciicam_instance *instance,

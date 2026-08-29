@@ -2,20 +2,12 @@
 
 This sample renders live camera luminance as ASCII in a visible browser canvas.
 JavaScript owns the one `requestAnimationFrame` loop and transfers RGBA pixels
-from a hidden source canvas to the shared C core. The default **Canvas 2D** path
-gets AA-lib's rendered character buffer from C and draws it with the browser's
-native 2D canvas API, without asking SDL to create a window or rendering
-context.
-
-The **Rendering system** menu also exposes all available paths explicitly:
-
-- **Canvas 2D (recommended)**: native browser drawing; no SDL canvas setup.
-- **Automatic fallback**: SDL/WebGL, then SDL software, then native Canvas 2D.
-- **SDL / WebGL**: SDL's accelerated GLES2/WebGL renderer only.
-- **SDL software**: SDL's browser 2D-canvas renderer only.
-
-The selection can also be set with
-`?renderer=canvas2d|auto|accelerated|software`.
+from a hidden source canvas to the shared C core. Rendering always uses the
+automatic compatibility chain: SDL/WebGL, then SDL software, then native
+Canvas 2D. The last path gets AA-lib's rendered character buffer from C and
+draws it with the browser's native 2D API, without asking SDL to create a
+window or rendering context. Every path uses AA-lib's `vga9` font and an 80×53
+character grid sized to preserve the camera's approximate 4:3 aspect ratio.
 
 ## Build and serve
 
@@ -38,7 +30,7 @@ need a served origin. Loopback is a secure development context; use HTTPS when
 hosting elsewhere. The output directory contains source-controlled `index.html`
 and `main.js` plus generated `hasciicam.js` and `hasciicam.wasm`.
 
-Select **Start camera**, grant video permission, and confirm that the 640×480
+Select **Start camera**, grant video permission, and confirm that the 640×477
 canvas shows moving ASCII. Select **Stop camera** before leaving; Stop and page
 close release every camera track. The page does not send frames to a server.
 
@@ -64,26 +56,24 @@ ctest --output-on-failure --test-dir build/presets/wasm-emscripten -L wasm
 
 The test's localhost-only `?autotest=1` mode clicks through its fake camera
 path and checks runtime readiness, camera transfer, multiple rendered frames,
-each explicit renderer, SDL-to-native fallback, and presentation after a
-callback boundary. It also checks stop/restart/page-hide cleanup, steady-state
-allocation reuse, and the permission-denied and missing-media-device error
-paths. It is not real-camera coverage.
+each renderer internally, SDL-to-native fallback, and presentation after a
+callback boundary. Explicit renderer selection is test-only; the interactive
+demo always uses automatic fallback. The test also checks stop/restart/page-hide
+cleanup, steady-state allocation reuse, and the permission-denied and
+missing-media-device error paths. It is not real-camera coverage.
 
 ## Manual real-camera checklist
 
 - Serve the generated directory from localhost or HTTPS, then use Chrome or
   Firefox with a real camera attached.
 - Start with keyboard focus on **Start camera**; allow the permission request.
-- Start with **Canvas 2D (recommended)** and verify live ASCII updates on the
-  640×480 canvas.
-- Stop the camera, select each other rendering system in turn, and start again.
-  SDL/WebGL may be unavailable on devices that disable hardware acceleration;
-  that should not prevent the native Canvas 2D selection from working.
+- Verify live VGA9 ASCII updates on the 640×477 canvas. The selected backend is
+  reported in the status message after automatic initialization.
 - Select **Stop camera**, then close the page; verify the browser's camera-use
   indicator turns off.
 
 If permission is denied, reset the site's camera permission and retry. For a
-blank canvas, select **Canvas 2D (recommended)** and inspect the browser log
-produced by the CTest. For cache permission errors, export the build-local
-`EM_CACHE` above. A server must return `.wasm` as `application/wasm`; Python's
-standard library server does so on supported Python installations.
+blank canvas, inspect the browser log produced by the CTest. For cache
+permission errors, export the build-local `EM_CACHE` above. A server must return
+`.wasm` as `application/wasm`; Python's standard library server does so on
+supported Python installations.
