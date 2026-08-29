@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CTest wrapper for the opt-in Emscripten SDL canvas smoke test."""
+"""CTest wrapper for the opt-in Emscripten browser renderer smoke test."""
 
 import argparse
 import http.server
@@ -132,8 +132,15 @@ def run_scenario(chromium, root, artifacts, scenario, renderer="auto"):
         if int(states.get("successfulFrames", "0")) < 6:
             raise RuntimeError(f"browser did not render both lifecycle sessions; see {log_path}")
         if int(states.get("presentationCount", "0")) < 1:
-            raise RuntimeError(f"browser did not observe SDL canvas presentation; see {log_path}")
-        expected_renderer = "software" if renderer in ("software", "fallback", "fallback-lost") else "accelerated"
+            raise RuntimeError(f"browser did not observe canvas presentation; see {log_path}")
+        if renderer in ("canvas2d", "fallback-native"):
+            expected_renderer = "canvas2d"
+            if int(states.get("canvasDrawCount", "0")) < 6:
+                raise RuntimeError(f"browser did not draw Canvas 2D lifecycle frames; see {log_path}")
+        elif renderer in ("software", "fallback", "fallback-lost"):
+            expected_renderer = "software"
+        else:
+            expected_renderer = "accelerated"
         if states.get("rendererBackend") != expected_renderer:
             raise RuntimeError(
                 f"browser renderer={states.get('rendererBackend')!r}, "
@@ -152,9 +159,11 @@ def main():
 
     args.artifacts.mkdir(parents=True, exist_ok=True)
     run_scenario(chromium, args.root, args.artifacts, "lifecycle")
+    run_scenario(chromium, args.root, args.artifacts, "lifecycle", "canvas2d")
     run_scenario(chromium, args.root, args.artifacts, "lifecycle", "software")
     run_scenario(chromium, args.root, args.artifacts, "lifecycle", "fallback")
     run_scenario(chromium, args.root, args.artifacts, "lifecycle", "fallback-lost")
+    run_scenario(chromium, args.root, args.artifacts, "lifecycle", "fallback-native")
     for scenario in ("denied", "missing-media"):
         run_scenario(chromium, args.root, args.artifacts, scenario)
 

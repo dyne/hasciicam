@@ -10,26 +10,42 @@
     main { box-sizing: border-box; display: grid; gap: 1rem; margin: 0 auto; max-width: 52rem; padding: 1.5rem; }
     h1 { font-size: 1.5rem; margin: 0; }
     p { color: #c6d0d9; line-height: 1.5; margin: 0; max-width: 65ch; }
-    .controls { display: flex; flex-wrap: wrap; gap: .75rem; }
-    button { background: #3d8bff; border: 1px solid #3d8bff; border-radius: .4rem; color: #07111f; cursor: pointer; font: inherit; font-weight: 700; padding: .6rem .9rem; }
+    .controls { align-items: end; display: flex; flex-wrap: wrap; gap: .75rem; }
+    .renderer-control { display: grid; gap: .3rem; }
+    .renderer-control label { color: #c6d0d9; font-size: .875rem; }
+    button, select { border-radius: .4rem; box-sizing: border-box; font: inherit; min-height: 44px; }
+    button { background: #3d8bff; border: 1px solid #3d8bff; color: #07111f; cursor: pointer; font-weight: 700; padding: .6rem .9rem; }
+    select { background: #1b242c; border: 1px solid #52606b; color: #f4f7fa; min-width: 15rem; padding: .55rem 2.25rem .55rem .7rem; }
     button:hover:not(:disabled) { background: #75aaff; border-color: #75aaff; }
-    button:disabled { cursor: not-allowed; opacity: .55; }
+    button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
     button.secondary { background: transparent; color: #f4f7fa; }
-    button:focus-visible { outline: 3px solid #f6c94c; outline-offset: 3px; }
+    button:focus-visible, select:focus-visible { outline: 3px solid #f6c94c; outline-offset: 3px; }
     #status { background: #1b242c; border-radius: .4rem; color: #e6edf3; min-height: 1.5rem; padding: .6rem .75rem; }
     #status[data-state="error"] { color: #ffd4d1; }
     #canvas { background: #000; display: block; height: auto; max-width: 100%; width: 100%; aspect-ratio: 4 / 3; }
     .visually-hidden { height: 1px; margin: -1px; overflow: hidden; position: absolute; width: 1px; clip: rect(0 0 0 0); white-space: nowrap; }
-    @media (max-width: 32rem) { main { padding: 1rem; } }
+    @media (max-width: 32rem) {
+      main { padding: 1rem; }
+      .controls, .renderer-control, button, select { width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <main id="hasciicam-app" data-runtime-ready="false" data-camera-ready="false" data-successful-frames="0" data-sdl-webgl-ready="false" data-canvas-nonblank="false" data-canvas-changed="false" data-presentation-observed="false" data-presentation-count="0" data-allocation-count="0" data-free-count="0" data-active-render-loops="0" data-max-active-render-loops="0" data-active-streams="0" data-max-active-streams="0" data-shutdown-count="0" data-restart-count="0" data-renderer-backend="none" data-error-kind="none" data-test-complete="false" data-test-passed="false">
+  <main id="hasciicam-app" data-runtime-ready="false" data-camera-ready="false" data-successful-frames="0" data-sdl-webgl-ready="false" data-canvas-nonblank="false" data-canvas-changed="false" data-presentation-observed="false" data-presentation-count="0" data-canvas-draw-count="0" data-allocation-count="0" data-free-count="0" data-active-render-loops="0" data-max-active-render-loops="0" data-active-streams="0" data-max-active-streams="0" data-shutdown-count="0" data-restart-count="0" data-renderer-backend="none" data-error-kind="none" data-test-complete="false" data-test-passed="false">
     <header>
       <h1>HasciiCam camera</h1>
       <p>Your camera stays in this browser tab. Frames are rendered locally into the canvas below.</p>
     </header>
     <div class="controls" aria-label="Camera controls">
+      <div class="renderer-control">
+        <label for="renderer">Rendering system</label>
+        <select id="renderer">
+          <option value="canvas2d" selected>Canvas 2D (recommended)</option>
+          <option value="auto">Automatic fallback</option>
+          <option value="accelerated">SDL / WebGL</option>
+          <option value="software">SDL software</option>
+        </select>
+      </div>
       <button id="start" type="button" disabled>Start camera</button>
       <button id="stop" class="secondary" type="button" disabled>Stop camera</button>
     </div>

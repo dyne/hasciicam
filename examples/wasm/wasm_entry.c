@@ -8,8 +8,14 @@ static const char *g_last_text = NULL;
 static int g_last_width = 0;
 static int g_last_height = 0;
 
+enum hasciicam_wasm_renderer {
+    HASCIICAM_WASM_RENDERER_SDL_ACCELERATED = 0,
+    HASCIICAM_WASM_RENDERER_SDL_SOFTWARE = 1,
+    HASCIICAM_WASM_RENDERER_CANVAS_2D = 2
+};
+
 int hasciicam_wasm_init(int camera_width, int camera_height, int ascii_width, int ascii_height,
-                        int software_renderer) {
+                        int renderer) {
     if (g_instance != NULL) {
         hasciicam_destroy(g_instance);
         g_instance = NULL;
@@ -18,7 +24,11 @@ int hasciicam_wasm_init(int camera_width, int camera_height, int ascii_width, in
     if (g_instance == NULL) {
         return 0;
     }
-    if (software_renderer) {
+    if (renderer == HASCIICAM_WASM_RENDERER_CANVAS_2D) {
+        return hasciicam_start_external(g_instance, camera_width, camera_height,
+                                        ascii_width, ascii_height);
+    }
+    if (renderer == HASCIICAM_WASM_RENDERER_SDL_SOFTWARE) {
         setenv("HASCIICAM_SDL_RENDERER", "software", 1);
         setenv("HASCIICAM_SDL_VSYNC", "off", 1);
     } else {
