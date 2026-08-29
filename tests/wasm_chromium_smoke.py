@@ -155,10 +155,18 @@ def main():
     chromium = Path(args.chromium)
     if not chromium.is_file() or not os.access(chromium, os.X_OK):
         raise RuntimeError(f"Chromium executable is unavailable: {chromium}")
-    if not (args.root / "index.html").is_file():
+    index_path = args.root / "index.html"
+    if not index_path.is_file():
         raise RuntimeError(f"WASM sample assets are unavailable: {args.root}")
-    if 'id="renderer"' in (args.root / "index.html").read_text(encoding="utf-8"):
+    index_html = index_path.read_text(encoding="utf-8")
+    if 'id="renderer"' in index_html:
         raise RuntimeError("WASM sample still exposes a renderer selector")
+    for fragment in ('class="site-brand"', 'class="dyne-footer"'):
+        if fragment not in index_html:
+            raise RuntimeError(f"WASM sample is missing website shell markup: {fragment}")
+    for asset_name in ("dyne-mark.svg", "dyne-logotype.svg"):
+        if not (args.root / asset_name).is_file():
+            raise RuntimeError(f"WASM sample is missing website asset: {asset_name}")
 
     args.artifacts.mkdir(parents=True, exist_ok=True)
     run_scenario(chromium, args.root, args.artifacts, "lifecycle")

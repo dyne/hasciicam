@@ -17,6 +17,8 @@ if(EMSCRIPTEN)
   set(HASCIICAM_WASM_ASSET_OUTPUTS
     "${CMAKE_CURRENT_BINARY_DIR}/index.html"
     "${CMAKE_CURRENT_BINARY_DIR}/main.js"
+    "${CMAKE_CURRENT_BINARY_DIR}/dyne-mark.svg"
+    "${CMAKE_CURRENT_BINARY_DIR}/dyne-logotype.svg"
   )
   add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/index.html"
@@ -32,6 +34,21 @@ if(EMSCRIPTEN)
       "${CMAKE_CURRENT_SOURCE_DIR}/main.js"
       "${CMAKE_CURRENT_BINARY_DIR}/main.js"
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/main.js"
+    VERBATIM
+  )
+  add_custom_command(
+    OUTPUT
+      "${CMAKE_CURRENT_BINARY_DIR}/dyne-mark.svg"
+      "${CMAKE_CURRENT_BINARY_DIR}/dyne-logotype.svg"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../docs/public/dyne-mark.svg"
+      "${CMAKE_CURRENT_BINARY_DIR}/dyne-mark.svg"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../docs/public/dyne-logotype.svg"
+      "${CMAKE_CURRENT_BINARY_DIR}/dyne-logotype.svg"
+    DEPENDS
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../docs/public/dyne-mark.svg"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../docs/public/dyne-logotype.svg"
     VERBATIM
   )
   add_custom_target(hasciicam_wasm_assets DEPENDS ${HASCIICAM_WASM_ASSET_OUTPUTS})
