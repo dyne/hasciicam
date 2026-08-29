@@ -1,12 +1,21 @@
-# WASM SDL2 browser camera sample
+# WASM browser camera sample
 
-This sample renders live camera luminance as ASCII in SDL2's visible
-`<canvas id="canvas">`. JavaScript owns the one `requestAnimationFrame` loop:
-it transfers RGBA pixels from a hidden source canvas to the shared C core, then
-returns to the browser after each SDL presentation. SDL's `SDL_Window *` maps
-to `#canvas`. It prefers SDL's GLES2/WebGL renderer and automatically retries
-with SDL's software 2D-canvas renderer when WebGL initialization fails. Append
-`?renderer=software` to select the compatibility path explicitly.
+This sample renders live camera luminance as ASCII in a visible browser canvas.
+JavaScript owns the one `requestAnimationFrame` loop and transfers RGBA pixels
+from a hidden source canvas to the shared C core. The default **Canvas 2D** path
+gets AA-lib's rendered character buffer from C and draws it with the browser's
+native 2D canvas API, without asking SDL to create a window or rendering
+context.
+
+The **Rendering system** menu also exposes all available paths explicitly:
+
+- **Canvas 2D (recommended)**: native browser drawing; no SDL canvas setup.
+- **Automatic fallback**: SDL/WebGL, then SDL software, then native Canvas 2D.
+- **SDL / WebGL**: SDL's accelerated GLES2/WebGL renderer only.
+- **SDL software**: SDL's browser 2D-canvas renderer only.
+
+The selection can also be set with
+`?renderer=canvas2d|auto|accelerated|software`.
 
 ## Build and serve
 
@@ -55,23 +64,26 @@ ctest --output-on-failure --test-dir build/presets/wasm-emscripten -L wasm
 
 The test's localhost-only `?autotest=1` mode clicks through its fake camera
 path and checks runtime readiness, camera transfer, multiple rendered frames,
-SDL/WebGL initialization, and presentation after a callback boundary. It also
-checks stop/restart/page-hide cleanup, steady-state allocation reuse, and the
-permission-denied and missing-media-device error paths. It is not real-camera
-coverage.
+each explicit renderer, SDL-to-native fallback, and presentation after a
+callback boundary. It also checks stop/restart/page-hide cleanup, steady-state
+allocation reuse, and the permission-denied and missing-media-device error
+paths. It is not real-camera coverage.
 
 ## Manual real-camera checklist
 
 - Serve the generated directory from localhost or HTTPS, then use Chrome or
   Firefox with a real camera attached.
 - Start with keyboard focus on **Start camera**; allow the permission request.
-- Verify live ASCII updates on the 640×480 SDL canvas and browser DevTools has
-  no WebGL errors.
+- Start with **Canvas 2D (recommended)** and verify live ASCII updates on the
+  640×480 canvas.
+- Stop the camera, select each other rendering system in turn, and start again.
+  SDL/WebGL may be unavailable on devices that disable hardware acceleration;
+  that should not prevent the native Canvas 2D selection from working.
 - Select **Stop camera**, then close the page; verify the browser's camera-use
   indicator turns off.
 
 If permission is denied, reset the site's camera permission and retry. For a
-blank canvas, confirm WebGL is enabled and inspect the browser log produced by
-the CTest. For cache permission errors, export the build-local `EM_CACHE`
-above. A server must return `.wasm` as `application/wasm`; Python's standard
-library server does so on supported Python installations.
+blank canvas, select **Canvas 2D (recommended)** and inspect the browser log
+produced by the CTest. For cache permission errors, export the build-local
+`EM_CACHE` above. A server must return `.wasm` as `application/wasm`; Python's
+standard library server does so on supported Python installations.

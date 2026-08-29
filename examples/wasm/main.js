@@ -3,12 +3,18 @@
 
   const SOURCE_WIDTH = 320;
   const SOURCE_HEIGHT = 240;
+  const CANVAS_WIDTH = 640;
+  const CANVAS_HEIGHT = 480;
+  const ASCII_WIDTH = 80;
+  const ASCII_HEIGHT = 30;
+  const RENDERER_MODES = { accelerated: 0, software: 1, canvas2d: 2 };
   const app = document.getElementById("hasciicam-app");
   const video = document.getElementById("camera-video");
   const sourceCanvas = document.getElementById("source-canvas");
   let visibleCanvas = document.getElementById("canvas");
   const startButton = document.getElementById("start");
   const stopButton = document.getElementById("stop");
+  const rendererSelect = document.getElementById("renderer");
   const status = document.getElementById("status");
   const sourceContext = sourceCanvas.getContext("2d", { willReadFrequently: true });
   let api = null;
@@ -35,6 +41,7 @@
     canvasChanged: false,
     presentationObserved: false,
     presentationCount: 0,
+    canvasDrawCount: 0,
     allocationCount: 0,
     freeCount: 0,
     activeRenderLoops: 0,
@@ -49,9 +56,14 @@
     testComplete: false,
     testPassed: false
   };
-  const autotestMode = new URLSearchParams(window.location.search).get("autotest") === "1" &&
+  const urlParams = new URLSearchParams(window.location.search);
+  const autotestMode = urlParams.get("autotest") === "1" &&
     ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname);
-  const autotestScenario = new URLSearchParams(window.location.search).get("scenario") || "lifecycle";
+  const autotestScenario = urlParams.get("scenario") || "lifecycle";
+  const rendererOption = urlParams.get("renderer");
+  if (["auto", "canvas2d", "accelerated", "software"].includes(rendererOption)) {
+    rendererSelect.value = rendererOption;
+  }
 
   function updateDiagnostics(changes) {
     Object.assign(diagnostics, changes);
@@ -63,6 +75,7 @@
     app.dataset.canvasChanged = String(diagnostics.canvasChanged);
     app.dataset.presentationObserved = String(diagnostics.presentationObserved);
     app.dataset.presentationCount = String(diagnostics.presentationCount);
+    app.dataset.canvasDrawCount = String(diagnostics.canvasDrawCount);
     app.dataset.allocationCount = String(diagnostics.allocationCount);
     app.dataset.freeCount = String(diagnostics.freeCount);
     app.dataset.activeRenderLoops = String(diagnostics.activeRenderLoops);
@@ -86,6 +99,7 @@
   function setControls() {
     startButton.disabled = !diagnostics.runtimeReady || running || starting;
     stopButton.disabled = !running && !starting;
+    rendererSelect.disabled = running || starting;
   }
 
   function stopTracks() {
@@ -161,13 +175,57 @@
       maxActiveRenderLoops: Math.max(diagnostics.maxActiveRenderLoops, 1) });
   }
 
+  function replaceVisibleCanvas() {
+    const replacement = visibleCanvas.cloneNode(false);
+    replacement.width = CANVAS_WIDTH;
+    replacement.height = CANVAS_HEIGHT;
+    visibleCanvas.replaceWith(replacement);
+    visibleCanvas = replacement;
+    window.Module.canvas = visibleCanvas;
+  }
+
+  function getRendererContext(backend) {
+    return backend === "accelerated" ?
+      visibleCanvas.getContext("webgl") : visibleCanvas.getContext("2d");
+  }
+
+  function rendererContextIsUsable(backend, context) {
+    return Boolean(context && (backend !== "accelerated" || !context.isContextLost()));
+  }
+
+  function drawCanvas2dFrame() {
+    const textPtr = api.asciiText();
+    const width = api.asciiWidth();
+    const height = api.asciiHeight();
+    const context = visibleCanvas.getContext("2d");
+    if (!textPtr || !context || width <= 0 || height <= 0) return false;
+
+    const cellWidth = visibleCanvas.width / width;
+    const cellHeight = visibleCanvas.height / height;
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, visibleCanvas.width, visibleCanvas.height);
+    context.fillStyle = "#f4f7fa";
+    context.font = `${cellHeight}px "Courier New", ui-monospace, monospace`;
+    context.textBaseline = "top";
+    const glyphWidth = context.measureText("M").width || cellWidth;
+    context.save();
+    context.scale(cellWidth / glyphWidth, 1);
+    for (let row = 0; row < height; row += 1) {
+      const start = textPtr + row * width;
+      const line = String.fromCharCode(...window.Module.HEAPU8.subarray(start, start + width));
+      context.fillText(line, 0, row * cellHeight);
+    }
+    context.restore();
+    updateDiagnostics({ canvasDrawCount: diagnostics.canvasDrawCount + 1 });
+    return true;
+  }
+
   function observePresentation() {
     if (!presentationPending || diagnostics.presentationObserved) return;
     presentationPending = false;
-    const context = rendererBackend === "software" ?
-      visibleCanvas.getContext("2d") : visibleCanvas.getContext("webgl");
-    const observed = Boolean(context &&
-      (rendererBackend === "software" || !context.isContextLost()));
+    const context = getRendererContext(rendererBackend);
+    const observed = rendererContextIsUsable(rendererBackend, context) &&
+      (rendererBackend !== "canvas2d" || diagnostics.canvasDrawCount > 0);
     updateDiagnostics({ canvasNonblank: observed, canvasChanged: observed,
                         presentationObserved: observed,
                         presentationCount: diagnostics.presentationCount + (observed ? 1 : 0) });
@@ -219,7 +277,11 @@
       return;
     }
     if (!api.render()) {
-      fatal("The SDL renderer stopped while drawing a frame.", "frame-render");
+      fatal("The renderer stopped while drawing a frame.", "frame-render");
+      return;
+    }
+    if (rendererBackend === "canvas2d" && !drawCanvas2dFrame()) {
+      fatal("Canvas 2D could not draw the ASCII frame.", "canvas-draw");
       return;
     }
     updateDiagnostics({ successfulFrames: diagnostics.successfulFrames + 1 });
@@ -288,40 +350,40 @@
       updateDiagnostics({ cameraReady: true, canvasNonblank: false,
                           canvasChanged: false, presentationObserved: false });
       sessionInitialized = true;
-      const rendererOption = new URLSearchParams(window.location.search).get("renderer");
-      const rendererRequest = rendererOption === "software" || rendererOption === "accelerated" ?
-        rendererOption : "auto";
       const simulateLostContext = autotestMode && rendererOption === "fallback-lost";
-      rendererBackend = rendererRequest === "software" ? "software" : "accelerated";
-      let initialized = api.init(SOURCE_WIDTH, SOURCE_HEIGHT, 80, 30,
-                                 rendererBackend === "software");
-      let rendererContext = initialized ? (rendererBackend === "software" ?
-        visibleCanvas.getContext("2d") : visibleCanvas.getContext("webgl")) : null;
-      let rendererUsable = Boolean(rendererContext &&
-        (rendererBackend === "software" || !rendererContext.isContextLost()));
-      if (simulateLostContext && rendererBackend === "accelerated" && rendererUsable) {
-        const loseContext = rendererContext.getExtension("WEBGL_lose_context");
-        if (loseContext) loseContext.loseContext();
-        rendererUsable = false;
+      const simulateNativeFallback = autotestMode && rendererOption === "fallback-native";
+      const simulateFallback = simulateLostContext || simulateNativeFallback;
+      const rendererRequest = simulateFallback ? "auto" :
+        (["auto", "canvas2d", "accelerated", "software"].includes(rendererOption) ?
+          rendererOption : rendererSelect.value);
+      const attempts = rendererRequest === "auto" ?
+        ["accelerated", "software", "canvas2d"] : [rendererRequest];
+      let initialized = false;
+      let rendererUsable = false;
+      replaceVisibleCanvas();
+      for (let index = 0; index < attempts.length; index += 1) {
+        if (index > 0) {
+          api.shutdown();
+          replaceVisibleCanvas();
+        }
+        rendererBackend = attempts[index];
+        initialized = api.init(SOURCE_WIDTH, SOURCE_HEIGHT, ASCII_WIDTH, ASCII_HEIGHT,
+                               RENDERER_MODES[rendererBackend]);
+        const rendererContext = initialized ? getRendererContext(rendererBackend) : null;
+        rendererUsable = rendererContextIsUsable(rendererBackend, rendererContext);
+        if (simulateLostContext && rendererBackend === "accelerated" && rendererUsable) {
+          const loseContext = rendererContext.getExtension("WEBGL_lose_context");
+          if (loseContext) loseContext.loseContext();
+          rendererUsable = false;
+        }
+        if (simulateNativeFallback && rendererBackend !== "canvas2d") {
+          rendererUsable = false;
+        }
+        if (initialized && rendererUsable) break;
       }
-      if ((!initialized || !rendererUsable) && rendererRequest === "auto") {
-        api.shutdown();
-        const replacement = visibleCanvas.cloneNode(false);
-        visibleCanvas.replaceWith(replacement);
-        visibleCanvas = replacement;
-        window.Module.canvas = visibleCanvas;
-        rendererBackend = "software";
-        initialized = api.init(SOURCE_WIDTH, SOURCE_HEIGHT, 80, 30, 1);
-        rendererContext = initialized ? visibleCanvas.getContext("2d") : null;
-        rendererUsable = Boolean(rendererContext);
-      }
-      if (!initialized) {
+      if (!initialized || !rendererUsable) {
         const detail = diagnostics.rendererMessage ? ` ${diagnostics.rendererMessage}` : "";
-        fatal(`SDL could not initialize the visible canvas.${detail}`, "sdl-init");
-        return;
-      }
-      if (!rendererUsable) {
-        fatal("SDL did not create a usable canvas renderer.", "canvas-init");
+        fatal(`Could not initialize the selected rendering system.${detail}`, "renderer-init");
         return;
       }
       running = true;
@@ -329,9 +391,12 @@
       updateDiagnostics({ sdlWebglReady: rendererBackend === "accelerated",
                           rendererBackend, rendererMessage: "" });
       setControls();
-      setStatus(rendererBackend === "software" ?
-        "Camera is running. Using the software canvas renderer." :
-        "Camera is running. Rendering locally.");
+      const rendererLabels = {
+        accelerated: "SDL / WebGL",
+        software: "SDL software",
+        canvas2d: "native Canvas 2D"
+      };
+      setStatus(`Camera is running with ${rendererLabels[rendererBackend]}.`);
       scheduleFrame();
     } catch (error) {
       if (token !== startToken) return;
@@ -365,6 +430,9 @@
         init: window.Module.cwrap("hasciicam_wasm_init", "number", ["number", "number", "number", "number", "number"]),
         submit: window.Module.cwrap("hasciicam_wasm_submit_rgba", "number", ["number", "number", "number", "number", "number"]),
         render: window.Module.cwrap("hasciicam_wasm_render", "number", []),
+        asciiText: window.Module.cwrap("hasciicam_wasm_ascii_text", "number", []),
+        asciiWidth: window.Module.cwrap("hasciicam_wasm_ascii_width", "number", []),
+        asciiHeight: window.Module.cwrap("hasciicam_wasm_ascii_height", "number", []),
         shutdown: window.Module.cwrap("hasciicam_wasm_shutdown", null, [])
       };
       updateDiagnostics({ runtimeReady: true });

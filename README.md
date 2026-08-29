@@ -60,11 +60,13 @@ and `wasm-emscripten`. Install Ninja first (`brew install ninja`,
 
 ## Browser camera sample
 
-The Emscripten preset builds a live SDL2/WebGL camera sample under
-`examples/wasm`. It must be served from localhost or HTTPS rather than opened
-with `file://`. See [examples/wasm/README.md](examples/wasm/README.md) for the
-exact `/opt/emsdk` and build-local `EM_CACHE` commands, the opt-in Chromium
-CTest smoke, and the separate real-camera checklist.
+The Emscripten preset builds a live browser camera sample under `examples/wasm`.
+Its default native Canvas 2D renderer bypasses SDL canvas initialization; the
+page also exposes SDL/WebGL, SDL software, and automatic fallback modes. It
+must be served from localhost or HTTPS rather than opened with `file://`. See
+[examples/wasm/README.md](examples/wasm/README.md) for the exact `/opt/emsdk`
+and build-local `EM_CACHE` commands, the opt-in Chromium CTest smoke, and the
+separate real-camera checklist.
 
 Common CMake options (all `-D<name>=ON|OFF`):
 

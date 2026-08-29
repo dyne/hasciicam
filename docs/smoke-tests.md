@@ -2,7 +2,7 @@
 
 This file collects short manual checks for supported host paths.
 
-## WASM SDL2 browser camera
+## WASM browser camera
 
 Build with the Emscripten preset and serve the generated sample; do not use
 `file://` for WASM or camera testing:
@@ -16,8 +16,10 @@ cmake --build --preset wasm-emscripten --target hasciicam_wasm_sample
 python3 -m http.server --directory build/presets/wasm-emscripten/examples/wasm 8000
 ```
 
-Open `http://127.0.0.1:8000/`, start a real camera, verify live ASCII on the
-640×480 SDL canvas, then Stop or close the page and confirm camera release.
+Open `http://127.0.0.1:8000/`, select **Canvas 2D (recommended)**, start a real
+camera, and verify live ASCII on the 640×480 canvas. Stop the camera and repeat
+with the automatic, SDL/WebGL, and SDL software selections, then Stop or close
+the page and confirm camera release.
 For deterministic fake-camera coverage, configure with
 `-DHASCIICAM_ENABLE_WASM_BROWSER_TESTS=ON` and
 `-DHASCIICAM_TEST_CHROMIUM="$(command -v chromium)"`, build the sample, then
