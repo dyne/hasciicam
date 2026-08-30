@@ -43,6 +43,7 @@ int main(void) {
     if (!expect_true(state.foreground_rgb == 0xABCDEFu, "foreground parse failed")) return 1;
     if (!expect_true(strcmp(state.font, "vga16") == 0, "font init failed")) return 1;
     if (!expect_true(strcmp(state.active_font, "vga16") == 0, "active font init failed")) return 1;
+    if (!expect_true(strcmp(state.text_frame_path, "hasciicam.txt") == 0, "text frame path init failed")) return 1;
     if (!expect_true(strcmp(state.image_path, "fixtures/source.png") == 0, "image path init failed")) return 1;
     if (!expect_true(state.source_kind == HASCIICAM_GUI_SOURCE_IMAGE &&
                      strcmp(state.source_label, "Image") == 0, "image source init failed")) return 1;
@@ -86,8 +87,13 @@ int main(void) {
     state.load_image_requested = 1;
     state.use_camera_requested = 1;
     state.open_image_dialog_requested = 1;
+    state.save_text_frame_requested = 1;
     if (!expect_true(state.load_image_requested && state.use_camera_requested &&
-                     state.open_image_dialog_requested, "independent source actions failed")) return 1;
+                     state.open_image_dialog_requested && state.save_text_frame_requested,
+                     "independent source/output actions failed")) return 1;
+    strcpy(state.text_frame_path, "custom-frame.txt");
+    if (!expect_true(strcmp(state.text_frame_path, "custom-frame.txt") == 0,
+                     "custom text frame path failed")) return 1;
     memset(state.image_path, 'x', sizeof(state.image_path));
     state.image_path[sizeof(state.image_path) - 1] = '\0';
     hasciicam_gui_state_copy_to_config(&state, &cfg);

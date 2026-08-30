@@ -595,6 +595,12 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME app_session COMMAND test_app_session)
   set_tests_properties(app_session PROPERTIES LABELS "unit;core")
 
+  add_executable(test_output_text_frame tests/test_output_text_frame.c)
+  target_link_libraries(test_output_text_frame PRIVATE hasciicam_core)
+  target_include_directories(test_output_text_frame PRIVATE src/output src/render third_party/aalib)
+  add_test(NAME output_text_frame COMMAND test_output_text_frame)
+  set_tests_properties(output_text_frame PROPERTIES LABELS "unit;core")
+
   if(HASCIICAM_BUILD_CLI)
     add_test(NAME cli_help COMMAND hasciicam -h)
     set_tests_properties(cli_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: hasciicam")

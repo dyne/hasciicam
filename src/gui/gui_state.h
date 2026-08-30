@@ -48,6 +48,7 @@ typedef struct hasciicam_gui_state {
 
     char save_path[260];
     char load_path[260];
+    char text_frame_path[260];
     hasciicam_gui_source_kind source_kind;
     char source_label[64];
     char image_path[512];
@@ -66,6 +67,7 @@ typedef struct hasciicam_gui_state {
     unsigned long long virtual_camera_dropped_frames;
 
     int save_requested;
+    int save_text_frame_requested;
     int load_requested;
     int open_load_dialog_requested;
     int load_image_requested;
