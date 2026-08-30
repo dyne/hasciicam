@@ -53,6 +53,17 @@ rendering options:
  -F --foreground   foreground color (hex)    - default FFFFFF
 ```
 
+## Live text-frame snapshot
+
+In SDL live mode, open the right-click controls and use **Output → Save text
+frame**. The default destination is `hasciicam.txt`; edit the path before
+saving when needed. This is a one-shot export of the next fully rendered grid,
+so current brightness, contrast, gamma, inversion, mirror, and font changes
+are reflected in its characters. The text file has no colors or AA attributes.
+
+This differs from `-m text -o FILE`, which continuously overwrites `FILE` with
+new frames instead of taking a live GUI snapshot.
+
 ## Linux Virtual Camera Output
 
 HasciiCam can write its live SDL ASCII frames into an existing
