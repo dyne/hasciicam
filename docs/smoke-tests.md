@@ -2,6 +2,11 @@
 
 This file collects short manual checks for supported host paths.
 
+## Still-image input
+
+`build/hasciicam --image tests/fixtures/image-red.png -O stdout --frames 1`
+renders a PNG still image without a camera.
+
 ## WASM browser camera
 
 Build with the Emscripten preset and serve the generated sample; do not use

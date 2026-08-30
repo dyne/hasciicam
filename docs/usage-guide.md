@@ -9,6 +9,11 @@ To see a brief list of command line options:
 ./hasciicam -h
 ```
 
+## Still-image input
+
+Use `--image picture.png` or `--image picture.jpg` to repeat a still image as
+the capture source. It works with live, text, and HTML output.
+
 ```
 hasciicam 2.6.0 - (h)ascii 4 the masses! - https://ascii.dyne.org
 (c)2000-2026 RASTASOFT by Jaromil @ Dyne.org

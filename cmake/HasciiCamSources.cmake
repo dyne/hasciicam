@@ -78,6 +78,8 @@ set(HASCIICAM_CAPTURE_SOURCES
     src/capture/capture_backend.c
     src/capture/capture_control.c
     src/capture/capture_external.c
+    src/capture/capture_image.c
+    src/capture/image_decode.c
     src/capture/capture_size.c
     src/capture/capture_synthetic.c
     src/capture/capture_dshow.cpp
