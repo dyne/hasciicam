@@ -170,6 +170,22 @@ Checks:
 - `hasciicam.txt` updates
 - file contains non-empty ASCII frame text
 
+## SDL live text-frame snapshot
+
+Run `./build/hasciicam -d synthetic:// -O SDL`, right-click the live window,
+then use **Output → Save text frame**. The default is `hasciicam.txt`.
+
+Checks:
+
+- the Output controls are distinct from Config Save/Load
+- the status reports the saved destination after the next rendered frame
+- the saved rows match the visible characters, including trailing spaces
+- the file has no color or attribute styling; `-m text -o FILE` remains the continuous export mode
+
+This check requires an interactive SDL display. Headless CI cannot capture the
+overlay screenshots; use the deterministic `output_text_frame` CTest coverage
+there instead.
+
 ## HTML output
 
 ```sh

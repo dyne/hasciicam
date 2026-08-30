@@ -207,6 +207,8 @@ In SDL live mode, the right-click GUI can expose camera controls when the active
 .IP
 The SDL GUI also shows a small pre-AA preview: the grayscale luminance frame after capture conversion/mirroring and immediately before AA-lib consumes it.
 .IP
+The SDL GUI Output section can save the next fully rendered live grid as a one-shot plain-text frame. Its default destination is \fBhasciicam.txt\fP. The snapshot includes rendered characters only; foreground/background colors and AA attributes are not encoded. This differs from \fB-m text -o FILE\fP, which continuously overwrites FILE with new frames.
+.IP
 Linux virtual camera output uses an existing \fBv4l2loopback\fP device. HasciiCam does not load the kernel module, create devices, or change system permissions. A common setup is:
 .br
 \fBsudo modprobe v4l2loopback video_nr=10 card_label="HasciiCam" exclusive_caps=1\fP

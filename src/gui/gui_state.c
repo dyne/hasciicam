@@ -71,6 +71,7 @@ void hasciicam_gui_state_init(hasciicam_gui_state *state, const hasciicam_config
 
     strncpy(state->save_path, "hasciicam.toml", sizeof(state->save_path) - 1);
     strncpy(state->load_path, "hasciicam.toml", sizeof(state->load_path) - 1);
+    strncpy(state->text_frame_path, "hasciicam.txt", sizeof(state->text_frame_path) - 1);
     strncpy(state->image_path, cfg->image, sizeof(state->image_path) - 1);
     hasciicam_gui_state_set_source(state,
                                    cfg->image[0] ? HASCIICAM_GUI_SOURCE_IMAGE : HASCIICAM_GUI_SOURCE_CAMERA,
