@@ -457,6 +457,7 @@ if(HASCIICAM_ENABLE_TESTS)
   add_executable(test_gui_state
     tests/test_gui_state.c
     src/gui/gui_state.c
+    src/gui/gui_file_dialog_fallback.c
   )
   target_include_directories(test_gui_state PRIVATE src/gui src/app src/capture)
   add_test(NAME gui_state COMMAND test_gui_state)
@@ -586,6 +587,13 @@ if(HASCIICAM_ENABLE_TESTS)
   target_compile_definitions(test_capture_image PRIVATE HASCIICAM_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
   add_test(NAME capture_image COMMAND test_capture_image)
   set_tests_properties(capture_image PROPERTIES LABELS "unit;core")
+
+  add_executable(test_app_session tests/test_app_session.c)
+  target_link_libraries(test_app_session PRIVATE hasciicam_core)
+  target_include_directories(test_app_session PRIVATE src/app src/capture)
+  target_compile_definitions(test_app_session PRIVATE HASCIICAM_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  add_test(NAME app_session COMMAND test_app_session)
+  set_tests_properties(app_session PROPERTIES LABELS "unit;core")
 
   if(HASCIICAM_BUILD_CLI)
     add_test(NAME cli_help COMMAND hasciicam -h)
