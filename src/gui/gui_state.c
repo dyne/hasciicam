@@ -71,6 +71,12 @@ void hasciicam_gui_state_init(hasciicam_gui_state *state, const hasciicam_config
 
     strncpy(state->save_path, "hasciicam.toml", sizeof(state->save_path) - 1);
     strncpy(state->load_path, "hasciicam.toml", sizeof(state->load_path) - 1);
+    strncpy(state->image_path, cfg->image, sizeof(state->image_path) - 1);
+    hasciicam_gui_state_set_source(state,
+                                   cfg->image[0] ? HASCIICAM_GUI_SOURCE_IMAGE : HASCIICAM_GUI_SOURCE_CAMERA,
+                                   cfg->image[0] ? "Image" : "Camera",
+                                   NULL,
+                                   0);
 }
 
 void hasciicam_gui_state_copy_to_config(const hasciicam_gui_state *state, hasciicam_config *cfg) {
@@ -87,6 +93,26 @@ void hasciicam_gui_state_copy_to_config(const hasciicam_gui_state *state, hascii
     cfg->font[sizeof(cfg->font) - 1] = '\0';
     hasciicam_gui_format_rgb_hex(state->background_rgb, cfg->background, sizeof(cfg->background));
     hasciicam_gui_format_rgb_hex(state->foreground_rgb, cfg->foreground, sizeof(cfg->foreground));
+}
+
+void hasciicam_gui_state_set_source(hasciicam_gui_state *state,
+                                    hasciicam_gui_source_kind kind,
+                                    const char *label,
+                                    const char *status,
+                                    int status_is_error) {
+    if (state == NULL)
+        return;
+    state->source_kind = kind == HASCIICAM_GUI_SOURCE_IMAGE ? HASCIICAM_GUI_SOURCE_IMAGE
+                                                              : HASCIICAM_GUI_SOURCE_CAMERA;
+    strncpy(state->source_label, label != NULL ? label :
+            (state->source_kind == HASCIICAM_GUI_SOURCE_IMAGE ? "Image" : "Camera"),
+            sizeof(state->source_label) - 1);
+    state->source_label[sizeof(state->source_label) - 1] = '\0';
+    if (status != NULL) {
+        strncpy(state->status_message, status, sizeof(state->status_message) - 1);
+        state->status_message[sizeof(state->status_message) - 1] = '\0';
+        state->status_is_error = status_is_error ? 1 : 0;
+    }
 }
 
 void hasciicam_gui_state_set_capture_info(hasciicam_gui_state *state, const capture_info *info) {

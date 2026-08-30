@@ -7,13 +7,15 @@
 #include <windows.h>
 #include <commdlg.h>
 
-hasciicam_gui_file_dialog_result hasciicam_gui_select_toml_file(char *out_path,
-                                                                size_t out_path_size,
-                                                                char *err,
-                                                                size_t err_size) {
+hasciicam_gui_file_dialog_result hasciicam_gui_select_file(hasciicam_gui_file_dialog_kind kind,
+                                                            char *out_path,
+                                                            size_t out_path_size,
+                                                            char *err,
+                                                            size_t err_size) {
     OPENFILENAMEW ofn;
     WCHAR file_path[MAX_PATH];
-    WCHAR filter[] = L"TOML files\0*.toml\0All files\0*.*\0\0";
+    WCHAR toml_filter[] = L"TOML files\0*.toml\0All files\0*.*\0\0";
+    WCHAR image_filter[] = L"Image files\0*.png;*.jpg;*.jpeg\0PNG files\0*.png\0JPEG files\0*.jpg;*.jpeg\0All files\0*.*\0\0";
     int utf8_len;
 
     if (out_path == NULL || out_path_size == 0) {
@@ -27,7 +29,7 @@ hasciicam_gui_file_dialog_result hasciicam_gui_select_toml_file(char *out_path,
     ofn.lStructSize = sizeof(ofn);
     ofn.lpstrFile = file_path;
     ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrFilter = filter;
+    ofn.lpstrFilter = kind == HASCIICAM_GUI_FILE_DIALOG_IMAGE ? image_filter : toml_filter;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
     if (!GetOpenFileNameW(&ofn)) {
@@ -51,6 +53,14 @@ hasciicam_gui_file_dialog_result hasciicam_gui_select_toml_file(char *out_path,
         return HASCIICAM_GUI_FILE_DIALOG_ERROR;
     }
     return HASCIICAM_GUI_FILE_DIALOG_SELECTED;
+}
+
+hasciicam_gui_file_dialog_result hasciicam_gui_select_toml_file(char *out_path,
+                                                                size_t out_path_size,
+                                                                char *err,
+                                                                size_t err_size) {
+    return hasciicam_gui_select_file(HASCIICAM_GUI_FILE_DIALOG_TOML,
+                                     out_path, out_path_size, err, err_size);
 }
 
 #endif
