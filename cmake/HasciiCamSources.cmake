@@ -68,6 +68,7 @@ set(HASCIICAM_OUTPUT_SOURCES
     src/output/output.c
     src/output/output_file.c
     src/output/output_memory.c
+    src/output/output_text_frame.c
 )
 
 set(HASCIICAM_RENDER_SOURCES

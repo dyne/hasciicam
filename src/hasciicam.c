@@ -57,6 +57,7 @@
 #include "gui/gui_state.h"
 #include "output/output.h"
 #include "output/output_file.h"
+#include "output/output_text_frame.h"
 #include "render/render_session.h"
 #include "render/render_font.h"
 
@@ -680,6 +681,22 @@ main (int argc, char **argv) {
 
     if (mode == HTML && frame_rendered) {
       hasciicam_output_file_publish_html(aatmpfile, aafile);
+    }
+    if (frame_rendered && gui_state.save_text_frame_requested) {
+      hasciicam_ascii_frame text_frame;
+      gui_state.save_text_frame_requested = 0;
+      cfg_err[0] = '\0';
+      if (hasciicam_render_session_get_ascii_frame(&render_session, &text_frame) &&
+          hasciicam_output_text_frame_write(&text_frame, gui_state.text_frame_path,
+                                            cfg_err, sizeof(cfg_err))) {
+        snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                 "text frame saved: %s", gui_state.text_frame_path);
+        gui_state.status_is_error = 0;
+      } else {
+        snprintf(gui_state.status_message, sizeof(gui_state.status_message),
+                 "text frame save failed: %s", cfg_err[0] ? cfg_err : "rendered frame unavailable");
+        gui_state.status_is_error = 1;
+      }
     }
     if (frame_rendered) {
       rendered_frames++;

@@ -115,6 +115,7 @@ HasciiCam can show an optional on-screen control panel in live SDL mode.
 - Live controls: AA brightness/contrast/gamma, invert, mirror, foreground/background colors, AA font
 - Camera controls: device/driver-dependent controls (when backend reports them), e.g. brightness/contrast/gamma/exposure/focus
 - Pre-AA preview: small opaque grayscale preview of the luminance frame right before AA-lib rendering
+- Output action: `Save text frame` writes the next rendered live grid to `hasciicam.txt` by default. It is a one-shot snapshot and stores characters only, not colors or AA attributes.
 - Config actions: `Save` writes TOML, `Load` reads TOML
 
 File chooser behavior:

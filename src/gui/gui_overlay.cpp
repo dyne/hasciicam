@@ -291,6 +291,13 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
         state->background_rgb = float3_to_rgb(bg);
 
     ImGui::Separator();
+    ImGui::Text("Output");
+    ImGui::InputText("Text frame path", state->text_frame_path, IM_ARRAYSIZE(state->text_frame_path));
+    if (ImGui::Button("Save text frame"))
+        state->save_text_frame_requested = 1;
+    ImGui::TextDisabled("Plain text characters only; colors are not saved.");
+
+    ImGui::Separator();
     ImGui::Text("Config");
     ImGui::InputText("Save path", state->save_path, IM_ARRAYSIZE(state->save_path));
     if (ImGui::Button("Save"))
