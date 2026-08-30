@@ -43,6 +43,7 @@ typedef struct hasciicam_config {
     int uid;
     int gid;
     char device[256];
+    char image[512];
     char aafile[256];
     char background[64];
     char foreground[64];

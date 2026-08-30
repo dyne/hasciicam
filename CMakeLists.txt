@@ -570,10 +570,22 @@ if(HASCIICAM_ENABLE_TESTS)
   add_test(NAME pipeline_smoke COMMAND test_pipeline_smoke)
   set_tests_properties(pipeline_smoke PROPERTIES LABELS "unit;core")
 
-  add_executable(test_capture_synthetic tests/test_capture_synthetic.c src/capture/capture_backend.c src/capture/capture_external.c src/capture/capture_synthetic.c)
+  add_executable(test_capture_synthetic tests/test_capture_synthetic.c src/capture/capture_backend.c src/capture/capture_external.c src/capture/capture_synthetic.c src/capture/capture_image.c src/capture/image_decode.c)
   target_include_directories(test_capture_synthetic PRIVATE src/capture)
   add_test(NAME capture_synthetic COMMAND test_capture_synthetic)
   set_tests_properties(capture_synthetic PROPERTIES LABELS "unit;core")
+
+  add_executable(test_image_decode tests/test_image_decode.c src/capture/image_decode.c)
+  target_include_directories(test_image_decode PRIVATE src/capture)
+  target_compile_definitions(test_image_decode PRIVATE HASCIICAM_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  add_test(NAME image_decode COMMAND test_image_decode)
+  set_tests_properties(image_decode PROPERTIES LABELS "unit;core")
+
+  add_executable(test_capture_image tests/test_capture_image.c src/capture/capture_backend.c src/capture/capture_external.c src/capture/capture_synthetic.c src/capture/capture_image.c src/capture/image_decode.c)
+  target_include_directories(test_capture_image PRIVATE src/capture)
+  target_compile_definitions(test_capture_image PRIVATE HASCIICAM_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  add_test(NAME capture_image COMMAND test_capture_image)
+  set_tests_properties(capture_image PROPERTIES LABELS "unit;core")
 
   if(HASCIICAM_BUILD_CLI)
     add_test(NAME cli_help COMMAND hasciicam -h)
@@ -613,6 +625,16 @@ if(HASCIICAM_ENABLE_TESTS)
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake
     )
     set_tests_properties(cli_html PROPERTIES LABELS "cli")
+
+    foreach(_image_mode stdout text html)
+      add_test(NAME cli_image_${_image_mode} COMMAND ${CMAKE_COMMAND}
+        -DHASCIICAM_EXE=$<TARGET_FILE:hasciicam>
+        -DHASCIICAM_MODE=${_image_mode}
+        -DHASCIICAM_IMAGE=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/image-red.png
+        -DHASCIICAM_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-image-${_image_mode}.out
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.cmake)
+      set_tests_properties(cli_image_${_image_mode} PROPERTIES LABELS "cli")
+    endforeach()
 
     add_test(
       NAME cli_render_tuning

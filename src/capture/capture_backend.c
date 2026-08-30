@@ -6,6 +6,7 @@
 #include "capture_dshow.h"
 #endif
 #include "capture_external.h"
+#include "capture_image.h"
 #include "capture_synthetic.h"
 #if defined(HASCIICAM_ENABLE_CAPTURE_MF)
 #include "capture_mf.h"
@@ -73,6 +74,17 @@ int capture_open_default(const capture_request *req,
     if (out_dev == NULL || out_ops == NULL)
         return 0;
     capture_set_last_error(NULL);
+
+    if (req != NULL && req->image_path != NULL && req->image_path[0] != '\0') {
+        const capture_ops *image_ops = capture_image_ops();
+        if (image_ops->open(out_dev, req)) {
+            *out_ops = image_ops;
+            if (!quiet) fprintf(stderr, "Capture backend: %s\n", image_ops->name());
+            return 1;
+        }
+        capture_set_last_error("cannot open image input");
+        return 0;
+    }
 
     if (req != NULL && req->device != NULL &&
         strcmp(req->device, "synthetic://") == 0) {

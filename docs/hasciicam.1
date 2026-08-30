@@ -6,6 +6,7 @@ hasciicam \- (h)ascii for the masses!
 [ \fB-hvq\fR ]
 [ \fB-m \fImode\fR ]
 [ \fB-d \fIdevice\fR ]
+[ \fB--image \fIfile\fR ]
 [ \fB-i \fIinput\fR ]
 [ \fB-o \fIoutput\fR ]
 [ \fB-f \fI:user%pass@host:/dir\fR ]
@@ -19,6 +20,8 @@ grabs frames using \fBVideo4Linux\fP api, renders them into ascii using \fBAA-li
 .SM HTML
 code. It's being used also \fBjpeglib\fP for optionally refresh a small jpeg image, so that it can work also as a simple webcam (or showing both, jpeg and asciivideo).
 .SH OPTIONS
+.IP "--image FILE"
+Use a PNG or JPEG still image as a repeating input source.
 .B
 .IP "-h --help"
 Display a help text and quit.

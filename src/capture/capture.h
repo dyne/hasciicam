@@ -22,6 +22,8 @@ typedef enum capture_pixel_format {
 typedef struct capture_request {
     /* Device selector semantics are backend-specific (path, name matcher, etc). */
     const char *device;
+    /* Optional still-image path. A nonempty value selects the image adapter. */
+    const char *image_path;
     /* Optional source input selector; unsupported values are adapter-defined. */
     int input_channel;
     /* Optional preferred dimensions; adapters may negotiate different values. */
