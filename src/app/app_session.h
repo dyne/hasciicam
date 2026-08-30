@@ -15,6 +15,8 @@ typedef struct hasciicam_session {
 } hasciicam_session;
 
 int hasciicam_session_start(hasciicam_session *session, const capture_request *req);
+/* Replace the active capture only after a fully started candidate is ready. */
+int hasciicam_session_replace(hasciicam_session *session, const capture_request *req);
 void hasciicam_session_set_mirror(hasciicam_session *session, int mirror_x, int mirror_y);
 int hasciicam_session_step(hasciicam_session *session,
                            int output_width,

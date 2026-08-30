@@ -188,6 +188,18 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
 
     ImGui::Separator();
     ImGui::Text("Capture");
+    ImGui::Text("Input");
+    ImGui::Text("Source: %s", state->source_label[0] ? state->source_label : "Camera");
+    ImGui::InputText("Image path", state->image_path, IM_ARRAYSIZE(state->image_path));
+    if (ImGui::Button("Browse..."))
+        state->open_image_dialog_requested = 1;
+    ImGui::SameLine();
+    if (ImGui::Button("Load image"))
+        state->load_image_requested = 1;
+    ImGui::SameLine();
+    if (ImGui::Button("Use camera"))
+        state->use_camera_requested = 1;
+    ImGui::Separator();
     ImGui::BeginGroup();
     mirror_x = state->mirror_x != 0;
     mirror_y = state->mirror_y != 0;
@@ -221,7 +233,7 @@ void hasciicam_gui_overlay_draw(hasciicam_gui_state *state) {
         ImGui::SameLine();
         ImGui::TextDisabled("No preview yet");
     }
-    if (state->capture_control_count > 0) {
+    if (state->source_kind == HASCIICAM_GUI_SOURCE_CAMERA && state->capture_control_count > 0) {
         ImGui::Separator();
         ImGui::Text("Camera Controls");
         int i;

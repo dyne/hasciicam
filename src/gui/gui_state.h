@@ -6,6 +6,11 @@
 #include "../app/app_config.h"
 #include "../capture/capture.h"
 
+typedef enum hasciicam_gui_source_kind {
+    HASCIICAM_GUI_SOURCE_CAMERA = 0,
+    HASCIICAM_GUI_SOURCE_IMAGE
+} hasciicam_gui_source_kind;
+
 typedef struct hasciicam_gui_state {
     int visible;
 
@@ -43,6 +48,9 @@ typedef struct hasciicam_gui_state {
 
     char save_path[260];
     char load_path[260];
+    hasciicam_gui_source_kind source_kind;
+    char source_label[64];
+    char image_path[512];
     char status_message[256];
     int status_is_error;
 
@@ -60,6 +68,9 @@ typedef struct hasciicam_gui_state {
     int save_requested;
     int load_requested;
     int open_load_dialog_requested;
+    int load_image_requested;
+    int use_camera_requested;
+    int open_image_dialog_requested;
 } hasciicam_gui_state;
 
 /**
@@ -76,6 +87,11 @@ void hasciicam_gui_state_copy_to_config(const hasciicam_gui_state *state, hascii
  * Set capture info fields shown in the GUI panel.
  */
 void hasciicam_gui_state_set_capture_info(hasciicam_gui_state *state, const capture_info *info);
+void hasciicam_gui_state_set_source(hasciicam_gui_state *state,
+                                    hasciicam_gui_source_kind kind,
+                                    const char *label,
+                                    const char *status,
+                                    int status_is_error);
 void hasciicam_gui_state_set_capture_controls(hasciicam_gui_state *state,
                                               const capture_control_desc *controls,
                                               int control_count);
