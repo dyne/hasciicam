@@ -66,6 +66,7 @@ static const struct option long_options[] = {
     {"quiet", no_argument, NULL, 'q'},
     {"mode", required_argument, NULL, 'm'},
     {"device", required_argument, NULL, 'd'},
+    {"image", required_argument, NULL, 1014},
     {"input", required_argument, NULL, 'i'},
     {"size", required_argument, NULL, 's'},
     {"aafile", required_argument, NULL, 'o'},
@@ -96,6 +97,7 @@ static const char *help_text =
     " -q --quiet        be quiet\n"
     " -m --mode         mode: live|html|text      - default live\n"
     " -d --device       video grabbing device     - default /dev/video\n"
+    "    --image FILE   use a PNG or JPEG still image as input\n"
     " -i --input        input channel number      - default 1\n"
     " -s --size         contextual size WxH       - html chars, else window px\n"
     "    --pixel-size   output window size WxH    - preferred final live pixels\n"
@@ -135,6 +137,7 @@ static const config_key_desc config_keys[] = {
     {"quiet", CONFIG_VALUE_BOOL, 1, 1},
     {"mode", CONFIG_VALUE_MODE, 1, 1},
     {"device", CONFIG_VALUE_STRING, 1, 1},
+    {"image", CONFIG_VALUE_STRING, 1, 1},
     {"input", CONFIG_VALUE_INT, 1, 1},
     {"size", CONFIG_VALUE_SIZE, 0, 0},
     {"pixel_size", CONFIG_VALUE_PIXEL_SIZE, 1, 1},
@@ -381,6 +384,11 @@ static int set_config_value(hasciicam_config *cfg,
     if (strcmp(key, "device") == 0) {
         strncpy(cfg->device, value, sizeof(cfg->device) - 1);
         cfg->device[sizeof(cfg->device) - 1] = '\0';
+        return 1;
+    }
+    if (strcmp(key, "image") == 0) {
+        strncpy(cfg->image, value, sizeof(cfg->image) - 1);
+        cfg->image[sizeof(cfg->image) - 1] = '\0';
         return 1;
     }
     if (strcmp(key, "input") == 0) {
@@ -654,6 +662,11 @@ static int config_value_as_string(const hasciicam_config *cfg,
         *out_is_quoted = 1;
         return 1;
     }
+    if (strcmp(key, "image") == 0) {
+        snprintf(out, out_size, "%s", cfg->image);
+        *out_is_quoted = 1;
+        return 1;
+    }
     if (strcmp(key, "input") == 0) {
         snprintf(out, out_size, "%d", cfg->input_channel);
         *out_is_quoted = 0;
@@ -843,6 +856,7 @@ void hasciicam_config_init_defaults(hasciicam_config *cfg) {
 
 #if defined(_WIN32)
     cfg->device[0] = '\0';
+    cfg->image[0] = '\0';
     strcpy(cfg->virtual_camera_device, "");
 #else
     {
@@ -1120,6 +1134,13 @@ void hasciicam_config_parse(hasciicam_config *cfg,
             break;
         case 'd':
             if (!set_config_value(cfg, "device", optarg, env_err, sizeof(env_err))) {
+                fprintf(stderr, "!! %s\n", env_err);
+                exit(1);
+            }
+            cfg->image[0] = '\0';
+            break;
+        case 1014:
+            if (!set_config_value(cfg, "image", optarg, env_err, sizeof(env_err))) {
                 fprintf(stderr, "!! %s\n", env_err);
                 exit(1);
             }

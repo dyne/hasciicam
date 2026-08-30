@@ -17,6 +17,9 @@ anybody that has a bttv card. a linux box and a cheap modem line to
 show a live asciivideo feed that can be browsable without any need for
 plugin, java etc. (which was an issue, back in 2001 when it was done).
 
+PNG and JPEG still images can also be used as a repeatable source with
+`--image FILE`; they work in live, text, and HTML modes.
+
 # BUILD FROM SOURCE
 
 Prerequisites:

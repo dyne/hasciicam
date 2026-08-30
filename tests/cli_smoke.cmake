@@ -10,26 +10,30 @@ endif()
 
 set(_stdout_file "${HASCIICAM_OUTPUT}")
 set(_stderr_file "${HASCIICAM_OUTPUT}.err")
+set(_source_args -d synthetic://)
+if(DEFINED HASCIICAM_IMAGE AND NOT HASCIICAM_IMAGE STREQUAL "")
+  set(_source_args --image "${HASCIICAM_IMAGE}")
+endif()
 
 file(REMOVE "${_stdout_file}" "${_stderr_file}")
 
 if(HASCIICAM_MODE STREQUAL "stdout")
   execute_process(
-    COMMAND "${HASCIICAM_EXE}" -d synthetic:// --frames 2 -O stdout
+    COMMAND "${HASCIICAM_EXE}" ${_source_args} --frames 1 -O stdout
     RESULT_VARIABLE _rc
     OUTPUT_FILE "${_stdout_file}"
     ERROR_FILE "${_stderr_file}"
   )
 elseif(HASCIICAM_MODE STREQUAL "text")
   execute_process(
-    COMMAND "${HASCIICAM_EXE}" -d synthetic:// --frames 2 -m text -o "${_stdout_file}"
+    COMMAND "${HASCIICAM_EXE}" ${_source_args} --frames 1 -m text -o "${_stdout_file}"
     RESULT_VARIABLE _rc
     OUTPUT_VARIABLE _out
     ERROR_FILE "${_stderr_file}"
   )
 elseif(HASCIICAM_MODE STREQUAL "html")
   execute_process(
-    COMMAND "${HASCIICAM_EXE}" -d synthetic:// --frames 2 -m html -o "${_stdout_file}"
+    COMMAND "${HASCIICAM_EXE}" ${_source_args} --frames 1 -m html -o "${_stdout_file}"
     RESULT_VARIABLE _rc
     OUTPUT_VARIABLE _out
     ERROR_FILE "${_stderr_file}"
