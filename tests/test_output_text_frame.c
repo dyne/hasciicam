@@ -1,7 +1,18 @@
 #include <stdio.h>
 #include <string.h>
+#if defined(_WIN32)
+#include <direct.h>
+#include <io.h>
+#define test_mkdir(path) _mkdir(path)
+#define test_rmdir(path) _rmdir(path)
+#define test_path_exists(path) (_access((path), 0) == 0)
+#else
 #include <sys/stat.h>
 #include <unistd.h>
+#define test_mkdir(path) mkdir((path), 0700)
+#define test_rmdir(path) rmdir(path)
+#define test_path_exists(path) (access((path), F_OK) == 0)
+#endif
 
 #include "../src/output/output.h"
 #include "../src/output/output_text_frame.h"
@@ -64,11 +75,11 @@ int main(void) {
     frame.height = 2;
     remove("test_output_text_frame_dir.tmp");
     remove("test_output_text_frame_dir");
-    if (!expect(mkdir("test_output_text_frame_dir", 0700) == 0, "cannot create test directory")) return 1;
+    if (!expect(test_mkdir("test_output_text_frame_dir") == 0, "cannot create test directory")) return 1;
     if (!expect(!hasciicam_output_text_frame_write(&frame, "test_output_text_frame_dir", error, sizeof(error)),
                 "directory destination accepted") ||
-        !expect(access("test_output_text_frame_dir.tmp", F_OK) != 0, "temporary file was not cleaned")) return 1;
-    rmdir("test_output_text_frame_dir");
+        !expect(!test_path_exists("test_output_text_frame_dir.tmp"), "temporary file was not cleaned")) return 1;
+    test_rmdir("test_output_text_frame_dir");
 
     for (i = 0; i < (int)sizeof(pixels); ++i)
         pixels[i] = (char)((i * 17) & 0xff);
