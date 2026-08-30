@@ -268,6 +268,7 @@ main (int argc, char **argv) {
 
   memset(&cap_req, 0, sizeof(cap_req));
   cap_req.device = device;
+  cap_req.image_path = appcfg.image;
   cap_req.input_channel = inputch;
   if (size_plan.requested_capture_width > 0 && size_plan.requested_capture_height > 0) {
     cap_req.requested_width = size_plan.requested_capture_width;
