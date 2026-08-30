@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "../src/gui/gui_state.h"
+#include "../src/gui/gui_file_dialog.h"
 
 static int expect_true(int condition, const char *message) {
     if (!condition) {
@@ -29,6 +30,7 @@ int main(void) {
     cfg.mirror_x = 1;
     cfg.mirror_y = 0;
     strcpy(cfg.font, "vga16");
+    strcpy(cfg.image, "fixtures/source.png");
 
     hasciicam_gui_state_init(&state, &cfg);
     if (!expect_true(state.aa_bright == 77, "bright init failed")) return 1;
@@ -41,6 +43,9 @@ int main(void) {
     if (!expect_true(state.foreground_rgb == 0xABCDEFu, "foreground parse failed")) return 1;
     if (!expect_true(strcmp(state.font, "vga16") == 0, "font init failed")) return 1;
     if (!expect_true(strcmp(state.active_font, "vga16") == 0, "active font init failed")) return 1;
+    if (!expect_true(strcmp(state.image_path, "fixtures/source.png") == 0, "image path init failed")) return 1;
+    if (!expect_true(state.source_kind == HASCIICAM_GUI_SOURCE_IMAGE &&
+                     strcmp(state.source_label, "Image") == 0, "image source init failed")) return 1;
 
     if (!expect_true(hasciicam_gui_parse_rgb_hex("00ff11", &rgb) == 1, "rgb parse lower failed")) return 1;
     if (!expect_true(rgb == 0x00FF11u, "rgb parse value failed")) return 1;
@@ -59,6 +64,7 @@ int main(void) {
     state.background_rgb = 0x0000FFu;
     state.foreground_rgb = 0xFF0000u;
     strcpy(state.font, "vga8");
+    strcpy(state.image_path, "replacement.jpg");
     hasciicam_gui_state_copy_to_config(&state, &cfg);
 
     if (!expect_true(cfg.aa_bright == 66, "bright copy failed")) return 1;
@@ -70,6 +76,37 @@ int main(void) {
     if (!expect_true(strcmp(cfg.background, "0000FF") == 0, "background copy failed")) return 1;
     if (!expect_true(strcmp(cfg.foreground, "FF0000") == 0, "foreground copy failed")) return 1;
     if (!expect_true(strcmp(cfg.font, "vga8") == 0, "font copy failed")) return 1;
+    if (!expect_true(strcmp(cfg.image, "fixtures/source.png") == 0, "image source copy changed unexpectedly")) return 1;
+
+    hasciicam_gui_state_set_source(&state, HASCIICAM_GUI_SOURCE_CAMERA, "Camera", "camera ready", 0);
+    if (!expect_true(state.source_kind == HASCIICAM_GUI_SOURCE_CAMERA &&
+                     strcmp(state.source_label, "Camera") == 0 &&
+                     strcmp(state.status_message, "camera ready") == 0 && !state.status_is_error,
+                     "camera source metadata failed")) return 1;
+    state.load_image_requested = 1;
+    state.use_camera_requested = 1;
+    state.open_image_dialog_requested = 1;
+    if (!expect_true(state.load_image_requested && state.use_camera_requested &&
+                     state.open_image_dialog_requested, "independent source actions failed")) return 1;
+    memset(state.image_path, 'x', sizeof(state.image_path));
+    state.image_path[sizeof(state.image_path) - 1] = '\0';
+    hasciicam_gui_state_copy_to_config(&state, &cfg);
+    if (!expect_true(strcmp(cfg.image, "fixtures/source.png") == 0,
+                     "image path should not change source config")) return 1;
+    memset(cfg.image, 'x', sizeof(cfg.image));
+    cfg.image[sizeof(cfg.image) - 1] = '\0';
+    hasciicam_gui_state_init(&state, &cfg);
+    if (!expect_true(state.image_path[sizeof(state.image_path) - 1] == '\0',
+                     "image path init termination failed")) return 1;
+    strcpy(cfg.image, "after-reinit.png");
+    hasciicam_gui_state_init(&state, &cfg);
+    if (!expect_true(strcmp(state.image_path, "after-reinit.png") == 0 &&
+                     state.source_kind == HASCIICAM_GUI_SOURCE_IMAGE, "reinit image preservation failed")) return 1;
+
+    if (!expect_true(hasciicam_gui_select_file(HASCIICAM_GUI_FILE_DIALOG_IMAGE,
+                                               state.image_path, sizeof(state.image_path), NULL, 0) ==
+                     HASCIICAM_GUI_FILE_DIALOG_NOT_AVAILABLE,
+                     "fallback image dialog failed")) return 1;
 
     memset(controls, 0, sizeof(controls));
     controls[0].id = CAPTURE_CONTROL_BRIGHTNESS;

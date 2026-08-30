@@ -28,6 +28,20 @@ int hasciicam_session_start(hasciicam_session *session, const capture_request *r
     return 1;
 }
 
+int hasciicam_session_replace(hasciicam_session *session, const capture_request *req) {
+    hasciicam_session candidate;
+
+    if (session == NULL || req == NULL)
+        return 0;
+    memset(&candidate, 0, sizeof(candidate));
+    if (!hasciicam_session_start(&candidate, req))
+        return 0;
+    hasciicam_session_set_mirror(&candidate, session->mirror_x, session->mirror_y);
+    hasciicam_session_stop(session);
+    *session = candidate;
+    return 1;
+}
+
 void hasciicam_session_set_mirror(hasciicam_session *session, int mirror_x, int mirror_y) {
     if (session == NULL)
         return;

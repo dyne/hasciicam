@@ -148,6 +148,7 @@ int vbytesperline;
 int
 main (int argc, char **argv) {
   capture_request cap_req;
+  capture_request camera_req;
   const capture_info *cap_info = NULL;
   hasciicam_session session;
   hasciicam_render_session render_session;
@@ -266,14 +267,15 @@ main (int argc, char **argv) {
     }
   }
 
-  memset(&cap_req, 0, sizeof(cap_req));
-  cap_req.device = device;
-  cap_req.image_path = appcfg.image;
-  cap_req.input_channel = inputch;
+  memset(&camera_req, 0, sizeof(camera_req));
+  camera_req.device = device;
+  camera_req.input_channel = inputch;
   if (size_plan.requested_capture_width > 0 && size_plan.requested_capture_height > 0) {
-    cap_req.requested_width = size_plan.requested_capture_width;
-    cap_req.requested_height = size_plan.requested_capture_height;
+    camera_req.requested_width = size_plan.requested_capture_width;
+    camera_req.requested_height = size_plan.requested_capture_height;
   }
+  cap_req = camera_req;
+  cap_req.image_path = appcfg.image;
 
   if (!hasciicam_session_start(&session, &cap_req)) {
     fprintf(stderr, "!! cannot open any capture backend: %s\n",
@@ -477,6 +479,63 @@ main (int argc, char **argv) {
       }
     }
 
+    if (gui_state.open_image_dialog_requested) {
+      hasciicam_gui_file_dialog_result dialog_res;
+      char dialog_err[256];
+      dialog_err[0] = '\0';
+      gui_state.open_image_dialog_requested = 0;
+      dialog_res = hasciicam_gui_select_file(HASCIICAM_GUI_FILE_DIALOG_IMAGE,
+                                              gui_state.image_path,
+                                              sizeof(gui_state.image_path),
+                                              dialog_err,
+                                              sizeof(dialog_err));
+      if (dialog_res == HASCIICAM_GUI_FILE_DIALOG_SELECTED) {
+        hasciicam_gui_state_set_source(&gui_state, gui_state.source_kind,
+                                       gui_state.source_label,
+                                       "image selected", 0);
+      } else if (dialog_res == HASCIICAM_GUI_FILE_DIALOG_NOT_AVAILABLE) {
+        hasciicam_gui_state_set_source(&gui_state, gui_state.source_kind,
+                                       gui_state.source_label,
+                                       "Browse is unavailable; enter an image path.", 0);
+      } else if (dialog_res == HASCIICAM_GUI_FILE_DIALOG_ERROR) {
+        hasciicam_gui_state_set_source(&gui_state, gui_state.source_kind,
+                                       gui_state.source_label,
+                                       dialog_err[0] ? dialog_err : "file dialog error", 1);
+      }
+    }
+
+    if (gui_state.load_image_requested || gui_state.use_camera_requested) {
+      capture_request requested = camera_req;
+      int loading_image = gui_state.load_image_requested != 0;
+      gui_state.load_image_requested = 0;
+      gui_state.use_camera_requested = 0;
+      if (loading_image)
+        requested.image_path = gui_state.image_path;
+      if (loading_image && requested.image_path[0] == '\0') {
+        hasciicam_gui_state_set_source(&gui_state, gui_state.source_kind,
+                                       gui_state.source_label, "enter an image path", 1);
+      } else if (!hasciicam_session_replace(&session, &requested)) {
+        hasciicam_gui_state_set_source(&gui_state, gui_state.source_kind,
+                                       gui_state.source_label, capture_last_error(), 1);
+      } else {
+        cap_info = hasciicam_session_capture_info(&session);
+        hasciicam_gui_state_reset_preview(&gui_state);
+        hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
+        control_count = hasciicam_session_list_controls(&session, control_descs, CAPTURE_MAX_CONTROLS);
+        hasciicam_gui_state_set_capture_controls(&gui_state, control_descs, control_count);
+        if (loading_image) {
+          strncpy(appcfg.image, gui_state.image_path, sizeof(appcfg.image) - 1);
+          appcfg.image[sizeof(appcfg.image) - 1] = '\0';
+          hasciicam_gui_state_set_source(&gui_state, HASCIICAM_GUI_SOURCE_IMAGE,
+                                         "Image", "image loaded", 0);
+        } else {
+          appcfg.image[0] = '\0';
+          hasciicam_gui_state_set_source(&gui_state, HASCIICAM_GUI_SOURCE_CAMERA,
+                                         "Camera", "camera active", 0);
+        }
+      }
+    }
+
     if (gui_state.save_requested) {
       gui_state.save_requested = 0;
       hasciicam_gui_state_copy_to_config(&gui_state, &appcfg);
@@ -495,13 +554,31 @@ main (int argc, char **argv) {
     if (gui_state.load_requested) {
       char loaded_path[260];
       char saved_path[260];
+      hasciicam_config loaded_cfg;
+      capture_request loaded_camera_req;
+      capture_request requested;
       gui_state.load_requested = 0;
       strncpy(loaded_path, gui_state.load_path, sizeof(loaded_path) - 1);
       loaded_path[sizeof(loaded_path) - 1] = '\0';
       strncpy(saved_path, gui_state.save_path, sizeof(saved_path) - 1);
       saved_path[sizeof(saved_path) - 1] = '\0';
       cfg_err[0] = '\0';
-      if (hasciicam_config_load_toml(&appcfg, gui_state.load_path, cfg_err, sizeof(cfg_err))) {
+      loaded_cfg = appcfg;
+      if (hasciicam_config_load_toml(&loaded_cfg, gui_state.load_path, cfg_err, sizeof(cfg_err))) {
+        memset(&loaded_camera_req, 0, sizeof(loaded_camera_req));
+        loaded_camera_req.device = loaded_cfg.device;
+        loaded_camera_req.input_channel = loaded_cfg.input_channel;
+        loaded_camera_req.requested_width = camera_req.requested_width;
+        loaded_camera_req.requested_height = camera_req.requested_height;
+        requested = loaded_camera_req;
+        requested.image_path = loaded_cfg.image;
+        if (!hasciicam_session_replace(&session, &requested)) {
+          hasciicam_gui_state_set_source(&gui_state, gui_state.source_kind,
+                                         gui_state.source_label, capture_last_error(), 1);
+          continue;
+        }
+        appcfg = loaded_cfg;
+        camera_req = loaded_camera_req;
         char previous_font[64];
         strncpy(previous_font, gui_state.active_font, sizeof(previous_font) - 1);
         previous_font[sizeof(previous_font) - 1] = '\0';
@@ -511,6 +588,7 @@ main (int argc, char **argv) {
         gui_state.load_path[sizeof(gui_state.load_path) - 1] = '\0';
         strncpy(gui_state.save_path, saved_path, sizeof(gui_state.save_path) - 1);
         gui_state.save_path[sizeof(gui_state.save_path) - 1] = '\0';
+        cap_info = hasciicam_session_capture_info(&session);
         hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
         control_count = hasciicam_session_list_controls(&session, control_descs, CAPTURE_MAX_CONTROLS);
         hasciicam_gui_state_set_capture_controls(&gui_state, control_descs, control_count);
@@ -519,9 +597,10 @@ main (int argc, char **argv) {
           gui_state.font_change_requested = 1;
         strncpy(gui_state.active_font, previous_font, sizeof(gui_state.active_font) - 1);
         gui_state.active_font[sizeof(gui_state.active_font) - 1] = '\0';
-        snprintf(gui_state.status_message, sizeof(gui_state.status_message),
-                 "loaded: %s", loaded_path);
-        gui_state.status_is_error = 0;
+        hasciicam_gui_state_set_source(&gui_state,
+                                       appcfg.image[0] ? HASCIICAM_GUI_SOURCE_IMAGE : HASCIICAM_GUI_SOURCE_CAMERA,
+                                       appcfg.image[0] ? "Image" : "Camera",
+                                       "configuration loaded", 0);
       } else {
         snprintf(gui_state.status_message, sizeof(gui_state.status_message),
                  "load failed: %s", cfg_err[0] ? cfg_err : "unknown error");
