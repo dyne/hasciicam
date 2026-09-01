@@ -103,6 +103,51 @@ static int test_pixel_size_plan_respects_font_height(void) {
            plan_8.requested_capture_height > plan_16.requested_capture_height;
 }
 
+static int test_resolve_ascii_prefers_explicit_plan(void) {
+    hasciicam_size_metrics m;
+    hasciicam_size_plan plan;
+    int aw = 0;
+    int ah = 0;
+    hasciicam_size_metrics_init(&m);
+    memset(&plan, 0, sizeof(plan));
+    plan.preferred_ascii_width = 80;
+    plan.preferred_ascii_height = 30;
+    hasciicam_size_resolve_ascii(&m, &plan, 1, 1280, 520, &aw, &ah);
+    return aw == 80 && ah == 30;
+}
+
+static int test_resolve_ascii_uses_replacement_source(void) {
+    hasciicam_size_metrics m;
+    hasciicam_size_plan plan;
+    int aw = 0;
+    int ah = 0;
+    hasciicam_size_metrics_init(&m);
+    memset(&plan, 0, sizeof(plan));
+    plan.preferred_ascii_width = 80;
+    plan.preferred_ascii_height = 30;
+    hasciicam_size_resolve_ascii(&m, &plan, 0, 800, 1200, &aw, &ah);
+    return aw == 200 && ah == 150;
+}
+
+static int test_fit_ascii_preserves_portrait_aspect(void) {
+    hasciicam_size_metrics m;
+    int aw = 270;
+    int ah = 240;
+    hasciicam_size_metrics_init(&m);
+    hasciicam_size_fit_ascii_to_display(&m, 1920, 1080, &aw, &ah);
+    return aw == 75 && ah == 67 && aw * m.display_pixels_per_char_x <= 1920 &&
+           ah * m.display_pixels_per_char_y <= 1080;
+}
+
+static int test_fit_ascii_leaves_small_grid_unchanged(void) {
+    hasciicam_size_metrics m;
+    int aw = 80;
+    int ah = 30;
+    hasciicam_size_metrics_init(&m);
+    hasciicam_size_fit_ascii_to_display(&m, 1920, 1080, &aw, &ah);
+    return aw == 80 && ah == 30;
+}
+
 int main(void) {
     if (!test_metrics_defaults()) return 1;
     if (!test_pixel_size_plan()) return 1;
@@ -111,6 +156,10 @@ int main(void) {
     if (!test_default_live_size_plan_hd()) return 1;
     if (!test_default_live_size_plan_small_display()) return 1;
     if (!test_pixel_size_plan_respects_font_height()) return 1;
+    if (!test_resolve_ascii_prefers_explicit_plan()) return 1;
+    if (!test_resolve_ascii_uses_replacement_source()) return 1;
+    if (!test_fit_ascii_preserves_portrait_aspect()) return 1;
+    if (!test_fit_ascii_leaves_small_grid_unchanged()) return 1;
     printf("app_size tests passed\n");
     return 0;
 }

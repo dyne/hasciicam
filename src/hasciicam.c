@@ -175,6 +175,7 @@ main (int argc, char **argv) {
   int detected_screen_w = 0;
   int detected_screen_h = 0;
   int auto_live_size_applied = 0;
+  int is_image_source = 0;
   hasciicam_font_desc selected_font;
   char *device;
   char *aafile;
@@ -293,6 +294,8 @@ main (int argc, char **argv) {
 
   vw = cap_info->width;
   vh = cap_info->height;
+  is_image_source = session.capture_ops != NULL &&
+                    strcmp(session.capture_ops->name(), "image") == 0;
   vbytesperline = cap_info->stride_bytes;
   vid_geo.w = vw;
   vid_geo.h = vh;
@@ -300,7 +303,15 @@ main (int argc, char **argv) {
 
   xbytestep = xstep + xstep;
   ybytestep = vbytesperline * (ystep - 1);
-  hasciicam_size_compute_ascii_from_capture(&size_metrics, vw, vh, &aw, &ah);
+  hasciicam_size_resolve_ascii(&size_metrics, &size_plan,
+                               appcfg.explicit_size && is_image_source,
+                               vw, vh, &aw, &ah);
+  if (mode == LIVE && is_image_source &&
+      hasciicam_display_size_detect_primary(&detected_screen_w, &detected_screen_h)) {
+    hasciicam_size_fit_ascii_to_display(&size_metrics,
+                                        detected_screen_w, detected_screen_h,
+                                        &aw, &ah);
+  }
   gw = aw * 2;
   gh = ah * 2;
 
@@ -519,7 +530,18 @@ main (int argc, char **argv) {
         hasciicam_gui_state_set_source(&gui_state, gui_state.source_kind,
                                        gui_state.source_label, capture_last_error(), 1);
       } else {
+        int replacement_aw;
+        int replacement_ah;
+        int display_resize_ok = 1;
         cap_info = hasciicam_session_capture_info(&session);
+        hasciicam_size_resolve_ascii(&size_metrics, &size_plan, appcfg.explicit_size,
+                                     cap_info->width, cap_info->height,
+                                     &replacement_aw, &replacement_ah);
+        if (mode == LIVE && !appcfg.explicit_size &&
+            !hasciicam_sdl_set_grid_size(render_session.context,
+                                         replacement_aw, replacement_ah)) {
+          display_resize_ok = 0;
+        }
         hasciicam_gui_state_reset_preview(&gui_state);
         hasciicam_gui_state_set_capture_info(&gui_state, cap_info);
         control_count = hasciicam_session_list_controls(&session, control_descs, CAPTURE_MAX_CONTROLS);
@@ -528,11 +550,17 @@ main (int argc, char **argv) {
           strncpy(appcfg.image, gui_state.image_path, sizeof(appcfg.image) - 1);
           appcfg.image[sizeof(appcfg.image) - 1] = '\0';
           hasciicam_gui_state_set_source(&gui_state, HASCIICAM_GUI_SOURCE_IMAGE,
-                                         "Image", "image loaded", 0);
+                                         "Image",
+                                         display_resize_ok ? "image loaded" :
+                                                             "image loaded; display resize failed",
+                                         display_resize_ok ? 0 : 1);
         } else {
           appcfg.image[0] = '\0';
           hasciicam_gui_state_set_source(&gui_state, HASCIICAM_GUI_SOURCE_CAMERA,
-                                         "Camera", "camera active", 0);
+                                         "Camera",
+                                         display_resize_ok ? "camera active" :
+                                                             "camera active; display resize failed",
+                                         display_resize_ok ? 0 : 1);
         }
       }
     }

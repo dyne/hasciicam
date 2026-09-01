@@ -18,6 +18,8 @@ int hasciicam_sdl_set_runtime_colors(aa_context *context,
                                      unsigned int background_rgb,
                                      int aa_dimmer);
 int hasciicam_sdl_set_runtime_font(aa_context *context, const char *font_short_name);
+/** Resize the SDL output to a character grid, fitting it to the display. */
+int hasciicam_sdl_set_grid_size(aa_context *context, int width, int height);
 int hasciicam_sdl_set_frame_callback(aa_context *context,
                                      hasciicam_sdl_frame_callback callback,
                                      void *user_data);
