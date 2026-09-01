@@ -30,6 +30,41 @@ static void SDL_apply_runtime_colors(struct sdldriverdata *d,
                                      unsigned int background_rgb,
                                      int aa_dimmer);
 
+static void SDL_fit_grid_to_display(struct sdldriverdata *d, int *width, int *height)
+{
+    SDL_Rect usable_bounds;
+    int max_width;
+    int max_height;
+
+    if (d == NULL || width == NULL || height == NULL ||
+        *width <= 0 || *height <= 0 || d->char_width <= 0 || d->char_height <= 0)
+        return;
+    if (SDL_GetDisplayUsableBounds(0, &usable_bounds) != 0 ||
+        usable_bounds.w <= 0 || usable_bounds.h <= 0)
+        return;
+
+    max_width = usable_bounds.w / d->char_width;
+    max_height = usable_bounds.h / d->char_height;
+    if (max_width < 1)
+        max_width = 1;
+    if (max_height < 1)
+        max_height = 1;
+
+    if (*width > max_width || *height > max_height) {
+        int fitted_width;
+        int fitted_height;
+        if ((long long)*width * max_height > (long long)*height * max_width) {
+            fitted_width = max_width;
+            fitted_height = (int)((long long)*height * fitted_width / *width);
+        } else {
+            fitted_height = max_height;
+            fitted_width = (int)((long long)*width * fitted_height / *height);
+        }
+        *width = fitted_width > 0 ? fitted_width : 1;
+        *height = fitted_height > 0 ? fitted_height : 1;
+    }
+}
+
 static int SDL_env_is(const char *value, const char *expected)
 {
     return value != NULL && expected != NULL && SDL_strcasecmp(value, expected) == 0;
@@ -432,8 +467,8 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     d->char_width = 8;
     d->char_height = d->font->height;
     
-    int win_width = d->width * d->char_width;
-    int win_height = d->height * d->char_height;
+    int win_width;
+    int win_height;
     Uint32 window_flags = SDL_WINDOW_SHOWN;
     SDL_Rect usable_bounds;
 
@@ -441,6 +476,9 @@ static int SDL_init(__AA_CONST struct aa_hardware_params *p, __AA_CONST void *no
     /* Browser CSS scales the fixed AA grid; native windows remain resizable. */
     window_flags |= SDL_WINDOW_RESIZABLE;
 #endif
+
+    win_width = d->width * d->char_width;
+    win_height = d->height * d->char_height;
 
     /* Keep initial window inside primary usable display bounds. */
     if (SDL_GetDisplayUsableBounds(0, &usable_bounds) == 0 &&
@@ -989,6 +1027,32 @@ int hasciicam_sdl_set_runtime_font(aa_context *context, const char *font_short_n
     if (d->height < 1)
         d->height = 1;
     aa_resize(context);
+    d->force_clear = 1;
+    return 1;
+}
+
+/** Resize the SDL output to a character grid, fitting it to the display. */
+int hasciicam_sdl_set_grid_size(aa_context *context, int width, int height) {
+    struct sdldriverdata *d;
+    int win_width;
+    int win_height;
+    if (context == NULL || context->driverdata == NULL || width <= 0 || height <= 0)
+        return 0;
+    if (context->driver != &SDL_d)
+        return 0;
+
+    d = (struct sdldriverdata *)context->driverdata;
+    SDL_fit_grid_to_display(d, &width, &height);
+    SDL_SetWindowSize(d->window, width * d->char_width, height * d->char_height);
+    SDL_GetWindowSize(d->window, &win_width, &win_height);
+    d->width = win_width / d->char_width;
+    d->height = win_height / d->char_height;
+    if (d->width < 1)
+        d->width = 1;
+    if (d->height < 1)
+        d->height = 1;
+    if (!aa_resize(context))
+        return 0;
     d->force_clear = 1;
     return 1;
 }

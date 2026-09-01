@@ -137,3 +137,62 @@ void hasciicam_size_compute_ascii_from_capture(const hasciicam_size_metrics *met
     *ascii_width = aw;
     *ascii_height = ah;
 }
+
+/** Resolve a fixed requested grid or derive a grid from the active source. */
+void hasciicam_size_resolve_ascii(const hasciicam_size_metrics *metrics,
+                                  const hasciicam_size_plan *plan,
+                                  int prefer_planned_size,
+                                  int capture_width,
+                                  int capture_height,
+                                  int *ascii_width,
+                                  int *ascii_height) {
+    if (ascii_width == 0 || ascii_height == 0)
+        return;
+    if (prefer_planned_size && plan != 0 &&
+        plan->preferred_ascii_width > 0 && plan->preferred_ascii_height > 0) {
+        *ascii_width = plan->preferred_ascii_width;
+        *ascii_height = plan->preferred_ascii_height;
+        return;
+    }
+    hasciicam_size_compute_ascii_from_capture(metrics, capture_width, capture_height,
+                                              ascii_width, ascii_height);
+}
+
+/** Fit a character grid to display bounds without changing its aspect ratio. */
+void hasciicam_size_fit_ascii_to_display(const hasciicam_size_metrics *metrics,
+                                         int display_width,
+                                         int display_height,
+                                         int *ascii_width,
+                                         int *ascii_height) {
+    int max_width;
+    int max_height;
+    int fitted_width;
+    int fitted_height;
+
+    if (metrics == 0 || ascii_width == 0 || ascii_height == 0 ||
+        display_width <= 0 || display_height <= 0 ||
+        *ascii_width <= 0 || *ascii_height <= 0 ||
+        metrics->display_pixels_per_char_x <= 0 ||
+        metrics->display_pixels_per_char_y <= 0)
+        return;
+
+    max_width = display_width / metrics->display_pixels_per_char_x;
+    max_height = display_height / metrics->display_pixels_per_char_y;
+    if (max_width < 1)
+        max_width = 1;
+    if (max_height < 1)
+        max_height = 1;
+    if (*ascii_width <= max_width && *ascii_height <= max_height)
+        return;
+
+    if ((long long)*ascii_width * max_height >
+        (long long)*ascii_height * max_width) {
+        fitted_width = max_width;
+        fitted_height = (int)((long long)*ascii_height * fitted_width / *ascii_width);
+    } else {
+        fitted_height = max_height;
+        fitted_width = (int)((long long)*ascii_width * fitted_height / *ascii_height);
+    }
+    *ascii_width = fitted_width > 0 ? fitted_width : 1;
+    *ascii_height = fitted_height > 0 ? fitted_height : 1;
+}

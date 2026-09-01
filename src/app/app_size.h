@@ -30,5 +30,19 @@ void hasciicam_size_compute_ascii_from_capture(const hasciicam_size_metrics *met
                                                int capture_height,
                                                int *ascii_width,
                                                int *ascii_height);
+/** Resolve a fixed requested grid or derive a grid from the active source. */
+void hasciicam_size_resolve_ascii(const hasciicam_size_metrics *metrics,
+                                  const hasciicam_size_plan *plan,
+                                  int prefer_planned_size,
+                                  int capture_width,
+                                  int capture_height,
+                                  int *ascii_width,
+                                  int *ascii_height);
+/** Fit a character grid to display bounds without changing its aspect ratio. */
+void hasciicam_size_fit_ascii_to_display(const hasciicam_size_metrics *metrics,
+                                         int display_width,
+                                         int display_height,
+                                         int *ascii_width,
+                                         int *ascii_height);
 
 #endif
